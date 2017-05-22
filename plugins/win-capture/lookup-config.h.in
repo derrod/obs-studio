@@ -1,0 +1,3 @@
+#pragma once
+
+#define COMPAT_UPDATE_URL "@COMPAT_UPDATE_URL@"

@@ -1,0 +1,21 @@
+{
+    "format_version": 1,
+    "compat": [
+		{
+			"executable": "chrome.exe",
+			"class": "",
+			"warning": "Chrome cannot be captured by window capture as long as hardware acceleration is enabled.\nTo disable hardware accel do...",
+			"affects_window_capture": true,
+			"affects_game_capture": false,
+			"match_mode": 1
+		},
+		{
+			"executable": "SystemSettings.exe",
+			"class": "",
+			"warning": "UWP Apps cannot be captured using Window Capture",
+			"affects_window_capture": true,
+			"affects_game_capture": false,
+			"match_mode": 1
+		}
+    ]
+}

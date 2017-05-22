@@ -1,10 +1,18 @@
 #include <windows.h>
 #include <obs-module.h>
+#include <util/dstr.h>
 #include <util/windows/win-version.h>
 #include <util/platform.h>
+#include <file-updater/file-updater.h>
+
+#include "compat-format-version.h"
+#include "lookup-config.h"
 
 OBS_DECLARE_MODULE()
 OBS_MODULE_USE_DEFAULT_LOCALE("win-capture", "en-US")
+
+#define WIN_CAPTURE_LOG_STRING "[win-capture plugin] "
+#define WIN_CAPTURE_VER_STRING "win-capture plugin (libobs " OBS_VERSION ")"
 
 extern struct obs_source_info duplicator_capture_info;
 extern struct obs_source_info monitor_capture_info;
@@ -12,6 +20,7 @@ extern struct obs_source_info window_capture_info;
 extern struct obs_source_info game_capture_info;
 
 static HANDLE init_hooks_thread = NULL;
+static update_info_t *update_info = NULL;
 
 extern bool cached_versions_match(void);
 extern bool load_cached_graphics_offsets(bool is32bit);
@@ -58,17 +67,48 @@ void wait_for_hook_initialization(void)
 	}
 }
 
+static bool confirm_compat_file(void *param, struct file_download_data *file)
+{
+	if (astrcmpi(file->name, "compat.json") == 0) {
+		obs_data_t *data;
+		int format_version;
+
+		data = obs_data_create_from_json((char*)file->buffer.array);
+		if (!data)
+			return false;
+
+		format_version = (int)obs_data_get_int(data, "format_version");
+		obs_data_release(data);
+
+		if (format_version != COMPAT_FORMAT_VERSION)
+			return false;
+	}
+
+	UNUSED_PARAMETER(param);
+	return true;
+}
+
 bool obs_module_load(void)
 {
 	struct win_version_info ver;
 	bool win8_or_above = false;
-	char *config_dir;
 
-	config_dir = obs_module_config_path(NULL);
+	char *local_dir = obs_module_file("");
+	char *config_dir = obs_module_config_path("");
+
 	if (config_dir) {
 		os_mkdirs(config_dir);
-		bfree(config_dir);
+		update_info = update_info_create(
+			WIN_CAPTURE_LOG_STRING,
+			WIN_CAPTURE_VER_STRING,
+			COMPAT_UPDATE_URL,
+			local_dir,
+			config_dir,
+			confirm_compat_file, NULL);
 	}
+
+	bfree(local_dir);
+	bfree(config_dir);
 
 	get_win_ver(&ver);
 
@@ -94,4 +134,5 @@ bool obs_module_load(void)
 void obs_module_unload(void)
 {
 	wait_for_hook_initialization();
+	update_info_destroy(update_info);
 }

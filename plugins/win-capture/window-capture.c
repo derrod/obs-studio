@@ -1,6 +1,8 @@
 #include <stdlib.h>
+#include <jansson.h>
 #include <util/dstr.h>
 #include "dc-capture.h"
+#include "json-helpers.h"
 #include "window-helpers.h"
 
 #define TEXT_WINDOW_CAPTURE obs_module_text("WindowCapture")
@@ -110,22 +112,97 @@ static void wc_defaults(obs_data_t *defaults)
 	obs_data_set_default_bool(defaults, "compatibility", false);
 }
 
+static void properties_data_destroy(void *data)
+{
+	json_t *root = data;
+	if (root)
+		json_decref(root);
+}
+
+static bool window_selected(obs_properties_t *props, obs_property_t *p,
+	obs_data_t *settings)
+{
+	const char *window = obs_data_get_string(settings, "window");
+	json_t       *root = obs_properties_get_param(props);
+
+	json_t *compat;
+	size_t index;
+
+	const char *warning = NULL;
+	const char *compat_class;
+	const char *compat_executable;
+
+	const char *window_class;
+	const char *window_executable;
+	const char *window_title;
+
+	int match_mode;
+	bool class_matches;
+	bool exe_matches;
+
+	build_window_strings(window, &window_class, &window_title, &window_executable);
+
+	if (window_class && window_executable) {
+		json_array_foreach(root, index, compat)
+		{
+			if (!get_bool_val(compat, "affects_window_capture"))
+				continue;
+
+			compat_executable = get_string_val(compat, "executable");
+			compat_class = get_string_val(compat, "class");
+			match_mode = get_int_val(compat, "match_mode");
+
+			exe_matches = strcmp(window_executable, compat_executable) == 0;
+			class_matches = strcmp(window_class, compat_class) == 0;
+
+			if (match_mode == 1 && exe_matches ||
+				match_mode == 2 && class_matches ||
+				match_mode == 3 && exe_matches && class_matches)
+				warning = get_string_val(compat, "warning");
+		}
+	}
+
+	p = obs_properties_get(props, "warning");
+
+	if (warning)
+	{
+		obs_property_set_visible(p, true);
+		obs_data_set_string(settings, "warning", warning);
+	}
+	else
+	{
+		obs_property_set_visible(p, false);
+		obs_data_set_string(settings, "warning", "");
+	}
+	return true;
+}
+
 static obs_properties_t *wc_properties(void *unused)
 {
 	UNUSED_PARAMETER(unused);
 
 	obs_properties_t *ppts = obs_properties_create();
 	obs_property_t *p;
+	json_t         *root;
+
+	root = open_compat_file();
+	if (root)
+		obs_properties_set_param(ppts, root, properties_data_destroy);
 
 	p = obs_properties_add_list(ppts, "window", TEXT_WINDOW,
 			OBS_COMBO_TYPE_LIST, OBS_COMBO_FORMAT_STRING);
 	fill_window_list(p, EXCLUDE_MINIMIZED, NULL);
+
+	obs_property_set_modified_callback(p, window_selected);
 
 	p = obs_properties_add_list(ppts, "priority", TEXT_MATCH_PRIORITY,
 			OBS_COMBO_TYPE_LIST, OBS_COMBO_FORMAT_INT);
 	obs_property_list_add_int(p, TEXT_MATCH_TITLE, WINDOW_PRIORITY_TITLE);
 	obs_property_list_add_int(p, TEXT_MATCH_CLASS, WINDOW_PRIORITY_CLASS);
 	obs_property_list_add_int(p, TEXT_MATCH_EXE,   WINDOW_PRIORITY_EXE);
+
+	// obs_properties_add_bool(ppts, "warning", "TEST");
+	obs_properties_add_text(ppts, "warning", "WARNING", OBS_TEXT_MULTILINE);
 
 	obs_properties_add_bool(ppts, "cursor", TEXT_CAPTURE_CURSOR);
 

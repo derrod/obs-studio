@@ -1,0 +1,10 @@
+{
+	"url": "https://rodney.io/stuff/compat",
+	"version": 2,
+	"files": [
+		{
+			"name": "compat.json",
+			"version": 2
+		}
+	]
+}
