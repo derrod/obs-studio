@@ -20,6 +20,7 @@
 #include <QBuffer>
 #include <QAction>
 #include <QSystemTrayIcon>
+#include <QDialog>
 #include <obs.hpp>
 #include <vector>
 #include <memory>
@@ -43,6 +44,7 @@ class QListWidgetItem;
 class VolControl;
 class QNetworkReply;
 class OBSBasicStats;
+class PerSceneTransition;
 
 #include "ui_OBSBasic.h"
 
@@ -80,6 +82,24 @@ struct QuickTransition {
 		  duration (duration_),
 		  id       (id_)
 	{}
+};
+
+class PerSceneTransition : public QDialog {
+	Q_OBJECT
+
+private:
+	OBSScene scene;
+
+	QComboBox *transition;
+	QSpinBox *trDuration;
+
+public:
+	PerSceneTransition(QWidget *parent, OBSScene scene_);
+	~PerSceneTransition();
+
+public slots:
+	void perSceneTransitionChanged(int index);
+	void perSceneTransitionDurationChanged(int value);
 };
 
 class OBSBasic : public OBSMainWindow {
@@ -134,6 +154,7 @@ private:
 	QPointer<OBSBasicTransform> transformWindow;
 	QPointer<OBSBasicAdvAudio> advAudioWindow;
 	QPointer<OBSBasicFilters> filters;
+	QPointer<PerSceneTransition> perSceneTransition;
 
 	QPointer<QTimer>    cpuUsageTimer;
 	os_cpu_usage_info_t *cpuUsageInfo = nullptr;
@@ -387,6 +408,7 @@ public slots:
 	void SaveProject();
 
 	void SetTransition(OBSSource transition);
+	void SetComboTransition(OBSSource transition);
 	void TransitionToScene(OBSScene scene, bool force = false);
 	void TransitionToScene(OBSSource scene, bool force = false);
 	void SetCurrentScene(OBSSource scene, bool force = false);
@@ -406,6 +428,8 @@ private slots:
 	void DuplicateSelectedScene();
 	void RemoveSelectedScene();
 	void RemoveSelectedSceneItem();
+
+	void PerSceneTransitionDialog();
 
 	void ToggleAlwaysOnTop();
 
@@ -626,7 +650,6 @@ private slots:
 	void on_toggleListboxToolbars_toggled(bool visible);
 	void on_toggleStatusBar_toggled(bool visible);
 
-	void on_transitions_currentIndexChanged(int index);
 	void on_transitionAdd_clicked();
 	void on_transitionRemove_clicked();
 	void on_transitionProps_clicked();
@@ -689,6 +712,5 @@ public:
 	virtual int GetProfilePath(char *path, size_t size, const char *file)
 		const override;
 
-private:
 	std::unique_ptr<Ui::OBSBasic> ui;
 };
