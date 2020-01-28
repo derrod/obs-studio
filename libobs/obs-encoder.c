@@ -966,6 +966,10 @@ bool do_encode(struct obs_encoder *encoder, struct encoder_frame *frame)
 	success = encoder->info.encode(encoder->context.data, frame, &pkt,
 				       &received);
 	profile_end(encoder->profile_encoder_encode_name);
+
+	if (pkt.type == OBS_ENCODER_AUDIO)
+		pkt.keyframe = true;
+
 	send_off_encoder_packet(encoder, success, received, &pkt);
 
 	profile_end(do_encode_name);
