@@ -69,3 +69,7 @@ Credits
  - Icons made by `Freepik <https://www.freepik.com>`_ from
    `Flaticon <https://www.flaticon.com/>`_ are licensed under
    `CC 3.0 BY <https://creativecommons.org/licenses/by/3.0/>`_.
+
+Pointless New Section
+---------------------
+You can ignore this.
