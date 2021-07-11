@@ -69,8 +69,8 @@ static void *gpu_encode_thread(struct obs_core_video_mix *video)
 		for (size_t i = 0; i < encoders.num; i++) {
 			struct encoder_packet pkt = {0};
 			bool received = false;
-			bool success;
 			uint32_t skip = 0;
+			bool success = false;
 
 			obs_encoder_t *encoder = encoders.array[i];
 			struct obs_encoder **paired =
@@ -125,10 +125,24 @@ static void *gpu_encode_thread(struct obs_core_video_mix *video)
 			else
 				next_key++;
 
-			success = encoder->info.encode_texture(
-				encoder->context.data, tf.handle,
-				encoder->cur_pts, lock_key, &next_key, &pkt,
-				&received);
+			if (encoder->info.encode_texture2) {
+				struct encoder_texture tex = {0};
+
+				obs_encoder_get_video_info(encoder, &tex.info);
+				tex.handle = tf.handle;
+				tex.tex[0] = tf.tex;
+				tex.tex[1] = tf.tex_uv;
+				tex.tex[2] = NULL;
+				success = encoder->info.encode_texture2(
+					encoder->context.data, &tex,
+					encoder->cur_pts, lock_key, &next_key,
+					&pkt, &received);
+			} else {
+				success = encoder->info.encode_texture(
+					encoder->context.data, tf.handle,
+					encoder->cur_pts, lock_key, &next_key,
+					&pkt, &received);
+			}
 			send_off_encoder_packet(encoder, success, received,
 						&pkt);
 
