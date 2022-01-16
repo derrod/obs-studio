@@ -2151,6 +2151,18 @@ obs_source_t *obs_sceneitem_get_source(const obs_sceneitem_t *item)
 	return item ? item->source : NULL;
 }
 
+void obs_sceneitem_set_source(obs_sceneitem_t *item, obs_source_t *source)
+{
+	if (!item || !source)
+		return;
+	if (item->source == source)
+		return;
+
+	obs_source_release(item->source);
+	item->source = source;
+	obs_source_addref(source);
+}
+
 static void signal_parent(obs_scene_t *parent, const char *command,
 			  calldata_t *params)
 {

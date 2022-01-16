@@ -5171,6 +5171,22 @@ void OBSBasic::EditSceneItemName()
 	ui->sources->Edit(idx);
 }
 
+void OBSBasic::SwapSceneItem()
+{
+	auto sceneItem = GetCurrentSceneItem();
+	if (!sceneItem)
+		return;
+
+	obs_sceneitem_t *item = sceneItem.Get();
+	uint64_t item_id = obs_sceneitem_get_id(item);
+	OBSBasicSourceSelect swapSourceSelect(this, "swap", undo_s, item_id);
+	swapSourceSelect.exec();
+
+	OBSScene scene = GetCurrentScene();
+	QMetaObject::invokeMethod(this, "RefreshSources",
+				  Q_ARG(OBSScene, scene));
+}
+
 void OBSBasic::SetDeinterlacingMode()
 {
 	QAction *action = reinterpret_cast<QAction *>(sender());
@@ -5455,6 +5471,7 @@ void OBSBasic::CreateSourcePopupMenu(int idx, bool preview)
 				SLOT(EditSceneItemName()));
 		popup.addAction(QTStr("Remove"), this,
 				SLOT(on_actionRemoveSource_triggered()));
+		popup.addAction(QTStr("Swap"), this, SLOT(SwapSceneItem()));
 		popup.addSeparator();
 		popup.addMenu(ui->orderMenu);
 

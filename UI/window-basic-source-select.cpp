@@ -39,7 +39,9 @@ bool OBSBasicSourceSelect::EnumSources(void *data, obs_source_t *source)
 	const char *name = obs_source_get_name(source);
 	const char *id = obs_source_get_unversioned_id(source);
 
-	if (strcmp(id, window->id) == 0)
+	if (window->id && strcmp(id, window->id) == 0)
+		window->ui->sourceList->addItem(QT_UTF8(name));
+	else if (strcmp(id, "scene") != 0 && strcmp(id, "group") != 0)
 		window->ui->sourceList->addItem(QT_UTF8(name));
 
 	return true;
@@ -193,6 +195,28 @@ static void AddExisting(const char *name, bool visible, bool duplicate,
 	}
 }
 
+static void Swap(const char *name, uint64_t item_id)
+{
+
+	OBSBasic *main = reinterpret_cast<OBSBasic *>(App()->GetMainWindow());
+	OBSScene scene = main->GetCurrentScene();
+
+	if (!scene)
+		return;
+
+	obs_sceneitem_t *item = obs_scene_find_sceneitem_by_id(scene, item_id);
+
+	if (!item)
+		return;
+
+	OBSSourceAutoRelease target = obs_get_source_by_name(name);
+
+	if (!target)
+		return;
+
+	obs_sceneitem_set_source(item, target.Get());
+}
+
 bool AddNew(QWidget *parent, const char *id, const char *name,
 	    const bool visible, OBSSource &newSource)
 {
@@ -242,7 +266,7 @@ void OBSBasicSourceSelect::on_buttonBox_accepted()
 	bool useExisting = ui->selectExisting->isChecked();
 	bool visible = ui->sourceVisible->isChecked();
 
-	if (useExisting) {
+	if (useExisting && !item_id) {
 		QListWidgetItem *item = ui->sourceList->currentItem();
 		if (!item)
 			return;
@@ -292,7 +316,7 @@ void OBSBasicSourceSelect::on_buttonBox_accepted()
 
 		undo_s.add_action(QTStr("Undo.Add").arg(source_name), undo,
 				  redo, "", "");
-	} else {
+	} else if (!item_id) {
 		if (ui->sourceName->text().isEmpty()) {
 			OBSMessageBox::warning(this,
 					       QTStr("NoNameEntered.Title"),
@@ -349,6 +373,14 @@ void OBSBasicSourceSelect::on_buttonBox_accepted()
 				  undo, redo,
 				  std::string(obs_source_get_name(newSource)),
 				  std::string(obs_data_get_json(wrapper)));
+	} else {
+		// Swap
+		QListWidgetItem *item = ui->sourceList->currentItem();
+		if (!item)
+			return;
+
+		QString source_name = item->text();
+		Swap(QT_TO_UTF8(source_name), item_id);
 	}
 
 	done(DialogCode::Accepted);
@@ -363,6 +395,8 @@ static inline const char *GetSourceDisplayName(const char *id)
 {
 	if (strcmp(id, "scene") == 0)
 		return Str("Basic.Scene");
+	else if (strcmp(id, "swap") == 0)
+		return Str("Basic.Swap");
 	const char *v_id = obs_get_latest_input_type_id(id);
 	return obs_source_get_display_name(v_id);
 }
@@ -375,11 +409,12 @@ template<typename T> static inline T GetOBSRef(QListWidgetItem *item)
 }
 
 OBSBasicSourceSelect::OBSBasicSourceSelect(OBSBasic *parent, const char *id_,
-					   undo_stack &undo_s)
+					   undo_stack &undo_s, uint64_t item_id)
 	: QDialog(parent),
 	  ui(new Ui::OBSBasicSourceSelect),
 	  id(id_),
-	  undo_s(undo_s)
+	  undo_s(undo_s),
+	  item_id(item_id)
 {
 	setWindowFlags(windowFlags() & ~Qt::WindowContextHelpButtonHint);
 
@@ -388,7 +423,6 @@ OBSBasicSourceSelect::OBSBasicSourceSelect(OBSBasic *parent, const char *id_,
 	ui->sourceList->setAttribute(Qt::WA_MacShowFocusRect, false);
 
 	QString placeHolderText{QT_UTF8(GetSourceDisplayName(id))};
-
 	QString text{placeHolderText};
 	int i = 2;
 	OBSSourceAutoRelease source = nullptr;
@@ -427,6 +461,13 @@ OBSBasicSourceSelect::OBSBasicSourceSelect(OBSBasic *parent, const char *id_,
 	} else if (strcmp(id_, "group") == 0) {
 		obs_enum_sources(EnumGroups, this);
 	} else {
+		if (strcmp(id_, "swap") == 0) {
+			// Disable add existing when swapping a source
+			ui->selectExisting->setChecked(true);
+			ui->createNew->setChecked(false);
+			ui->createNew->setEnabled(false);
+			ui->sourceName->setEnabled(false);
+		}
 		obs_enum_sources(EnumSources, this);
 	}
 }

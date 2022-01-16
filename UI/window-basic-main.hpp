@@ -795,6 +795,7 @@ private:
 	void ResizePreview(uint32_t cx, uint32_t cy);
 
 	void AddSource(const char *id);
+	void SwapSource(const char* item_id);
 	QMenu *CreateAddSourcePopupMenu();
 	void AddSourcePopupMenu(const QPoint &pos);
 	void copyActionsDynamicProperties();
@@ -1089,6 +1090,8 @@ private slots:
 
 	void EditSceneName();
 	void EditSceneItemName();
+
+	void SwapSceneItem();
 
 	void SceneNameEdited(QWidget *editor,
 			     QAbstractItemDelegate::EndEditHint endHint);

@@ -1683,8 +1683,10 @@ EXPORT int obs_sceneitem_get_order_position(obs_sceneitem_t *item);
 /** Gets the scene parent associated with the scene item. */
 EXPORT obs_scene_t *obs_sceneitem_get_scene(const obs_sceneitem_t *item);
 
-/** Gets the source of a scene item. */
+/** Gets/Sets the source of a scene item. */
 EXPORT obs_source_t *obs_sceneitem_get_source(const obs_sceneitem_t *item);
+EXPORT void obs_sceneitem_set_source(obs_sceneitem_t *item,
+				     obs_source_t *source);
 
 /* FIXME: The following functions should be deprecated and replaced with a way
  * to specify saveable private user data. -Jim */
