@@ -2163,6 +2163,10 @@ static int run_program(fstream &logFile, int argc, char *argv[])
 			mb.exec();
 			if (mb.clickedButton() == closeButton)
 				return 0;
+
+			blog(LOG_WARNING,
+			     "The user ignored our warning to not run on ChromeOS,"
+			     "if you're in support chat and reading this, tell them to leave.");
 		}
 #endif
 
