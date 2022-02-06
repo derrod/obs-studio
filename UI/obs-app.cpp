@@ -2140,26 +2140,31 @@ static int run_program(fstream &logFile, int argc, char *argv[])
 		/* --------------------------------------- */
 	run:
 
+		if (!created_log) {
+			create_log_file(logFile);
+			created_log = true;
+		}
+
 #if !defined(_WIN32) && !defined(__APPLE__) && !defined(__FreeBSD__)
 		// Mounted by termina during chromeOS linux container startup
 		// https://chromium.googlesource.com/chromiumos/overlays/board-overlays/+/master/project-termina/chromeos-base/termina-lxd-scripts/files/lxd_setup.sh
 		os_dir_t *crosDir = os_opendir("/opt/google/cros-containers");
 		if (crosDir) {
-			QMessageBox::StandardButtons buttons(QMessageBox::Ok);
 			QMessageBox mb(QMessageBox::Critical,
 				       QTStr("ChromeOS.Title"),
-				       QTStr("ChromeOS.Text"), buttons,
-				       nullptr);
+				       QTStr("ChromeOS.Text"));
+			mb.setTextFormat(Qt::RichText);
+			mb.addButton(QTStr("AlreadyRunning.LaunchAnyway"),
+				     QMessageBox::AcceptRole);
+			QPushButton *closeButton =
+				mb.addButton(QMessageBox::Close);
+			mb.setDefaultButton(closeButton);
 
 			mb.exec();
-			return 0;
+			if (mb.clickedButton() == closeButton)
+				return 0;
 		}
 #endif
-
-		if (!created_log) {
-			create_log_file(logFile);
-			created_log = true;
-		}
 
 #ifdef __APPLE__
 		bool rosettaTranslated = ProcessIsRosettaTranslated();
