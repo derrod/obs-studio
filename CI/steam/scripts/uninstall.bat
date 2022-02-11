@@ -14,6 +14,12 @@ goto checkAdmin
 :clearRegistry
 	reg delete "HKLM\SOFTWARE\WOW6432Node\OBS Studio" /f
 	reg delete "HKLM\SOFTWARE\OBS Studio" /f
+	:: Vulkan layer keys
+	reg delete "HKLM\SOFTWARE\Khronos\Vulkan\ImplicitLayers" /f /v "%PROGRAMDATA%\obs-studio-hook\obs-vulkan64.json"
+	reg delete "HKLM\SOFTWARE\WOW6432Node\Khronos\Vulkan\ImplicitLayers" /f /v "%PROGRAMDATA%\obs-studio-hook\obs-vulkan32.json"
+
+:deleteProgramDataFolder
+	RMDIR /S /Q "%PROGRAMDATA%\obs-studio-hook"
 
 :uninstallDLLs
 	regsvr32.exe /u /s %1\data\obs-plugins\win-dshow\obs-virtualcam-module32.dll
