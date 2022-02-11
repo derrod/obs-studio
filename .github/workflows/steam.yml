@@ -1,0 +1,190 @@
+name: Steam Upload
+
+on:
+  release:
+    types:
+    - published
+  workflow_dispatch:
+  #   inputs:
+  #     tag:
+  #       description: 'Release to upload'
+  #       required: true
+  schedule:
+  - cron: 0 0,12 * * *
+
+env:
+  WORKFLOW_ID: 583765
+  GIT_NIGHTLY_BRANCH: master
+  STEAM_NIGHTLY_BRANCH: nightly
+  STEAM_STABLE_BRANCH: staging
+  STEAM_BETA_BRANCH: beta_staging
+
+jobs:
+  upload:
+    name: Build and Upload
+    runs-on: ubuntu-20.04
+
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v2
+      with:
+        path: source
+
+    - name: Setup 7zip
+      run: |
+        mkdir 7z
+        (
+            cd 7z
+            curl -s https://www.7-zip.org/a/7z2107-linux-x64.tar.xz | tar -xJ
+            echo "$(pwd)" >> $GITHUB_PATH
+        )
+
+    - name: Download and extract release assets
+      if: github.event_name == 'release'
+      run: |
+        DESC=${{ github.event.release.tag_name }}
+        if [ "${{ github.event.release.prerelease }}" = "true" ]; then
+          BRANCH=${{ env.STEAM_BETA_BRANCH }}
+        else
+          BRANCH=${{ env.STEAM_STABLE_BRANCH }}
+        fi
+
+        curl -s "${{ github.event.release.assets_url }}" -o assets.json
+        WIN_ASSET_URL=$(jq -r '.[] | select(.name|test(".*x64.zip")) .browser_download_url' assets.json)
+        MAC_ASSET_URL=$(jq -r '.[] | select(.name|test(".*.dmg")) .browser_download_url' assets.json)
+        wget "${WIN_ASSET_URL}" -O windows.zip
+        wget "${MAC_ASSET_URL}" -O mac.dmg
+
+        mkdir steam
+        (
+          cd steam
+          echo "::group::Extract Win64"
+          mkdir steam-windows
+          (
+            cd steam-windows
+            unzip ../../windows.zip
+          )
+          echo "::endgroup::"
+          
+          echo "::group::Extract macOS"
+
+          echo "Extracting DMG and moving over .app ..."
+          mkdir steam-macos
+
+          # 7zip will have an exit code of 2 due to the 'Applications' symlink
+          # GitHub treats this as a failure and there isn't really any good way to ignore those.
+          7zzs x ../mac.dmg -otmp || true
+
+          mv tmp/*/OBS.app steam-macos
+          echo "::endgroup::"
+        )
+        # set env variables for subsequent steps
+        echo "BRANCH=${BRANCH}" >> $GITHUB_ENV
+        echo "DESC=${DESC}" >> $GITHUB_ENV
+
+    - name: Download and extract nightly build
+      if: github.event_name != 'release'
+      run: |
+        BRANCH=${{ env.STEAM_NIGHTLY_BRANCH }}
+        curl -o builds.json -s "${{ github.api_url }}/repos/${{ github.repository }}/actions/workflows/${{ env.WORKFLOW_ID }}/runs?per_page=1&event=push&status=success&branch=${{ env.GIT_NIGHTLY_BRANCH }}"
+        ARTIFACTS_URL=$(jq -r '.workflow_runs[].artifacts_url' builds.json)
+        DESC="g$(jq -r '.workflow_runs[].head_sha' builds.json | cut -c1-9)"
+
+        curl -s $ARTIFACTS_URL -o artifacts.json
+        WIN_ARTIFACT_URL=$(jq -r '.artifacts[] | select(.name|test(".*win64")) .archive_download_url' artifacts.json)
+        MAC_ARTIFACT_URL=$(jq -r '.artifacts[] | select(.name|test(".*dmg")) .archive_download_url' artifacts.json)
+
+        wget --header="Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" "${WIN_ARTIFACT_URL}" -O windows.zip
+        wget --header="Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" "${MAC_ARTIFACT_URL}" -O mac.dmg.zip
+
+        mkdir steam
+        (
+          cd steam
+          
+          echo "::group::Extract Win64"
+          mkdir steam-windows
+          (
+            cd steam-windows
+            unzip ../../windows.zip
+          )
+          echo "::endgroup::"
+
+          echo "::group::Extract macOS"
+          mkdir steam-macos
+          unzip ../mac.dmg.zip
+          # ignore exit code from 7zip
+          7zzs x *.dmg -otmp || true
+
+          mv tmp/*/OBS.app steam-macos
+          echo "::endgroup::"
+        )
+
+        # set env variables for subsequent steps
+        echo "BRANCH=${BRANCH}" >> $GITHUB_ENV
+        echo "DESC=${DESC}" >> $GITHUB_ENV
+
+    - name: Restore/Check nightly build cache
+      if: github.event_name != 'release'
+      id: nightly-cache
+      uses: actions/cache@v2
+      with:
+        path: ${{ github.workspace }}/steam/build
+        key: ${{ env.BRANCH }}-${{ env.DESC }}
+        # Using "restore-keys" will restore the most recent cache for the branch, even if the exact cache doesn't exist.
+        # This doesn't set cache-hit to true so it won't skip the upload.
+        restore-keys: ${{ env.BRANCH }}-
+
+    - name: Restore release build cache
+      if: github.event_name == 'release'
+      uses: actions/cache@v2
+      with:
+        path: ${{ github.workspace }}/steam/build
+        key: ${{ env.BRANCH }}-${{ env.DESC }}
+        # Normally we should *never* hit the exact cache here but we can use the previous one to speed up builds
+        restore-keys: ${{ env.BRANCH }}-
+
+    - name: Setup steamcmd
+      # If the nightly build has already been uploaded and thus a cache exists skip this and the following steps.
+      # Steam does not prevent us from uploading duplicate builds so this would just pollute the dashboard.
+      # This is a bit of a hack and can fail to work if our cache has been evicted or we somehow have no commits for 7 days,
+      # but it's better than nothing!
+      if: steps.nightly-cache.outputs.cache-hit != 'true'
+      uses: CyberAndrii/setup-steamcmd@v1
+
+    - name: Generate Steam auth code
+      if: steps.nightly-cache.outputs.cache-hit != 'true'
+      id: steam-totp
+      uses: CyberAndrii/steam-totp@v1
+      with:
+        shared_secret: ${{ secrets.STEAM_GUARD_SEED }}
+
+    - name: Upload to Steam
+      if: steps.nightly-cache.outputs.cache-hit != 'true'
+      run: |
+        cd steam
+
+        echo "::group::Prepare Builds"
+        # copy install scripts and sentinel file
+        cp -r ../source/CI/steam/scripts steam-windows/scripts
+        touch steam-windows/disable_updater
+        # macOS only needs the disable_updater file
+        touch steam-macos/OBS.app/Contents/disable_updater
+        echo "::endgroup::"
+
+        echo "::group::Preparing build file"
+        # The description in Steamworks for the build will be "github_<branch>-<tag/short hash>", e.g. "github_nightly-gaa73de952"
+        sed 's/@@DESC@@/${{ env.BRANCH }}-${{ env.DESC }}/;s/@@BRANCH@@/${{ env.BRANCH }}/' ../source/CI/steam/obs_build.vdf > build.vdf
+        echo "Generated file:"
+        cat build.vdf
+        echo "::endgroup::"
+
+        echo "::group::Upload to Steam"
+        steamcmd +login ${{ secrets.STEAM_USER }} ${{ secrets.STEAM_PASSWORD }} ${{ steps.steam-totp.outputs.code }} +run_app_build $(pwd)/build.vdf +quit
+        echo "::endgroup::"
+
+    - name: Upload build logs
+      if: steps.nightly-cache.outputs.cache-hit != 'true'
+      uses: actions/upload-artifact@v2
+      with:
+        name: steam-build-logs
+        path: ${{ github.workspace }}/steam/build/*.log
