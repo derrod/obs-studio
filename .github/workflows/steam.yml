@@ -107,10 +107,12 @@ jobs:
 
         curl -s $ARTIFACTS_URL -o artifacts.json
         WIN_ARTIFACT_URL=$(jq -r '.artifacts[] | select(.name|test(".*win64")) .archive_download_url' artifacts.json)
-        MAC_ARTIFACT_URL=$(jq -r '.artifacts[] | select(.name|test(".*macos-x86_64")) .archive_download_url' artifacts.json)
+        MAC_x86_ARTIFACT_URL=$(jq -r '.artifacts[] | select(.name|test(".*macos-x86_64")) .archive_download_url' artifacts.json)
+        MAC_ARM_ARTIFACT_URL=$(jq -r '.artifacts[] | select(.name|test(".*macos-arm64")) .archive_download_url' artifacts.json)
 
         wget --header="Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" "${WIN_ARTIFACT_URL}" -O windows.zip
-        wget --header="Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" "${MAC_ARTIFACT_URL}" -O mac.dmg.zip
+        wget --header="Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" "${MAC_x86_ARTIFACT_URL}" -O mac_x86.dmg.zip
+        wget --header="Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" "${MAC_ARM_ARTIFACT_URL}" -O mac_arm.dmg.zip
 
         mkdir steam
         (
@@ -126,13 +128,23 @@ jobs:
           )
           echo "::endgroup::"
 
-          echo "::group::Extract macOS"
+          echo "::group::Extract macOS (x86)"
           mkdir steam-macos
-          unzip ../mac.dmg.zip
+          unzip ../mac_x86.dmg.zip
           # ignore exit code from 7zip
           7zzs x *.dmg -otmp || true
-
           mv tmp/*/OBS.app steam-macos
+          rm *.dmg
+          echo "::endgroup::"
+          
+          # ARM (temporary)
+          echo "::group::Extract macOS (x86)"
+          mkdir steam-macos-m1
+          unzip ../mac_arm.dmg.zip
+          7zzs x *.dmg -otmp_arm || true
+          mv tmp_arm/*/OBS.app steam-macos-m1
+          rm *.dmg
+          
           echo "::endgroup::"
         )
 
@@ -146,6 +158,17 @@ jobs:
       uses: actions/cache@v2
       with:
         path: ${{ github.workspace }}/steam/build
+        key: ${{ env.BRANCH }}-${{ env.DESC }}
+        # Using "restore-keys" will restore the most recent cache for the branch, even if the exact cache doesn't exist.
+        # This doesn't set cache-hit to true so it won't skip the upload.
+        restore-keys: ${{ env.BRANCH }}
+
+    - name: Restore/Check m1 nightly build cache
+      if: github.event_name != 'release'
+      id: nightly-m1-cache
+      uses: actions/cache@v2
+      with:
+        path: ${{ github.workspace }}/steam/build_m1
         key: ${{ env.BRANCH }}-${{ env.DESC }}
         # Using "restore-keys" will restore the most recent cache for the branch, even if the exact cache doesn't exist.
         # This doesn't set cache-hit to true so it won't skip the upload.
@@ -165,7 +188,7 @@ jobs:
       # Steam does not prevent us from uploading duplicate builds so this would just pollute the dashboard.
       # This is a bit of a hack and can fail to work if our cache has been evicted or we somehow have no commits for 7 days,
       # but it's better than nothing!
-      if: steps.nightly-cache.outputs.cache-hit != 'true'
+      if: steps.nightly-cache.outputs.cache-hit != 'true' || steps.nightly-m1-cache.outputs.cache-hit != 'true' 
       uses: CyberAndrii/setup-steamcmd@v1
 
     - name: Generate Steam auth code
@@ -206,3 +229,33 @@ jobs:
       with:
         name: steam-build-logs
         path: ${{ github.workspace }}/steam/build/*.log
+
+    - name: Generate Steam auth code (2)
+      if: steps.nightly-m1-cache.outputs.cache-hit != 'true'
+      id: steam-totp-m1
+      uses: CyberAndrii/steam-totp@v1
+      with:
+        shared_secret: ${{ secrets.STEAM_SHARED_SECRET }}
+
+    - name: Upload M1 build to Steam
+      if: steps.nightly-m1-cache.outputs.cache-hit != 'true'
+      run: |
+        cd steam
+
+        echo "::group::Preparing build file"
+        # The description in Steamworks for the build will be "github_<branch>-<tag/short hash>", e.g. "github_nightly-gaa73de952"
+        sed 's/@@DESC@@/${{ env.BRANCH }}-${{ env.DESC }}/;s/@@BRANCH@@/${{ env.BRANCH }}/' ../source/CI/steam/obs_m1_build.vdf > build_m1.vdf
+        echo "Generated file:"
+        cat build_m1.vdf
+        echo "::endgroup::"
+
+        echo "::group::Upload to Steam"
+        steamcmd +login ${{ secrets.STEAM_USER }} ${{ secrets.STEAM_PASSWORD }} ${{ steps.steam-totp-m1.outputs.code }} +run_app_build $(pwd)/build_m1.vdf +quit
+        echo "::endgroup::"
+
+    - name: Upload M1 build logs
+      if: steps.nightly-m1-cache.outputs.cache-hit != 'true'
+      uses: actions/upload-artifact@v2
+      with:
+        name: steam-m1-build-logs
+        path: ${{ github.workspace }}/steam/build_m1/*.log

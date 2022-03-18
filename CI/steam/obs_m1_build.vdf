@@ -1,0 +1,25 @@
+"AppBuild"
+{
+	"AppID" "1905640" // your AppID
+	"Desc" "github_@@DESC@@"
+
+	"ContentRoot" "./"
+	"BuildOutput" "build_m1/"
+    
+	"SetLive" "@@BRANCH@@"
+    // "Preview" "1"
+
+	"Depots"
+	{
+		"1905641" // Mac
+		{
+			"ContentRoot" "./steam-macos-m1"
+			"FileMapping"
+			{
+				"LocalPath" "*"
+				"DepotPath" "."
+				"recursive" "1"
+			}
+		}
+	}
+}
