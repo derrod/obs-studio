@@ -5,12 +5,27 @@ on:
     types:
     - published
   workflow_dispatch:
-  #   inputs:
-  #     tag:
-  #       description: 'Release to upload'
-  #       required: true
+    inputs:
+      tag:
+        description: 'Tag to fetch and upload (nightly if none)'
+        required: false
+      win_url_override:
+        description: 'Windows build to use (.zip only, requires Mac url to be set)'
+        required: false
+      mac_url_override:
+        description: 'Mac build to use (.dmg only, requires Windows url to be set)'
+        required: false
+      steam_branch:
+        description: 'Branch to upload to'
+        type: choice
+        required: true
+        default: 'nightly'
+        options:
+          - nightly
+          - staging
+          - beta_staging
   schedule:
-  - cron: 0 0,12 * * *
+  - cron: 0 0 * * *
 
 env:
   WORKFLOW_ID: 583765
@@ -92,7 +107,7 @@ jobs:
 
         curl -s $ARTIFACTS_URL -o artifacts.json
         WIN_ARTIFACT_URL=$(jq -r '.artifacts[] | select(.name|test(".*win64")) .archive_download_url' artifacts.json)
-        MAC_ARTIFACT_URL=$(jq -r '.artifacts[] | select(.name|test(".*dmg")) .archive_download_url' artifacts.json)
+        MAC_ARTIFACT_URL=$(jq -r '.artifacts[] | select(.name|test(".*macos-x86_64")) .archive_download_url' artifacts.json)
 
         wget --header="Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" "${WIN_ARTIFACT_URL}" -O windows.zip
         wget --header="Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" "${MAC_ARTIFACT_URL}" -O mac.dmg.zip
@@ -106,6 +121,8 @@ jobs:
           (
             cd steam-windows
             unzip ../../windows.zip
+            unzip *.zip
+            rm *.zip
           )
           echo "::endgroup::"
 
