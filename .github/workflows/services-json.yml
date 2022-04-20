@@ -9,6 +9,9 @@ on:
     paths:
       - "plugins/rtmp-services/data/services.json"
       - "plugins/rtmp-services/data/package.json"
+  schedule:
+  - cron: 0 0 1 * *
+  workflow_dispatch:
 
 jobs:
   schema:
@@ -34,3 +37,40 @@ jobs:
           repo-token: "${{ secrets.GITHUB_TOKEN }}"
           title: 'Service JSON Errors'
           input: './validation_errors.json'
+
+  service_check:
+    name: Service Check
+    runs-on: ubuntu-latest
+    needs: schema
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+
+      - name: Install & Configure Python
+        run: |
+          sudo apt install python3.9
+          python3.9 -m pip install requests
+
+      - name: Check Services
+        id: check
+        run: |
+           python3.9 -u CI/check-services.py
+           # if there are unstaged changes, run the PR step
+           if [ -n "$(git status --porcelain=v1 2>/dev/null)" ]; then
+             echo "::set-output name=make_pr::true"
+           else
+             echo "::set-output name=make_pr::false"
+           fi
+
+      - name: Create Pull Request
+        uses: peter-evans/create-pull-request@v4
+        if: steps.check.outputs.make_pr == 'true'
+        with:
+          commit-message: "rtmp-services: Remove defunct servers/services"
+          title: "rtmp-services: Remove defunct servers/services"
+          branch: "automated/clean-services"
+          body: "Automatic PR to remove dead servers"
+          delete-branch: true
