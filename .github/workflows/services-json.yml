@@ -85,5 +85,5 @@ jobs:
           commit-message: "rtmp-services: Remove defunct servers/services"
           title: "rtmp-services: Remove defunct servers/services"
           branch: "automated/clean-services"
-          body: "Automatic PR to remove dead servers"
+          body: "Automatic PR to remove dead servers\nCreated by workflow run: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
           delete-branch: true
