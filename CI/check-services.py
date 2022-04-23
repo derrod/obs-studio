@@ -170,7 +170,7 @@ def main():
         with open(CACHE_FILE, 'w', encoding='utf-8') as cache_file:
             json.dump(fail_timestamps, cache_file)
     except OSError as e:
-        print(f'⚠ Could not write cache file: {e}')
+        print(f'❌ Could not write cache file: {e}')
         return 1
     else:
         print('Successfully wrote cache file:', CACHE_FILE)
@@ -187,7 +187,7 @@ def main():
             with open(PACKAGE_FILE, 'w', encoding='utf-8') as package_file:
                 json.dump(package, package_file, indent=4)
         except OSError as e:
-            print(f'⚠ Could not write services/package file: {e}')
+            print(f'❌ Could not write services/package file: {e}')
             return 1
 
 
