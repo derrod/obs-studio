@@ -12,7 +12,7 @@ from random import randbytes
 from urllib.parse import urlparse
 from collections import defaultdict
 
-MINIMUM_PURGE_AGE = 9.75 * 24 * 60 * 60  # slightly less than 10 days
+MINIMUM_PURGE_AGE = 0 * 24 * 60 * 60  # slightly less than 10 days
 TIMEOUT = 10
 SKIPPED_SERVICES = {'YouNow', 'SHOWROOM', 'Dacast'}
 SERVICES_FILE = 'plugins/rtmp-services/data/services.json'
