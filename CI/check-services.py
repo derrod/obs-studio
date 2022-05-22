@@ -12,7 +12,7 @@ from random import randbytes
 from urllib.parse import urlparse
 from collections import defaultdict
 
-MINIMUM_PURGE_AGE = 0 * 24 * 60 * 60  # slightly less than 10 days
+MINIMUM_PURGE_AGE = 9.75 * 24 * 60 * 60  # slightly less than 10 days
 TIMEOUT = 10
 SKIPPED_SERVICES = {'YouNow', 'SHOWROOM', 'Dacast'}
 SERVICES_FILE = 'plugins/rtmp-services/data/services.json'
@@ -181,14 +181,14 @@ def find_people_to_blame(raw_services: str, servers: list[tuple[str, str]]) -> l
             if user := blame['commit']['author']['user']:
                 line_author[i] = user['login']
 
-    authors = defaultdict(list)
+    authors = defaultdict(set)
     for i, line in enumerate(raw_services.splitlines()):
         if '"url":' not in line:
             continue
         for server, service in servers:
             if server in line and (author := line_author.get(i)):
                 if author not in DO_NOT_PING:
-                    authors[author].append(service)
+                    authors[author].add(service)
 
     return sorted((author, sorted(services)) for author, services in authors.items())
 
@@ -329,7 +329,7 @@ def main():
         msg = PR_MESSAGE.format(
             repository=os.environ['REPOSITORY'],
             run_id=os.environ['WORKFLOW_RUN_ID'],
-            authors='\n'.join(f'- {author} ({services})' for author, services in authors),
+            authors='\n'.join(f'- {author} ({", ".join(services)})' for author, services in authors),
             services='\n'.join(f'- **{name}** ({action})' for name, action in sorted(affected_services.items())),
         )
         print(f'::set-output name=pr_message::{json.dumps(msg)}')
