@@ -22,11 +22,9 @@ CACHE_FILE = 'other/timestamps.json'
 DO_NOT_PING = {'jp9000'}
 PR_MESSAGE = '''This is an automatically created pull request to remove unresponsive servers and services.
 
-**Services affected:**
-{services}
-
-**Authors who have modified the affected services:**
-{authors}
+| Service | Action Taken | Author(s) |
+| ------- | ------------ | --------- |
+{table}
 
 If you are not or no longer responsible for an affected service and want to be excluded from future pings please let us know.
 
@@ -162,9 +160,9 @@ def get_last_artifact():
                 return json.loads(zip_ref.read(info.filename))
 
 
-def find_people_to_blame(raw_services: str, servers: list[tuple[str, str]]) -> list:
+def find_people_to_blame(raw_services: str, servers: list[tuple[str, str]]) -> dict():
     if not servers:
-        return []
+        return dict()
 
     # Fetch Blame data from github
     s = requests.session()
@@ -181,16 +179,16 @@ def find_people_to_blame(raw_services: str, servers: list[tuple[str, str]]) -> l
             if user := blame['commit']['author']['user']:
                 line_author[i] = user['login']
 
-    authors = defaultdict(set)
+    services = defaultdict(set)
     for i, line in enumerate(raw_services.splitlines()):
         if '"url":' not in line:
             continue
         for server, service in servers:
             if server in line and (author := line_author.get(i)):
                 if author not in DO_NOT_PING:
-                    authors[author].add(service)
+                    services[service].add(author)
 
-    return sorted((author, sorted(services)) for author, services in authors.items())
+    return services
 
 
 def main():
@@ -319,18 +317,20 @@ def main():
 
         # try to find authors to ping, this is optional and is allowed to fail
         try:
-            authors = find_people_to_blame(raw_services, removed_servers)
+            service_authors = find_people_to_blame(raw_services, removed_servers)
         except Exception as e:
             print(f'⚠ Could not fetch blame for some reason: {e}')
-            authors = []
+            service_authors = dict()
 
-        # set github outputs
+        # set GitHub outputs
         print(f'::set-output name=make_pr::true')
         msg = PR_MESSAGE.format(
             repository=os.environ['REPOSITORY'],
             run_id=os.environ['WORKFLOW_RUN_ID'],
-            authors='\n'.join(f'- {author} ({", ".join(services)})' for author, services in authors),
-            services='\n'.join(f'- {name} *({action}*)' for name, action in sorted(affected_services.items())),
+            table='\n'.join(
+                f'| {name} | {action} | {", ".join("+" + author for author in sorted(service_authors.get(name, [])))} |'
+                for name, action in sorted(affected_services.items())
+            ),
         )
         print(f'::set-output name=pr_message::{json.dumps(msg)}')
     else:
