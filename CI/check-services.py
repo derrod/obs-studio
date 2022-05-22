@@ -10,6 +10,7 @@ import zipfile
 from io import BytesIO
 from random import randbytes
 from urllib.parse import urlparse
+from collections import defaultdict
 
 MINIMUM_PURGE_AGE = 9.75 * 24 * 60 * 60  # slightly less than 10 days
 TIMEOUT = 10
@@ -19,10 +20,17 @@ PACKAGE_FILE = 'plugins/rtmp-services/data/package.json'
 CACHE_FILE = 'other/timestamps.json'
 
 DO_NOT_PING = {'jp9000'}
-PR_MESSAGE = '''Automatic PR to remove dead servers
-Created by workflow run: https://github.com/{repository}/actions/runs/{run_id}
+PR_MESSAGE = '''This is an automatically created pull request to remove unresponsive servers and services.
 
-Authors who have modified the affected services: {authors}'''
+Services affected:
+{services}
+
+Authors who have modified the affected services:
+{authors}
+
+If you are not or no longer responsible for an affected service and want to be excluded from future pings please let us know.
+
+Created by workflow run: https://github.com/{repository}/actions/runs/{run_id}'''
 
 # GQL is great isn't it
 GQL_QUERY = '''{
@@ -154,7 +162,7 @@ def get_last_artifact():
                 return json.loads(zip_ref.read(info.filename))
 
 
-def find_people_to_blame(raw_services: str, servers: list) -> list:
+def find_people_to_blame(raw_services: str, servers: list[tuple[str, str]]) -> list:
     if not servers:
         return []
 
@@ -173,15 +181,16 @@ def find_people_to_blame(raw_services: str, servers: list) -> list:
             if user := blame['commit']['author']['user']:
                 line_author[i] = user['login']
 
-    authors = set()
+    authors = defaultdict(list)
     for i, line in enumerate(raw_services.splitlines()):
         if '"url":' not in line:
             continue
-        for server in servers:
-            if server in line and (author := line_author.get(i)) is not None:
-                authors.add(author)
+        for server, service in servers:
+            if server in line and (author := line_author.get(i)):
+                if author not in DO_NOT_PING:
+                    authors[author].append(service)
 
-    return sorted(authors ^ DO_NOT_PING)
+    return sorted((author, sorted(services)) for author, services in authors.items())
 
 
 def main():
@@ -214,8 +223,8 @@ def main():
         print('Successfully loaded cache file:', CACHE_FILE)
 
     start_time = int(time.time())
+    affected_services = dict()
     removed_servers = list()
-    removed_something = False
 
     # create temporary new list
     new_services = services.copy()
@@ -253,7 +262,7 @@ def main():
                             f'🗑️ Purging server "{server["url"]}", it has been '
                             f'unresponsive for {round(delta/60/60/24)} days.'
                         )
-                        removed_servers.append(server['url'])
+                        removed_servers.append((server['url'], service['name']))
                         # continuing here means not adding it to the new list, thus dropping it
                         continue
                 else:
@@ -268,11 +277,12 @@ def main():
 
         if (diff := len(service['servers']) - len(new_service['servers'])) > 0:
             print(f'ℹ️ Removed {diff} server(s) from {service["name"]}')
-            removed_something = True
+            affected_services[service['name']] = f'{diff} servers removed'
 
         # remove services with no valid servers
         if not new_service['servers']:
             print(f'💀 Service "{service["name"]}" has no valid servers left, removing!')
+            affected_services[service['name']] = f'Service removed'
             continue
 
         new_services['services'].append(new_service)
@@ -288,7 +298,7 @@ def main():
     else:
         print('Successfully wrote cache file:', CACHE_FILE)
 
-    if removed_something:
+    if removed_servers:
         # increment package version and save that as well
         package['version'] += 1
         package['files'][0]['version'] += 1
@@ -319,7 +329,8 @@ def main():
         msg = PR_MESSAGE.format(
             repository=os.environ['REPOSITORY'],
             run_id=os.environ['WORKFLOW_RUN_ID'],
-            authors=', '.join(f'@{author}' for author in authors),
+            authors='\n'.join(f'- {author} ({services})' for author, services in authors),
+            services='\n'.join(f'- **{name}** ({action})' for name, action in sorted(affected_services.items())),
         )
         print(f'::set-output name=pr_message::{json.dumps(msg)}')
     else:
