@@ -12,7 +12,7 @@ from random import randbytes
 from urllib.parse import urlparse
 from collections import defaultdict
 
-MINIMUM_PURGE_AGE = 9.75 * 24 * 60 * 60  # slightly less than 10 days
+MINIMUM_PURGE_AGE = 0 * 24 * 60 * 60  # slightly less than 10 days
 TIMEOUT = 10
 SKIPPED_SERVICES = {'YouNow', 'SHOWROOM', 'Dacast'}
 SERVICES_FILE = 'plugins/rtmp-services/data/services.json'
@@ -22,10 +22,10 @@ CACHE_FILE = 'other/timestamps.json'
 DO_NOT_PING = {'jp9000'}
 PR_MESSAGE = '''This is an automatically created pull request to remove unresponsive servers and services.
 
-Services affected:
+**Services affected:**
 {services}
 
-Authors who have modified the affected services:
+**Authors who have modified the affected services:**
 {authors}
 
 If you are not or no longer responsible for an affected service and want to be excluded from future pings please let us know.
@@ -330,7 +330,7 @@ def main():
             repository=os.environ['REPOSITORY'],
             run_id=os.environ['WORKFLOW_RUN_ID'],
             authors='\n'.join(f'- {author} ({", ".join(services)})' for author, services in authors),
-            services='\n'.join(f'- **{name}** ({action})' for name, action in sorted(affected_services.items())),
+            services='\n'.join(f'- {name} *({action}*)' for name, action in sorted(affected_services.items())),
         )
         print(f'::set-output name=pr_message::{json.dumps(msg)}')
     else:
