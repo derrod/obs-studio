@@ -170,7 +170,10 @@ def find_people_to_blame(raw_services: str, servers: list) -> list:
     line_author = dict()
     for blame in j['data']['repositoryOwner']['repository']['object']['blame']['ranges']:
         for i in range(blame['startingLine'] - 1, blame['endingLine']):
-            line_author[i] = blame['commit']['author']['user']['login']
+            if user := blame['commit']['author']['user']:
+                line_author[i] = user['login']
+            else:
+                line_author[i] = None
 
     authors = set()
     for i, line in enumerate(raw_services.splitlines()):
