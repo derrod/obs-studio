@@ -70,9 +70,8 @@ jobs:
 
             ASSETS="$(curl -s "${ASSETS_URL}")"
             WIN_ASSET_URL="$(jq -r '.[] | select(.name|test(".*x64.zip")) .browser_download_url' <<< ${ASSETS})"
-            MAC_ASSET_URL="$(jq -r '.[] | select(.name|test(".*arm64.*.dmg")) .browser_download_url' <<< ${ASSETS})"
+            MAC_ASSET_URL="$(jq -r '.[] | select(.name|test(".*.dmg")) .browser_download_url' <<< ${ASSETS})"
             # todo finalise new asset names
-            MAC_ARM_ASSET_URL="$(jq -r '.[] | select(.name|test(".*x86.*.dmg")) .browser_download_url' <<< ${ASSETS})"
             TYPE='release'
         else
             BRANCH='${{ env.STEAM_NIGHTLY_BRANCH }}'
@@ -100,7 +99,7 @@ jobs:
             # todo arm override
         fi
 
-        if [[ -z ${WIN_ASSET_URL} || -z ${MAC_ASSET_URL} || -z ${MAC_ARM_ASSET_URL} ]]; then
+        if [[ -z ${WIN_ASSET_URL} || -z ${MAC_ASSET_URL} ]]; then
             echo "Missing at least one asset URL!"
             exit 1
         fi
@@ -111,7 +110,6 @@ jobs:
         echo "::set-output name=desc::${DESC}"
         echo "::set-output name=win_url::${WIN_ASSET_URL}"
         echo "::set-output name=mac_intel_url::${MAC_ASSET_URL}"
-        echo "::set-output name=mac_arm_url::${MAC_ARM_ASSET_URL}"
 
     - name: Restore build cache
       id: cache
@@ -153,12 +151,6 @@ jobs:
         else
             curl -L '${{ steps.build-info.outputs.mac_intel_url }}' -o mac_x86.dmg
         fi
-
-        if [[ '${{ steps.build-info.outputs.mac_arm_url }}' == *'api.github.com'* ]]; then
-            curl -L -H 'Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}' '${{ steps.build-info.outputs.mac_arm_url }}' -o mac_arm64.dmg.zip
-        else
-            curl -L '${{ steps.build-info.outputs.mac_arm_url }}' -o mac_arm64.dmg
-        fi
         echo "::endgroup::"
 
         mkdir -p steam && cd steam
@@ -192,20 +184,7 @@ jobs:
             7zz x ../mac_x86.dmg -otmp_x86 || true
         fi
         
-        mv tmp_x86/*/OBS.app steam-macos/x86
-        echo "::endgroup::"
-        
-        echo "::group::Extract and prepare macOS (arm64)"
-        mkdir -p steam-macos/arm64
-        if [[ -f ../mac_arm64.dmg.zip ]]; then
-            unzip ../mac_arm64.dmg.zip
-            7zz x *.dmg -otmp_arm64 || true
-            rm *.dmg
-        else
-            7zz x ../mac_arm64.dmg -otmp_arm64 || true
-        fi
-
-        mv tmp_arm64/*/OBS.app steam-macos/arm64
+        mv tmp_x86/*/OBS.app steam-macos
         
         cp ../source/CI/steam/scripts_macos/launch.sh steam-macos/launch.sh
         echo "::endgroup::"
