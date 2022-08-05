@@ -55,6 +55,7 @@
 #include <curl/curl.h>
 
 #ifdef _WIN32
+#include <json11.hpp>
 #include <windows.h>
 #include <filesystem>
 #else
@@ -1251,6 +1252,102 @@ bool OBSApp::InitTheme()
 		return true;
 
 	return SetTheme("System");
+}
+
+#ifdef _WIN32
+void ParseBranchesJson(vector<UpdateBranch> &out, const std::string &jsonString,
+		       std::string &error)
+{
+	json11::Json root;
+	root = json11::Json::parse(jsonString, error);
+	if (!error.empty() || !root.is_array())
+		return;
+
+	for (const json11::Json &item : root.array_items()) {
+		UpdateBranch branch = {
+			QString::fromStdString(item["name"].string_value()),
+			QString::fromStdString(
+				item["display_name"].string_value()),
+			QString::fromStdString(
+				item["description"].string_value()),
+			QString::fromStdString(item["manifest"].string_value()),
+			item["default"].bool_value(),
+			item["enabled"].bool_value(),
+			item["visible"].bool_value(),
+		};
+		out.push_back(branch);
+	}
+}
+
+void LoadBranchesFile(vector<UpdateBranch> &out)
+{
+	string error;
+	string branchesText;
+
+	BPtr<char> branchesFilePath =
+		GetConfigPathPtr("obs-studio\\updates\\branches.json");
+
+	QFile branchesFile(branchesFilePath.Get());
+	if (!branchesFile.open(QIODevice::ReadOnly)) {
+		error = "Opening file failed.";
+		goto fail;
+	}
+
+	branchesText = branchesFile.readAll();
+	if (branchesText.empty()) {
+		error = "File empty.";
+		goto fail;
+	}
+
+	ParseBranchesJson(out, branchesText, error);
+	if (error.empty())
+		return;
+fail:
+	blog(LOG_WARNING, "Loading branches from file failed: %s",
+	     error.c_str());
+	return;
+}
+#endif
+
+void OBSApp::SetBranchData(const string &data)
+{
+#ifdef _WIN32
+	string error;
+	vector<UpdateBranch> result;
+
+	ParseBranchesJson(result, data, error);
+
+	if (!error.empty()) {
+		blog(LOG_WARNING, "Reading branches JSON response failed: %s",
+		     error.c_str());
+		return;
+	} else if (result.empty()) {
+		blog(LOG_WARNING, "Branches JSON array was empty.");
+		return;
+	}
+
+	updateBranches = result;
+#else
+	UNUSED_PARAMETER(data);
+#endif
+}
+
+std::vector<UpdateBranch> OBSApp::GetBranches(bool reload)
+{
+#ifdef _WIN32
+	if (reload || updateBranches.empty()) {
+		vector<UpdateBranch> result;
+		LoadBranchesFile(result);
+
+		if (!result.empty())
+			updateBranches = result;
+		else
+			blog(LOG_WARNING, "Branches list in file was empty.");
+	}
+#else
+	UNUSED_PARAMETER(reload);
+#endif
+	return updateBranches;
 }
 
 OBSApp::OBSApp(int &argc, char **argv, profiler_name_store_t *store)
