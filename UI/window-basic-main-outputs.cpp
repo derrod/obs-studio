@@ -1037,7 +1037,18 @@ bool SimpleOutput::ConfigureRecording(bool updateReplayBuffer)
 				    strPath.c_str());
 	}
 
-	obs_data_set_string(settings, "muxer_settings", mux);
+	// Enable fragmented MP4 (fMP4) via custom muxer settings
+	if (strcmp(format, "mp4") == 0) {
+		string mux_fmp4 = "movflags=dash";
+		if (mux) {
+			mux_fmp4 += " ";
+			mux_fmp4 += mux;
+		}
+		obs_data_set_string(settings, "muxer_settings",
+				    mux_fmp4.c_str());
+	} else {
+		obs_data_set_string(settings, "muxer_settings", mux);
+	}
 
 	if (updateReplayBuffer)
 		obs_output_update(replayBuffer, settings);
