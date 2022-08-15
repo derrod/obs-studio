@@ -411,8 +411,22 @@ try {
 
 /* ------------------------------------------------------------------------ */
 
+#if defined(OBS_RELEASE_CANDIDATE) && OBS_RELEASE_CANDIDATE > 0
+#define CUR_VER                                                               \
+	((uint64_t)OBS_RELEASE_CANDIDATE_VER << 16ULL | OBS_RELEASE_CANDIDATE \
+								<< 8ULL)
+#define PRE_RELEASE true
+#elif OBS_BETA > 0
+#define CUR_VER ((uint64_t)OBS_BETA_VER << 16ULL | OBS_BETA)
+#define PRE_RELEASE true
+#else
+#define CUR_VER ((uint64_t)LIBOBS_API_VER << 16ULL)
+#define PRE_RELEASE false
+#endif
+
 static bool ParseUpdateManifest(const char *manifest, bool *updatesAvailable,
-				string &notes_str, int &updateVer)
+				string &notes_str, uint64_t &updateVer,
+				string &branch)
 try {
 
 	string error;
@@ -427,6 +441,8 @@ try {
 	int major = root["version_major"].int_value();
 	int minor = root["version_minor"].int_value();
 	int patch = root["version_patch"].int_value();
+	int rc = root["rc"].int_value();
+	int beta = root["beta"].int_value();
 
 	if (major == 0)
 		throw strprintf("Invalid version number: %d.%d.%d", major,
@@ -442,11 +458,27 @@ try {
 	if (!packages.is_array())
 		throw string("'packages' value invalid");
 
-	int cur_ver = LIBOBS_API_VER;
-	int new_ver = MAKE_SEMANTIC_VERSION(major, minor, patch);
+	uint64_t cur_ver = CUR_VER;
+	uint64_t new_ver = MAKE_SEMANTIC_VERSION((uint64_t)major,
+						 (uint64_t)minor,
+						 (uint64_t)patch)
+			   << 16;
+
+	/* RC builds are shifted so that rc1 and beta1 versions do not result
+	 * in the same new_ver. */
+	if (rc > 0)
+		new_ver |= (uint64_t)rc << 8;
+	else if (beta > 0)
+		new_ver |= (uint64_t)beta;
 
 	updateVer = new_ver;
-	*updatesAvailable = new_ver > cur_ver;
+
+	/* When using a pre-release build or non-default branch we only check if
+	 * the manifest version is different, so that it can be rolled-back. */
+	if (branch != WIN_DEFAULT_BRANCH || PRE_RELEASE)
+		*updatesAvailable = new_ver != cur_ver;
+	else
+		*updatesAvailable = new_ver > cur_ver;
 
 	return true;
 
@@ -454,6 +486,9 @@ try {
 	blog(LOG_WARNING, "%s: %s", __FUNCTION__, text.c_str());
 	return false;
 }
+
+#undef CUR_VER
+#undef PRE_RELEASE
 
 /* ------------------------------------------------------------------------ */
 
@@ -709,10 +744,10 @@ try {
 	 * check manifest for update           */
 
 	string notes;
-	int updateVer = 0;
+	uint64_t updateVer = 0;
 
 	if (!ParseUpdateManifest(text.c_str(), &updatesAvailable, notes,
-				 updateVer))
+				 updateVer, branch))
 		throw string("Failed to parse manifest");
 
 	if (!updatesAvailable && !repairMode) {
@@ -729,8 +764,8 @@ try {
 	/* ----------------------------------- *
 	 * skip this version if set to skip    */
 
-	int skipUpdateVer = config_get_int(GetGlobalConfig(), "General",
-					   "SkipUpdateVersion");
+	uint64_t skipUpdateVer = config_get_uint(GetGlobalConfig(), "General",
+						 "SkipUpdateVersion");
 	if (!manualUpdate && updateVer == skipUpdateVer && !repairMode)
 		return;
 
@@ -758,8 +793,8 @@ try {
 			return;
 
 		} else if (queryResult == OBSUpdate::Skip) {
-			config_set_int(GetGlobalConfig(), "General",
-				       "SkipUpdateVersion", updateVer);
+			config_set_uint(GetGlobalConfig(), "General",
+					"SkipUpdateVersion", updateVer);
 			return;
 		}
 	}
