@@ -424,6 +424,12 @@ try {
 #define PRE_RELEASE false
 #endif
 
+#ifdef OBS_COMMIT
+#define CUR_COMMIT OBS_COMMIT
+#else
+#define CUR_COMMIT "00000000"
+#endif
+
 static bool ParseUpdateManifest(const char *manifest, bool *updatesAvailable,
 				string &notes_str, uint64_t &updateVer,
 				string &branch)
@@ -443,8 +449,9 @@ try {
 	int patch = root["version_patch"].int_value();
 	int rc = root["rc"].int_value();
 	int beta = root["beta"].int_value();
+	string commit_hash = root["commit"].string_value();
 
-	if (major == 0)
+	if (major == 0 && commit_hash.empty())
 		throw strprintf("Invalid version number: %d.%d.%d", major,
 				minor, patch);
 
@@ -458,20 +465,28 @@ try {
 	if (!packages.is_array())
 		throw string("'packages' value invalid");
 
-	uint64_t cur_ver = CUR_VER;
-	uint64_t new_ver = MAKE_SEMANTIC_VERSION((uint64_t)major,
-						 (uint64_t)minor,
-						 (uint64_t)patch)
-			   << 16;
+	uint64_t cur_ver;
+	uint64_t new_ver;
 
-	/* RC builds are shifted so that rc1 and beta1 versions do not result
-	 * in the same new_ver. */
-	if (rc > 0)
-		new_ver |= (uint64_t)rc << 8;
-	else if (beta > 0)
-		new_ver |= (uint64_t)beta;
+	if (commit_hash.empty()) {
+		cur_ver = CUR_VER;
+		new_ver = MAKE_SEMANTIC_VERSION(
+			(uint64_t)major, (uint64_t)minor, (uint64_t)patch);
+		new_ver <<= 16;
+		/* RC builds are shifted so that rc1 and beta1 versions do not result
+	     * in the same new_ver. */
+		if (rc > 0)
+			new_ver |= (uint64_t)rc << 8;
+		else if (beta > 0)
+			new_ver |= (uint64_t)beta;
 
-	updateVer = new_ver;
+		updateVer = new_ver;
+	} else {
+		/* Test or nightly builds may not have a (valid) version number,
+		 * so compare commit hashes instead. */
+		cur_ver = stoul(CUR_COMMIT, nullptr, 16);
+		new_ver = stoul(commit_hash.substr(0, 8), nullptr, 16);
+	}
 
 	/* When using a pre-release build or non-default branch we only check if
 	 * the manifest version is different, so that it can be rolled-back. */
@@ -487,6 +502,7 @@ try {
 	return false;
 }
 
+#undef CUR_COMMIT
 #undef CUR_VER
 #undef PRE_RELEASE
 
