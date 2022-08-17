@@ -492,14 +492,14 @@ try {
 			new_ver |= (uint64_t)rc << 8;
 		else if (beta > 0)
 			new_ver |= (uint64_t)beta;
-
-		updateVer = new_ver;
 	} else {
 		/* Test or nightly builds may not have a (valid) version number,
 		 * so compare commit hashes instead. */
 		cur_ver = stoul(CUR_COMMIT, nullptr, 16);
 		new_ver = stoul(commit_hash.substr(0, 8), nullptr, 16);
 	}
+
+	updateVer = new_ver;
 
 	/* When using a pre-release build or non-default branch we only check if
 	 * the manifest version is different, so that it can be rolled-back. */
