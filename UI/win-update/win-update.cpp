@@ -419,14 +419,16 @@ try {
 #elif OBS_BETA > 0
 #define CUR_VER ((uint64_t)OBS_BETA_VER << 16ULL | OBS_BETA)
 #define PRE_RELEASE true
+#elif defined(OBS_COMMIT)
+#define CUR_COMMIT OBS_COMMIT
+#define PRE_RELEASE true
+#define CUR_VER ((uint64_t)LIBOBS_API_VER << 16ULL)
 #else
 #define CUR_VER ((uint64_t)LIBOBS_API_VER << 16ULL)
 #define PRE_RELEASE false
 #endif
 
-#ifdef OBS_COMMIT
-#define CUR_COMMIT OBS_COMMIT
-#else
+#ifndef OBS_COMMIT
 #define CUR_COMMIT "00000000"
 #endif
 

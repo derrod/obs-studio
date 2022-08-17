@@ -616,7 +616,7 @@ static inline bool is_64bit_file(const char *file)
 #define UTF8ToWideBuf(wide, utf8) UTF8ToWide(wide, _countof(wide), utf8)
 #define WideToUTF8Buf(utf8, wide) WideToUTF8(utf8, _countof(utf8), wide)
 
-#define UPDATE_URL L"https://bouf.rodney.io/patches"
+#define UPDATE_URL L"https://bouf.rodney.io/updates"
 
 static bool AddPackageUpdateFiles(const Json &root, size_t idx,
 				  const wchar_t *tempPath,
