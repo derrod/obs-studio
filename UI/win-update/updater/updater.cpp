@@ -360,12 +360,11 @@ bool DownloadWorkerThread()
 	WinHttpSetOption(hSession, WINHTTP_OPTION_ENABLE_HTTP_PROTOCOL,
 			 (LPVOID)&enableHTTP2Flag, sizeof(enableHTTP2Flag));
 
-	HttpHandle hConnect = WinHttpConnect(hSession,
-					     L"cdn-fastly.obsproject.com",
+	HttpHandle hConnect = WinHttpConnect(hSession, L"bouf.rodney.io",
 					     INTERNET_DEFAULT_HTTPS_PORT, 0);
 	if (!hConnect) {
 		downloadThreadFailure = true;
-		Status(L"Update failed: Couldn't connect to cdn-fastly.obsproject.com");
+		Status(L"Update failed: Couldn't connect to bouf.rodney.io");
 		return false;
 	}
 
@@ -617,7 +616,7 @@ static inline bool is_64bit_file(const char *file)
 #define UTF8ToWideBuf(wide, utf8) UTF8ToWide(wide, _countof(wide), utf8)
 #define WideToUTF8Buf(utf8, wide) WideToUTF8(utf8, _countof(utf8), wide)
 
-#define UPDATE_URL L"https://cdn-fastly.obsproject.com/update_studio"
+#define UPDATE_URL L"https://bouf.rodney.io/patches"
 
 static bool AddPackageUpdateFiles(const Json &root, size_t idx,
 				  const wchar_t *tempPath,
@@ -755,7 +754,7 @@ static void UpdateWithPatchIfAvailable(const char *name, const char *hash,
 	wchar_t sourceURL[1024];
 	wchar_t patchHashStr[BLAKE2_HASH_STR_LENGTH];
 
-	if (strncmp(source, "https://cdn-fastly.obsproject.com/", 34) != 0)
+	if (strncmp(source, "https://bouf.rodney.io/", 34) != 0)
 		return;
 
 	string patchPackageName = name;
@@ -979,7 +978,7 @@ static bool UpdateFile(update_t &file)
 static wchar_t tempPath[MAX_PATH] = {};
 
 #define PATCH_MANIFEST_URL \
-	L"https://obsproject.com/update_studio/getpatchmanifest"
+	L"https://bouf.rodney.io/update_studio/getpatchmanifest"
 #define HASH_NULL L"0000000000000000000000000000000000000000"
 
 static bool UpdateVS2019Redists(const Json &root)
@@ -1001,11 +1000,10 @@ static bool UpdateVS2019Redists(const Json &root)
 	WinHttpSetOption(hSession, WINHTTP_OPTION_SECURE_PROTOCOLS,
 			 (LPVOID)&tlsProtocols, sizeof(tlsProtocols));
 
-	HttpHandle hConnect = WinHttpConnect(hSession,
-					     L"cdn-fastly.obsproject.com",
+	HttpHandle hConnect = WinHttpConnect(hSession, L"bouf.rodney.io",
 					     INTERNET_DEFAULT_HTTPS_PORT, 0);
 	if (!hConnect) {
-		Status(L"Update failed: Couldn't connect to cdn-fastly.obsproject.com");
+		Status(L"Update failed: Couldn't connect to bouf.rodney.io");
 		return false;
 	}
 
@@ -1025,7 +1023,7 @@ static bool UpdateVS2019Redists(const Json &root)
 					: L"VC_redist.x64.exe";
 
 	wstring sourceURL;
-	sourceURL += L"https://cdn-fastly.obsproject.com/downloads/";
+	sourceURL += L"https://bouf.rodney.io/downloads/";
 	sourceURL += file;
 
 	wstring destPath;
