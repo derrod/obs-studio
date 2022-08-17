@@ -364,6 +364,17 @@ try {
 	long responseCode;
 	uint8_t updateFileHash[BLAKE2_HASH_LENGTH];
 	vector<string> extraHeaders;
+	CryptProvider localProvider;
+
+	/* ----------------------------------- *
+	 * create signature provider           */
+
+	if (!CryptAcquireContext(&localProvider, nullptr, MS_ENH_RSA_AES_PROV,
+				 PROV_RSA_AES, CRYPT_VERIFYCONTEXT))
+		throw strprintf("CryptAcquireContext failed: %lu",
+				GetLastError());
+
+	provider = localProvider;
 
 	BPtr<char> updateFilePath =
 		GetConfigPathPtr("obs-studio\\updates\\updater.exe");
