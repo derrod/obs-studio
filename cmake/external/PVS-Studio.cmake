@@ -272,6 +272,8 @@ set(PVS_STUDIO_RECURSIVE_TARGETS_NEW)
 
 macro(pvs_studio_get_recursive_targets TARGET)
     get_target_property(libs "${TARGET}" LINK_LIBRARIES)
+    get_target_property(deps "${TARGET}" MANUALLY_ADDED_DEPENDENCIES)
+    list(APPEND libs ${deps})
     foreach (lib IN LISTS libs)
         list(FIND PVS_STUDIO_RECURSIVE_TARGETS "${lib}" index)
         if (TARGET "${lib}" AND "${index}" STREQUAL -1)

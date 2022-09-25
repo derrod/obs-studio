@@ -96,6 +96,14 @@ if(BUILD_TESTS OR ENABLE_UNIT_TESTS)
   add_subdirectory(test)
 endif()
 
+
+include("cmake/external/PVS-Studio.cmake")
+set(PVS_STUDIO_RECURSIVE_TARGETS)
+set(PVS_STUDIO_RECURSIVE_TARGETS_NEW)
+pvs_studio_get_recursive_targets(obs)
+message("Targets: ${PVS_STUDIO_RECURSIVE_TARGETS_NEW}")
+message(FATAL_ERROR, "YOLO")
+
 option(ENABLE_PVS "Enable PVS Analysis" OFF)
 if(ENABLE_PVS AND (OS_LINUX OR OS_WINDOWS))
   include("cmake/external/PVS-Studio.cmake")
