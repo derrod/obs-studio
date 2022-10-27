@@ -34,7 +34,7 @@ jobs:
   upload:
     name: Steam upload
     runs-on: ubuntu-20.04
-    if: github.repository_owner == 'obsproject'
+    # if: github.repository_owner == 'obsproject'
 
     steps:
     - name: Checkout
@@ -243,14 +243,14 @@ jobs:
       uses: CyberAndrii/setup-steamcmd@e19cd1516315ce46dbfffa47193f92fe42d1419e
 
     - name: Generate Steam auth code
-      if: steps.should-run.outputs.result == 'true'
+      if: github.repository_owner == 'obsproject' && steps.should-run.outputs.result == 'true'
       id: steam-totp
       uses: CyberAndrii/steam-totp@0fc9e59dc5bbf4368d23d5a33956f104248da31a
       with:
         shared_secret: ${{ secrets.STEAM_SHARED_SECRET }}
 
     - name: Upload to Steam
-      if: steps.should-run.outputs.result == 'true'
+      if: github.repository_owner == 'obsproject' && steps.should-run.outputs.result == 'true'
       run: |
         cd steam
         echo "::group::Prepare Steam build script"
