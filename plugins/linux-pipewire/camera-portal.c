@@ -703,9 +703,7 @@ static void framerate_list(struct camera_device *dev, uint32_t pixelformat,
 		struct obs_pw_video_format obs_pw_video_format;
 		enum spa_choice_type choice;
 		const struct spa_pod_prop *prop;
-		struct spa_pod_parser pod_parser;
 		struct spa_rectangle this_resolution;
-		struct spa_fraction framerate;
 		struct spa_pod *framerate_pod;
 		uint32_t media_subtype;
 		uint32_t media_type;
@@ -1259,7 +1257,6 @@ static const char *pipewire_camera_get_name(void *data)
 static void *pipewire_camera_create(obs_data_t *settings, obs_source_t *source)
 {
 	struct camera_portal_source *camera_source;
-	bool set;
 
 	camera_source = bzalloc(sizeof(struct camera_portal_source));
 	camera_source->source = source;
