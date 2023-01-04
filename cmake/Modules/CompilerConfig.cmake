@@ -68,7 +68,8 @@ if(OS_WINDOWS AND MSVC)
     /D_UNICODE
     /D_CRT_SECURE_NO_WARNINGS
     /D_CRT_NONSTDC_NO_WARNINGS
-    /utf-8)
+    /utf-8
+    /permissive-)
 
   add_link_options(
     "LINKER:/OPT:REF"
