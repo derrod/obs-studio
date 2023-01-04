@@ -243,7 +243,7 @@ void gs_swap_chain::Resize(uint32_t cx, uint32_t cy, gs_color_format format)
 				 swapDesc.Flags);
 	if (FAILED(hr))
 		throw HRError("Failed to resize swap buffers", hr);
-	ComQIPtr<IDXGISwapChain3> swap3 = swap;
+	ComQIPtr<IDXGISwapChain3> swap3 = (IDXGISwapChain *)swap;
 	if (swap3) {
 		const DXGI_COLOR_SPACE_TYPE dxgi_space =
 			(format == GS_RGBA16F)
@@ -290,7 +290,7 @@ gs_swap_chain::gs_swap_chain(gs_device *device, const gs_init_data *data)
 	DXGI_SWAP_EFFECT effect = DXGI_SWAP_EFFECT_DISCARD;
 	UINT flags = 0;
 
-	ComQIPtr<IDXGIFactory5> factory5 = device->factory;
+	ComQIPtr<IDXGIFactory5> factory5 = (IDXGIFactory1 *)device->factory;
 	if (factory5) {
 		initData.num_backbuffers = max(data->num_backbuffers, 2);
 

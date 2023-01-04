@@ -332,7 +332,7 @@ gs_texture_2d::gs_texture_2d(gs_device_t *device, uint32_t handle,
 {
 	HRESULT hr;
 	if (ntHandle) {
-		ComQIPtr<ID3D11Device1> dev = device->device;
+		ComQIPtr<ID3D11Device1> dev = (ID3D11Device *)device->device;
 		hr = dev->OpenSharedResource1((HANDLE)(uintptr_t)handle,
 					      __uuidof(ID3D11Texture2D),
 					      (void **)texture.Assign());
