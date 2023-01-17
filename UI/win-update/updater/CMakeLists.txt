@@ -7,11 +7,6 @@ if(NOT ENABLE_UPDATER)
   return()
 endif()
 
-if(NOT DEFINED STATIC_ZLIB_PATH OR "${STATIC_ZLIB_PATH}" STREQUAL "")
-  message(STATUS "STATIC_ZLIB_PATH not set, windows updater disabled")
-  return()
-endif()
-
 find_package(zstd)
 
 add_executable(updater WIN32)
