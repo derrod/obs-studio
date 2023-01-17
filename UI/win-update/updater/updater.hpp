@@ -37,6 +37,7 @@
 #include <zlib.h>
 #include <ctype.h>
 #include <blake2.h>
+#include <zstd.h>
 
 #include <string>
 
@@ -97,6 +98,7 @@ extern HCRYPTPROV hProvider;
 extern int totalFileSize;
 extern int completedFileSize;
 extern HANDLE cancelRequested;
+extern ZSTD_DCtx *zstdCtx;
 
 #pragma pack(push, r1, 1)
 

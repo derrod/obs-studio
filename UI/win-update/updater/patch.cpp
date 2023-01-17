@@ -214,6 +214,7 @@ try {
 	int64_t newsize;
 	struct bspatch_stream stream;
 	bool success;
+	bool zstd;
 
 	WinHandle hPatch;
 	WinHandle hTarget;
@@ -236,9 +237,19 @@ try {
 	 * read patch header                 */
 
 	DWORD read;
+	DWORD patchFileSize;
+
+	patchFileSize = GetFileSize(hPatch, nullptr);
+	if (patchFileSize == INVALID_FILE_SIZE)
+		throw int(GetLastError());
+
 	success = !!ReadFile(hPatch, header, sizeof(header), &read, nullptr);
 	if (success && read == sizeof(header)) {
-		if (memcmp(header, "JIMSLEY/BSDIFF43", 16))
+		if (memcmp(header, "JIMSLEY/BSDIFF43", 16) == 0)
+			zstd = false;
+		else if (memcmp(header, "BOUF//ZSTD//DICT", 16) == 0)
+			zstd = true;
+		else
 			throw int(-4);
 	} else {
 		throw int(GetLastError());
@@ -282,20 +293,43 @@ try {
 	/* --------------------------------- *
 	 * patch to new file data            */
 
-	if (!strm.init_decoder())
-		throw int(-10);
+	if (zstd) {
+		// Read remainder of patch into memory
+		vector<uint8_t> patchData;
+		try {
+			patchData.resize(patchFileSize - sizeof(header));
+		} catch (...) {
+			throw int(-1);
+		}
 
-	patch_data data;
-	data.h = hPatch;
-	data.strm = strm.get();
+		if (!ReadFile(hPatch, &patchData[0],
+			      patchFileSize - sizeof(header), &read, nullptr))
+			throw int(GetLastError());
+		if (read != (patchFileSize - sizeof(header)))
+			throw int(-1);
 
-	stream.read = read_lzma;
-	stream.opaque = &data;
+		size_t result = ZSTD_decompress_usingDict(
+			zstdCtx, &newData[0], newData.size(), patchData.data(),
+			patchData.size(), oldData.data(), oldData.size());
 
-	int ret = bspatch(oldData.data(), oldData.size(), newData.data(),
-			  newData.size(), &stream);
-	if (ret != 0)
-		throw int(-9);
+		if (result != newsize || ZSTD_isError(result))
+			throw int(-9);
+	} else {
+		if (!strm.init_decoder())
+			throw int(-10);
+
+		patch_data data;
+		data.h = hPatch;
+		data.strm = strm.get();
+
+		stream.read = read_lzma;
+		stream.opaque = &data;
+
+		int ret = bspatch(oldData.data(), oldData.size(),
+				  newData.data(), newData.size(), &stream);
+		if (ret != 0)
+			throw int(-9);
+	}
 
 	/* --------------------------------- *
 	 * write new file                    */

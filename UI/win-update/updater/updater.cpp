@@ -36,6 +36,7 @@ HANDLE updateThread = nullptr;
 HINSTANCE hinstMain = nullptr;
 HWND hwndMain = nullptr;
 HCRYPTPROV hProvider = 0;
+ZSTD_DCtx *zstdCtx = nullptr;
 
 static bool bExiting = false;
 static bool updateFailed = false;
@@ -1603,6 +1604,8 @@ static bool Update(wchar_t *cmdLine)
 
 	SendDlgItemMessage(hwndMain, IDC_PROGRESS, PBM_SETPOS, 0, 0);
 
+	zstdCtx = ZSTD_createDCtx();
+
 	for (update_t &update : updates) {
 		if (!UpdateFile(update)) {
 			return false;
@@ -1618,6 +1621,8 @@ static bool Update(wchar_t *cmdLine)
 			}
 		}
 	}
+
+	ZSTD_freeDCtx(zstdCtx);
 
 	for (deletion_t &deletion : deletions) {
 		if (!RenameRemovedFile(deletion)) {
