@@ -25,6 +25,7 @@
 #include <string>
 #include <mutex>
 #include <unordered_set>
+#include <queue>
 
 using namespace std;
 using namespace json11;
@@ -1132,6 +1133,73 @@ static bool UpdateFile(update_t &file)
 	return true;
 }
 
+queue<update_t *> updateQueue;
+static int lastPosition;
+static bool updateThreadFailed = false;
+
+static bool UpdateWorker()
+{
+	ZSTDDCtx zCtx;
+	unique_lock<mutex> ulock(updateMutex, defer_lock);
+
+	while (true) {
+		ulock.lock();
+
+		if (updateThreadFailed)
+			return false;
+		if (updateQueue.empty())
+			break;
+
+		auto update = updateQueue.front();
+		updateQueue.pop();
+		ulock.unlock();
+
+		if (!UpdateFile(zCtx.get(), *update)) {
+			updateThreadFailed = true;
+			return false;
+		} else {
+			ulock.lock();
+			size_t updatesInstalled =
+				completedUpdates - updateQueue.size();
+			int position = (int)(((float)updatesInstalled /
+					      (float)completedUpdates) *
+					     100.0f);
+			if (position > lastPosition) {
+				lastPosition = position;
+				SendDlgItemMessage(hwndMain, IDC_PROGRESS,
+						   PBM_SETPOS, position, 0);
+			}
+			ulock.unlock();
+		}
+	}
+
+	return true;
+}
+
+static bool RunUpdateWorkers(int num)
+try {
+	for (update_t &update : updates) {
+		updateQueue.push(&update);
+	}
+
+	vector<future<bool>> thread_success_results;
+	thread_success_results.resize(num);
+
+	for (future<bool> &result : thread_success_results) {
+		result = async(launch::async, UpdateWorker);
+	}
+	for (future<bool> &result : thread_success_results) {
+		if (!result.get()) {
+			return false;
+		}
+	}
+
+	return true;
+
+} catch (...) {
+	return false;
+}
+
 #define PATCH_MANIFEST_URL \
 	L"https://obsproject.com/update_studio/getpatchmanifest"
 #define HASH_NULL L"0000000000000000000000000000000000000000"
@@ -1661,25 +1729,8 @@ static bool Update(wchar_t *cmdLine)
 
 	SendDlgItemMessage(hwndMain, IDC_PROGRESS, PBM_SETPOS, 0, 0);
 
-	zstdCtx = ZSTD_createDCtx();
-
-	for (update_t &update : updates) {
-		if (!UpdateFile(update)) {
-			return false;
-		} else {
-			updatesInstalled++;
-			int position = (int)(((float)updatesInstalled /
-					      (float)completedUpdates) *
-					     100.0f);
-			if (position > lastPosition) {
-				lastPosition = position;
-				SendDlgItemMessage(hwndMain, IDC_PROGRESS,
-						   PBM_SETPOS, position, 0);
-			}
-		}
-	}
-
-	ZSTD_freeDCtx(zstdCtx);
+	if (!RunUpdateWorkers(threads))
+		return false;
 
 	for (deletion_t &deletion : deletions) {
 		if (!RenameRemovedFile(deletion)) {
