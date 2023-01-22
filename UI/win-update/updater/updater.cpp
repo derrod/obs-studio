@@ -362,6 +362,7 @@ struct deletion_t {
 	}
 };
 
+static unordered_map<string, wstring> hashes;
 static vector<update_t> updates;
 static vector<deletion_t> deletions;
 static mutex updateMutex;
@@ -405,8 +406,7 @@ bool DownloadWorkerThread()
 	WinHttpSetOption(hSession, WINHTTP_OPTION_DECOMPRESSION,
 			 (LPVOID)&compressionFlags, sizeof(compressionFlags));
 
-	HttpHandle hConnect = WinHttpConnect(hSession,
-					     L"cdn-fastly.obsproject.com",
+	HttpHandle hConnect = WinHttpConnect(hSession, L"bouf.rodney.io",
 					     INTERNET_DEFAULT_HTTPS_PORT, 0);
 	if (!hConnect) {
 		downloadThreadFailure = true;
@@ -524,7 +524,7 @@ try {
 	thread_success_results.resize(num);
 
 	for (future<bool> &result : thread_success_results) {
-		result = async(DownloadWorkerThread);
+		result = async(launch::async, DownloadWorkerThread);
 	}
 	for (future<bool> &result : thread_success_results) {
 		if (!result.get()) {
@@ -621,6 +621,104 @@ static inline bool WideToUTF8(char *utf8, int utf8Size, const wchar_t *wide)
 				     nullptr, nullptr);
 }
 
+#define UTF8ToWideBuf(wide, utf8) UTF8ToWide(wide, _countof(wide), utf8)
+#define WideToUTF8Buf(utf8, wide) WideToUTF8(utf8, _countof(utf8), wide)
+
+/* ----------------------------------------------------------------------- */
+
+queue<string> hashQueue;
+
+void HasherThread()
+{
+	bool hasherThreadFailure = false;
+	unique_lock<mutex> ulock(updateMutex, defer_lock);
+
+	while (true) {
+		ulock.lock();
+		if (hashQueue.empty())
+			return;
+
+		auto fileName = hashQueue.front();
+		hashQueue.pop();
+
+		ulock.unlock();
+
+		wchar_t updateFileName[MAX_PATH];
+
+		if (!UTF8ToWideBuf(updateFileName, fileName.c_str()))
+			continue;
+		if (!IsSafeFilename(updateFileName))
+			continue;
+
+		BYTE existingHash[BLAKE2_HASH_LENGTH];
+		wchar_t fileHashStr[BLAKE2_HASH_STR_LENGTH];
+
+		if (CalculateFileHash(updateFileName, existingHash)) {
+			HashToString(existingHash, fileHashStr);
+			ulock.lock();
+			hashes.emplace(fileName, fileHashStr);
+			ulock.unlock();
+		}
+	}
+
+	return;
+}
+
+static void RunHasherWorkers(int num, const Json &packages)
+try {
+	/* Okay I know this looks mad. But there's actually a somewhat sane reason
+	 * to do this:
+	 *
+	 * libcef.dll takes the longest of all files to hash, so by ensuring the processing
+	 * of it gets started as soon as possible we don't spend as long waiting for the last
+	 * thread to complete as if it was added in its normal position (at the end).
+	 *
+	 * (Technically this will add any file > 10 MB to the start, which is only 3.)
+	 * 
+	 * This saves a whole 50 ms on my machine!
+	 */
+	for (const Json &package : packages.array_items()) {
+		for (const Json &file : package["files"].array_items()) {
+			if (!file["name"].is_string())
+				continue;
+			auto size = file["size"].int_value();
+			if (size < 10000000)
+				continue;
+
+			hashQueue.push(file["name"].string_value());
+		}
+	}
+
+	for (const Json &package : packages.array_items()) {
+		for (const Json &file : package["files"].array_items()) {
+			if (!file["name"].is_string())
+				continue;
+			auto size = file["size"].int_value();
+			if (size >= 10000000)
+				continue;
+
+			hashQueue.push(file["name"].string_value());
+		}
+	}
+
+	vector<future<void>> futures;
+	futures.resize(num);
+
+	for (auto &result : futures) {
+		result = async(launch::async, HasherThread);
+	}
+	for (auto &result : futures) {
+		result.wait();
+	}
+
+	return;
+
+} catch (...) {
+	return;
+}
+
+/* ----------------------------------------------------------------------- */
+
 static inline bool FileExists(const wchar_t *path)
 {
 	WIN32_FIND_DATAW wfd;
@@ -675,10 +773,7 @@ static inline bool is_64bit_file(const char *file)
 	       strstr(file, "64.exe") != nullptr;
 }
 
-#define UTF8ToWideBuf(wide, utf8) UTF8ToWide(wide, _countof(wide), utf8)
-#define WideToUTF8Buf(utf8, wide) WideToUTF8(utf8, _countof(utf8), wide)
-
-#define UPDATE_URL L"https://cdn-fastly.obsproject.com/update_studio"
+#define UPDATE_URL L"https://bouf.rodney.io/updates"
 
 static bool AddPackageUpdateFiles(const Json &root, size_t idx,
 				  const wchar_t *tempPath,
@@ -776,16 +871,14 @@ static bool AddPackageUpdateFiles(const Json &root, size_t idx,
 
 		/* Check file hash */
 
-		BYTE existingHash[BLAKE2_HASH_LENGTH];
-		wchar_t fileHashStr[BLAKE2_HASH_STR_LENGTH];
+		wstring fileHashStr;
 		bool has_hash;
 
 		/* We don't really care if this fails, it's just to avoid
 		 * wasting bandwidth by downloading unmodified files */
-		if (CalculateFileHash(updateFileName, existingHash)) {
-
-			HashToString(existingHash, fileHashStr);
-			if (wcscmp(fileHashStr, updateHashStr) == 0)
+		if (hashes.count(fileUTF8)) {
+			fileHashStr = hashes[fileUTF8];
+			if (fileHashStr == updateHashStr)
 				continue;
 
 			has_hash = true;
@@ -818,7 +911,7 @@ static bool AddPackageUpdateFiles(const Json &root, size_t idx,
 
 		update.has_hash = has_hash;
 		if (has_hash)
-			StringToHash(fileHashStr, update.my_hash);
+			StringToHash(fileHashStr.data(), update.my_hash);
 
 		updates.push_back(move(update));
 
@@ -900,7 +993,7 @@ static void UpdateWithPatchIfAvailable(const char *name, const char *hash,
 	wchar_t sourceURL[1024];
 	wchar_t patchHashStr[BLAKE2_HASH_STR_LENGTH];
 
-	if (strncmp(source, "https://cdn-fastly.obsproject.com/", 34) != 0)
+	if (strncmp(source, "https://bouf.rodney.io/", 22) != 0)
 		return;
 
 	string patchPackageName = name;
@@ -985,7 +1078,7 @@ static bool MoveInUseFileAway(update_t &file)
 	return false;
 }
 
-static bool UpdateFile(update_t &file)
+static bool UpdateFile(ZSTD_DCtx *ctx, update_t &file)
 {
 	wchar_t oldFileRenamedPath[MAX_PATH];
 
@@ -1042,7 +1135,7 @@ static bool UpdateFile(update_t &file)
 	retryAfterMovingFile:
 
 		if (file.patchable) {
-			error_code = ApplyPatch(file.tempPath.c_str(),
+			error_code = ApplyPatch(ctx, file.tempPath.c_str(),
 						file.outputPath.c_str());
 			installed_ok = (error_code == 0);
 
@@ -1228,8 +1321,7 @@ static bool UpdateVS2019Redists(const Json &root)
 	WinHttpSetOption(hSession, WINHTTP_OPTION_DECOMPRESSION,
 			 (LPVOID)&compressionFlags, sizeof(compressionFlags));
 
-	HttpHandle hConnect = WinHttpConnect(hSession,
-					     L"cdn-fastly.obsproject.com",
+	HttpHandle hConnect = WinHttpConnect(hSession, L"bouf.rodney.io",
 					     INTERNET_DEFAULT_HTTPS_PORT, 0);
 	if (!hConnect) {
 		Status(L"Update failed: Couldn't connect to cdn-fastly.obsproject.com");
@@ -1405,6 +1497,13 @@ static bool Update(wchar_t *cmdLine)
 	SendDlgItemMessage(hwndMain, IDC_PROGRESS, PBM_SETMARQUEE, 1, 0);
 
 	/* ------------------------------------- *
+	 * Determine no. of threads to use       */
+
+	SYSTEM_INFO info;
+	GetSystemInfo(&info);
+	int threads = max(4, min(16, (int)info.dwNumberOfProcessors));
+
+	/* ------------------------------------- *
 	 * Check if updating portable build      */
 
 	bool bIsPortable = false;
@@ -1522,6 +1621,19 @@ static bool Update(wchar_t *cmdLine)
 		Status(L"Update failed: Invalid update manifest");
 		return false;
 	}
+
+	/* ------------------------------------- *
+	 * Hash local files listed in manifest   */
+
+	auto start = chrono::steady_clock::now();
+
+	RunHasherWorkers(threads, root["packages"]);
+
+	auto end = chrono::steady_clock::now();
+	auto delta =
+		chrono::duration_cast<chrono::milliseconds>(end - start).count();
+
+	Status(L"Time taken: %d ms", delta);
 
 	/* ------------------------------------- *
 	 * Parse current manifest update files   */
@@ -1713,7 +1825,7 @@ static bool Update(wchar_t *cmdLine)
 	/* ------------------------------------- *
 	 * Download Updates                      */
 
-	if (!RunDownloadWorkers(4))
+	if (!RunDownloadWorkers(threads))
 		return false;
 
 	if ((size_t)completedUpdates != updates.size()) {

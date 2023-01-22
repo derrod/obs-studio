@@ -51,7 +51,8 @@ static int64_t offtin(const uint8_t *buf)
 
 /* ------------------------------------------------------------------------ */
 
-int ApplyPatch(const wchar_t *patchFile, const wchar_t *targetFile)
+int ApplyPatch(ZSTD_DCtx *ctx, const wchar_t *patchFile,
+	       const wchar_t *targetFile)
 try {
 	uint8_t header[24];
 	int64_t newsize;
@@ -147,7 +148,7 @@ try {
 	 * patch to new file data            */
 
 	size_t result = ZSTD_decompress_usingDict(
-		zstdCtx, &newData[0], newData.size(), patchData.data(),
+		ctx, &newData[0], newData.size(), patchData.data(),
 		patchData.size(), oldData.data(), oldData.size());
 
 	if (result != newsize || ZSTD_isError(result))
