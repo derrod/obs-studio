@@ -25,8 +25,11 @@ jobs:
       - name: Setup Environment
         id: setup
         run: |
+          BRANCH=$(git describe --exact-match --tags 2> /dev/null || git branch --show-current)
+          # Remove patch version from tag
+          BRANCH=$(echo ${BRANCH} | sed -e 's/\.[0-9]*$//')
+          echo "commitBranch=${BRANCH}" >> $GITHUB_OUTPUT
           echo "commitHash=$(git describe --exact-match --tags 2> /dev/null || git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
-          echo "commitBranch=$(git describe --exact-match --tags 2> /dev/null || git branch --show-current)" >> $GITHUB_OUTPUT
           echo "fullCommitHash=$(git rev-parse HEAD)" >> $GITHUB_OUTPUT
 
       - name: Bump Version Number
