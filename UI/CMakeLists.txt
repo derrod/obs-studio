@@ -345,6 +345,8 @@ if(OS_WINDOWS)
   target_sources(
     obs
     PRIVATE obs.manifest
+            auth-keychain.hpp
+            auth-keychain-win.cpp
             platform-windows.cpp
             win-update/update-window.cpp
             win-update/update-window.hpp

@@ -7,6 +7,7 @@
 #include <qt-wrappers.hpp>
 #include <obs-app.hpp>
 
+#include "auth-keychain.hpp"
 #include "window-basic-main.hpp"
 #include "remote-text.hpp"
 
@@ -150,9 +151,25 @@ void OAuth::DeleteCookies(const std::string &service)
 void OAuth::SaveInternal()
 {
 	OBSBasic *main = OBSBasic::Get();
-	config_set_string(main->Config(), service(), "RefreshToken",
-			  refresh_token.c_str());
-	config_set_string(main->Config(), service(), "Token", token.c_str());
+
+	std::string keychain_key = "OBS::";
+	keychain_key += obs_frontend_get_current_profile();
+	keychain_key += "::";
+	keychain_key += service();
+
+	std::string keychain_data = refresh_token + "::" + token;
+
+	if (KeychainSave(keychain_key, "", keychain_data)) {
+		config_remove_value(main->Config(), service(), "RefreshToken");
+		config_remove_value(main->Config(), service(), "Token");
+	} else {
+		// Fall back to config if saving to keychain fails
+		config_set_string(main->Config(), service(), "RefreshToken",
+				  refresh_token.c_str());
+		config_set_string(main->Config(), service(), "Token",
+				  token.c_str());
+	}
+
 	config_set_uint(main->Config(), service(), "ExpireTime", expire_time);
 	config_set_int(main->Config(), service(), "ScopeVer", currentScopeVer);
 }
@@ -167,8 +184,24 @@ static inline std::string get_config_str(OBSBasic *main, const char *section,
 bool OAuth::LoadInternal()
 {
 	OBSBasic *main = OBSBasic::Get();
-	refresh_token = get_config_str(main, service(), "RefreshToken");
-	token = get_config_str(main, service(), "Token");
+
+	std::string keychain_key = "OBS::";
+	keychain_key += obs_frontend_get_current_profile();
+	keychain_key += "::";
+	keychain_key += service();
+
+	std::string keychain_data;
+	std::string username;
+
+	if (KeychainLoad(keychain_key, username, keychain_data)) {
+		refresh_token =
+			keychain_data.substr(0, keychain_data.find("::"));
+		token = keychain_data.substr(keychain_data.find("::") + 2);
+	} else {
+		refresh_token = get_config_str(main, service(), "RefreshToken");
+		token = get_config_str(main, service(), "Token");
+	}
+
 	expire_time = config_get_uint(main->Config(), service(), "ExpireTime");
 	currentScopeVer =
 		(int)config_get_int(main->Config(), service(), "ScopeVer");
