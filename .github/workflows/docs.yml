@@ -60,6 +60,9 @@ jobs:
           target_path: '../home/_build'
           pre_build_commands: 'pip install -Iv sphinx==5.1.1'
 
+      - name: Copy redirects file
+        run: sudo cp docs/_redirects '${{ runner.temp }}/_github_home/_build/_redirects'
+
       - uses: actions/upload-artifact@v3
         with:
           name: 'OBS Studio Docs ${{ steps.setup.outputs.commitHash }}'
