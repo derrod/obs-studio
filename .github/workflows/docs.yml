@@ -63,9 +63,6 @@ jobs:
           target_path: '../home/_build'
           pre_build_commands: 'pip install -Iv sphinx==5.1.1'
 
-      - name: Copy redirects file
-        run: sudo cp docs/_redirects '${{ runner.temp }}/_github_home/_build/_redirects'
-
       - uses: actions/upload-artifact@v3
         with:
           name: 'OBS Studio Docs ${{ steps.setup.outputs.commitHash }}'
@@ -87,6 +84,11 @@ jobs:
         with:
           name: 'OBS Studio Docs ${{ needs.docs.outputs.commitHash }}'
           path: docs
+
+      - name: Setup redirects
+        run: |
+          echo "/previous/27.2 https://obsproject.com/docs/27.2 302" >> docs/_redirects
+          echo "/previous/:major.:minor https://:major-:minor.obs-docs-test.pages.dev 302" >> docs/_redirects
 
       - name: Publish to live page
         uses: cloudflare/wrangler-action@4c10c1822abba527d820b29e6333e7f5dac2cabd
