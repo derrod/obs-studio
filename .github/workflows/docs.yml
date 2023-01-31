@@ -88,7 +88,7 @@ jobs:
       - name: Setup redirects
         run: |
           echo "/previous/27.2 https://obsproject.com/docs/27.2 302" >> docs/_redirects
-          echo "/previous/:major.:minor https://:major-:minor.obs-docs-test.pages.dev 302" >> docs/_redirects
+          echo "/previous/:major.:minor https://:major-:minor.${{ vars.CF_PAGES_PROJECT }}.pages.dev 302" >> docs/_redirects
 
       - name: Publish to live page
         uses: cloudflare/wrangler-action@4c10c1822abba527d820b29e6333e7f5dac2cabd
