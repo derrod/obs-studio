@@ -52,6 +52,9 @@ $CheckoutDir = Resolve-Path -Path "$PSScriptRoot\.."
 $DepsBuildDir = "${CheckoutDir}/../obs-build-dependencies"
 $ObsBuildDir = "${CheckoutDir}/../obs-studio"
 
+# https://github.com/actions/runner-images/issues/7007
+[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12 -bor [Net.SecurityProtocolType]::Tls13
+
 . ${CheckoutDir}/CI/include/build_support_windows.ps1
 
 # Handle installation of build system components and build dependencies
