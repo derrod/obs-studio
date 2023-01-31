@@ -130,6 +130,7 @@ function Install-Dependencies {
         @('cef', $WindowsCefVersion)
     )
 
+    [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12 -bor [Net.SecurityProtocolType]::Tls13
     Foreach($Dependency in ${BuildDependencies}) {
         $DependencyName = $Dependency[0]
         $DependencyVersion = $Dependency[1]
