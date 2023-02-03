@@ -275,6 +275,8 @@ static struct obs_data_item *obs_data_item_create(const char *name,
 
 	name_size = get_name_align_size(name);
 	total_size = name_size + sizeof(struct obs_data_item) + size;
+	if (default_data)
+		total_size += size;
 
 	item = bzalloc(total_size);
 
@@ -287,6 +289,9 @@ static struct obs_data_item *obs_data_item_create(const char *name,
 		item->default_len = size;
 		item->default_size = size;
 
+		item->data_len = size;
+		item->data_size = size;
+
 	} else if (autoselect_data) {
 		item->autoselect_size = size;
 
@@ -297,8 +302,13 @@ static struct obs_data_item *obs_data_item_create(const char *name,
 
 	strcpy(get_item_name(item), name);
 	memcpy(get_item_data(item), data, size);
-
 	item_data_addref(item);
+
+	if (default_data) {
+		memcpy(get_item_default_data(item), data, size);
+		item_default_data_addref(item);
+	}
+
 	return item;
 }
 
@@ -918,6 +928,9 @@ static void set_item_data(struct obs_data *data, struct obs_data_item **item,
 		obs_data_item_release(&next);
 
 	} else if (default_data) {
+		if (item && *item && (*item)->data_len == 0)
+			obs_data_item_setdata(item, ptr, size, type);
+
 		obs_data_item_set_default_data(item, ptr, size, type);
 	} else if (autoselect_data) {
 		obs_data_item_set_autoselect_data(item, ptr, size, type);
@@ -1077,12 +1090,30 @@ static inline void clear_item(struct obs_data_item *item)
 			if (obj && *obj)
 				obs_data_release(*obj);
 
+			obs_data_t *def = obs_data_item_get_default_obj(item);
+			if (obj && def) {
+				*obj = def;
+				return;
+			}
 		} else if (item->type == OBS_DATA_ARRAY) {
 			obs_data_array_t **array = item->data_size ? ptr : NULL;
 
 			if (array && *array)
 				obs_data_array_release(*array);
+
+			obs_data_array_t *def =
+				obs_data_item_get_default_array(item);
+			if (array && def) {
+				*array = def;
+				return;
+			}
+		} else if (item->type != OBS_DATA_STRING && item->default_len) {
+			memcpy(ptr, (uint8_t *)ptr + item->data_len,
+			       item->default_size);
+			return;
 		}
+
+		// ToDo deal with strings
 
 		size = item->default_len + item->autoselect_size;
 		if (size)
