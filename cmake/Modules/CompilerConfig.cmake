@@ -52,6 +52,7 @@ if(OS_WINDOWS AND MSVC)
   endif()
 
   add_compile_options(
+    /Brepro
     /MP
     /W3
     /WX
@@ -71,6 +72,10 @@ if(OS_WINDOWS AND MSVC)
     /utf-8)
 
   add_link_options(
+    # ToDo figure out how to properly escape this (currently it gets turned into
+    # %%%%PDB%%%%, thanks cmake!)
+    "LINKER:/PDBALTPATH:%_PDB%"
+    "LINKER:/Brepro"
     "LINKER:/OPT:REF"
     "LINKER:/WX"
     "$<$<NOT:$<EQUAL:${CMAKE_SIZEOF_VOID_P},8>>:LINKER\:/SAFESEH\:NO>"
