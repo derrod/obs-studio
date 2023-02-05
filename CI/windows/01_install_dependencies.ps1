@@ -31,13 +31,7 @@ Function Install-obs-deps {
     if (!(Test-Path "${DepsBuildDir}/windows-deps-${Version}-${ArchSuffix}")) {
 
         Write-Step "Download..."
-        $ProgressPreference = $(if ($Quiet.isPresent) { "SilentlyContinue" } else { "Continue" })
-        try {
-            Invoke-WebRequest -Uri "https://github.com/obsproject/obs-deps/releases/download/${Version}/windows-deps-${Version}-${ArchSuffix}.zip" -UseBasicParsing -OutFile "windows-deps-${Version}-${ArchSuffix}.zip"
-        } catch {
-            Write-Output $Error[0].Exception.InnerException
-        }
-        $ProgressPreference = "Continue"
+        curl -f "https://github.com/obsproject/obs-deps/releases/download/${Version}/windows-deps-${Version}-${ArchSuffix}.zip" -o "windows-deps-${Version}-${ArchSuffix}.zip"
 
         Write-Step "Unpack..."
 
@@ -61,13 +55,7 @@ function Install-qt-deps {
     if (!(Test-Path "${DepsBuildDir}/windows-deps-${Version}-${ArchSuffix}/mkspecs")) {
 
         Write-Step "Download..."
-        $ProgressPreference = $(if ($Quiet.isPresent) { 'SilentlyContinue' } else { 'Continue' })
-        try {
-            Invoke-WebRequest -Uri "https://github.com/obsproject/obs-deps/releases/download/${Version}/windows-deps-qt6-${Version}-${ArchSuffix}.zip" -UseBasicParsing -OutFile "windows-deps-qt6-${Version}-${ArchSuffix}.zip"
-        } catch {
-            Write-Output $Error[0].Exception.InnerException
-        }
-        $ProgressPreference = "Continue"
+        curl -f "https://github.com/obsproject/obs-deps/releases/download/${Version}/windows-deps-qt6-${Version}-${ArchSuffix}.zip" -o "windows-deps-qt6-${Version}-${ArchSuffix}.zip"
 
         Write-Step "Unpack..."
 
@@ -88,9 +76,7 @@ function Install-vlc {
 
     if (!((Test-Path "$DepsBuildDir/vlc-${Version}") -and (Test-Path "$DepsBuildDir/vlc-${Version}/include/vlc/vlc.h"))) {
         Write-Step "Download..."
-        $ProgressPreference = $(if ($Quiet.isPresent) { 'SilentlyContinue' } else { 'Continue' })
-        Invoke-WebRequest -Uri "https://cdn-fastly.obsproject.com/downloads/vlc.zip" -UseBasicParsing -OutFile "vlc_${Version}.zip"
-        $ProgressPreference = "Continue"
+        curl -f "https://cdn-fastly.obsproject.com/downloads/vlc.zip" -o "vlc_${Version}.zip"
 
         Write-Step "Unpack..."
         # Expand-Archive -Path "vlc_${Version}.zip"
@@ -113,9 +99,7 @@ function Install-cef {
 
     if (!((Test-Path "${DepsBuildDir}/cef_binary_${Version}_windows_${ArchSuffix}") -and (Test-Path "${DepsBuildDir}/cef_binary_${Version}_windows_${ArchSuffix}/build/libcef_dll_wrapper/Release/libcef_dll_wrapper.lib"))) {
         Write-Step "Download..."
-        $ProgressPreference = $(if ($Quiet.isPresent) { 'SilentlyContinue' } else { 'Continue' })
-        Invoke-WebRequest -Uri "https://cdn-fastly.obsproject.com/downloads/cef_binary_${Version}_windows_${ArchSuffix}.zip" -UseBasicParsing -OutFile "cef_binary_${Version}_windows_${ArchSuffix}.zip"
-        $ProgressPreference = "Continue"
+        curl -f "https://cdn-fastly.obsproject.com/downloads/cef_binary_${Version}_windows_${ArchSuffix}.zip" -o "cef_binary_${Version}_windows_${ArchSuffix}.zip"
 
         Write-Step "Unpack..."
         Expand-Archive -Path "cef_binary_${Version}_windows_${ArchSuffix}.zip" -Force
