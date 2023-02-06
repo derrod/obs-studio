@@ -16,6 +16,7 @@ set_target_properties(
   PROPERTIES AUTOMOC ON
              AUTOUIC ON
              AUTORCC ON
+             AUTORCC_OPTIONS "--format-version;1;--compress-algo;zlib"
              AUTOUIC_SEARCH_PATHS "forms")
 
 target_sources(aja-output-ui PRIVATE forms/output.ui)
