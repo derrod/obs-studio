@@ -63,6 +63,142 @@ jobs:
         run: |
           ./CI/check-cmake.sh
 
+  macos_build:
+    name: '02 - macOS'
+    runs-on: [macos-12]
+    strategy:
+      matrix:
+        suffix: [a, b]
+    if: always()
+    needs: [clang_check]
+    env:
+      MACOSX_DEPLOYMENT_TARGET_X86_64: '10.15'
+      MACOSX_DEPLOYMENT_TARGET_ARM64: '11.0'
+      SPARKLE_VERSION: '1.26.0'
+      SPARKLE_HASH: '8312cbf7528297a49f1b97692c33cb8d33254c396dc51be394e9484e4b6833a0'
+      BLOCKED_FORMULAS: 'speexdsp curl php composer'
+      CODESIGN_IDENT: '-'
+      HAVE_CODESIGN_IDENTITY: ${{ secrets.MACOS_SIGNING_IDENTITY != '' && secrets.MACOS_SIGNING_CERT != '' }}
+      ARCH: 'arm64'
+    defaults:
+      run:
+        shell: bash
+        working-directory: 'obs-studio'
+    steps:
+      - name: 'Checkout'
+        uses: actions/checkout@v3
+        with:
+          submodules: 'recursive'
+          path: 'obs-studio'
+          fetch-depth: 0
+
+      - name: 'Check for Github Labels'
+        if: github.event_name == 'pull_request'
+        run: |
+          if test -n "$(curl -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" -s "${{ github.event.pull_request.url }}" | jq -e '.labels[] | select(.name == "Seeking Testers")')"; then
+            echo "SEEKING_TESTERS=1" >> $GITHUB_ENV
+          else
+            echo "SEEKING_TESTERS=0" >> $GITHUB_ENV
+          fi
+
+          echo "CACHE_DATE=$(date +"%Y-%m-%d")" >> $GITHUB_ENV
+
+      - name: 'Restore ccache from cache'
+        id: ccache-cache
+        uses: actions/cache@v3
+        env:
+          CACHE_NAME: 'ccache-cache'
+        with:
+          path: ${{ github.workspace }}/.ccache
+          key: ${{ runner.os }}-pr-${{ env.CACHE_NAME }}-${{ env.ARCH }}-${{ env.CACHE_DATE }}
+
+      - name: 'Restore Chromium Embedded Framework from cache'
+        id: cef-cache
+        uses: actions/cache@v3
+        env:
+          CACHE_NAME: 'cef-cache'
+        with:
+          path: ${{ github.workspace }}/obs-build-dependencies/cef_binary_${{ env.CEF_BUILD_VERSION_MAC }}_macos_${{ env.ARCH }}
+          key: ${{ runner.os }}-pr-${{ env.CACHE_NAME }}-${{ env.CEF_BUILD_VERSION_MAC }}-${{ env.ARCH }}-${{ env.CACHE_REVISION }}
+
+      - name: 'Restore VLC dependency from cache'
+        id: vlc-cache
+        uses: actions/cache@v3
+        env:
+          CACHE_NAME: 'vlc-cache'
+        with:
+          path: ${{ github.workspace }}/obs-build-dependencies/vlc-${{ env.VLC_VERSION_MAC }}
+          key: ${{ runner.os }}-pr-${{ env.CACHE_NAME }}-${{ env.VLC_VERSION_MAC }}-${{ env.CACHE_REVISION }}
+
+      - name: 'Restore Sparkle dependency from cache'
+        id: sparkle-cache
+        uses: actions/cache@v3
+        env:
+          CACHE_NAME: 'sparkle-cache'
+        with:
+          path: ${{ github.workspace }}/obs-build-dependencies/obs-deps/lib/Sparkle.framework
+          key: ${{ runner.os }}-pr-${{ env.CACHE_NAME }}-${{ env.SPARKLE_VERSION }}-${{ env.CACHE_REVISION }}
+
+      - name: 'Setup build environment'
+        id: setup
+        run: |
+          REMOVE_FORMULAS=""
+          for FORMULA in ${{ env.BLOCKED_FORMULAS }}; do
+            if [ -d "/usr/local/opt/${FORMULA}" ]; then
+              REMOVE_FORMULAS="${REMOVE_FORMULAS}${FORMULA} "
+            fi
+          done
+
+          if [ -n "${REMOVE_FORMULAS}" ]; then
+            brew uninstall ${REMOVE_FORMULAS}
+          fi
+
+          echo "commitHash=$(git rev-parse --short=9 HEAD)" >> $GITHUB_OUTPUT
+
+      - name: 'Switch to Xcode 14.1'
+        run: sudo xcode-select -switch /Applications/Xcode_14.1.app
+
+      - name: 'Install dependencies'
+        env:
+          RESTORED_VLC: ${{ steps.vlc-cache.outputs.cache-hit }}
+          RESTORED_SPARKLE: ${{ steps.sparkle-cache.outputs.cache-hit }}
+          RESTORED_CEF: ${{ steps.cef-cache.outputs.cache-hit }}
+        run: CI/macos/01_install_dependencies.sh --architecture "${{ env.ARCH }}"
+
+      - name: 'Install Apple Developer Certificate'
+        if: ${{ startsWith(github.ref, 'refs/tags/') && github.event_name != 'pull_request' && env.HAVE_CODESIGN_IDENTITY == 'true' }}
+        uses: apple-actions/import-codesign-certs@253ddeeac23f2bdad1646faac5c8c2832e800071
+        with:
+          p12-file-base64: ${{ secrets.MACOS_SIGNING_CERT }}
+          p12-password: ${{ secrets.MACOS_SIGNING_CERT_PASSWORD }}
+
+      - name: 'Set Signing Identity'
+        if: ${{ startsWith(github.ref, 'refs/tags/') && github.event_name != 'pull_request' && env.HAVE_CODESIGN_IDENTITY == 'true' }}
+        run: |
+          echo "CODESIGN_IDENT=${{ secrets.MACOS_SIGNING_IDENTITY }}" >> $GITHUB_ENV
+          echo "BUILD_FOR_DISTRIBUTION=ON" >> $GITHUB_ENV
+
+      - name: 'Build OBS'
+        run: CI/macos/02_build_obs.sh --codesign --architecture "${{ env.ARCH }}"
+
+      - name: 'Run tests'
+        if: ${{ success() && env.ARCH == 'x86_64' }}
+        run: cmake --build build -t test
+
+      - name: 'Create build artifact'
+        if: ${{ success() && (github.event_name != 'pull_request' || env.SEEKING_TESTERS == '1') }}
+        run: |
+          CI/macos/03_package_obs.sh --codesign --architecture "${{ env.ARCH }}"
+          ARTIFACT_NAME=$(basename $(/usr/bin/find build -type f -name "obs-studio-*.dmg" -depth 1 | head -1))
+          echo "FILE_NAME=${ARTIFACT_NAME}" >> $GITHUB_ENV
+
+      - name: 'Upload build Artifact'
+        if: ${{ success() && (github.event_name != 'pull_request' || env.SEEKING_TESTERS == '1') }}
+        uses: actions/upload-artifact@v3
+        with:
+          name: 'obs-studio-macos-${{ env.ARCH }}-${{ steps.setup.outputs.commitHash }}-${{ matrix.suffix }}'
+          path: '${{ github.workspace }}/obs-studio/build/${{ env.FILE_NAME }}'
+
   windows_build:
     name: '02 - Windows'
     runs-on: [windows-2022]
