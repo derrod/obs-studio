@@ -19,7 +19,8 @@ set_target_properties(
   obs-vst
   PROPERTIES AUTOMOC ON
              AUTOUIC ON
-             AUTORCC ON)
+             AUTORCC ON
+             AUTORCC_OPTIONS "--format-version;1;--compress-algo;zlib")
 
 target_include_directories(
   obs-vst PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}

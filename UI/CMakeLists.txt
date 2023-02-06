@@ -80,6 +80,7 @@ set_target_properties(
   PROPERTIES AUTOMOC ON
              AUTOUIC ON
              AUTORCC ON
+             AUTORCC_OPTIONS "--format-version;1;--compress-algo;zlib"
              AUTOUIC_SEARCH_PATHS "forms;forms/source-toolbar")
 
 target_include_directories(obs PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}
