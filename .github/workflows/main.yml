@@ -104,15 +104,6 @@ jobs:
 
           echo "CACHE_DATE=$(date +"%Y-%m-%d")" >> $GITHUB_ENV
 
-      - name: 'Restore ccache from cache'
-        id: ccache-cache
-        uses: actions/cache@v3
-        env:
-          CACHE_NAME: 'ccache-cache'
-        with:
-          path: ${{ github.workspace }}/.ccache
-          key: ${{ runner.os }}-pr-${{ env.CACHE_NAME }}-${{ env.ARCH }}-${{ env.CACHE_DATE }}
-
       - name: 'Restore Chromium Embedded Framework from cache'
         id: cef-cache
         uses: actions/cache@v3
