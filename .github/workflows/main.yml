@@ -37,6 +37,7 @@ env:
   YOUTUBE_SECRET: ${{ secrets.YOUTUBE_SECRET }}
   YOUTUBE_SECRET_HASH: ${{ secrets.YOUTUBE_SECRET_HASH }}
   SOURCE_DATE_EPOCH: '1380595033'
+  ZERO_AR_DATE: '1'
 
 jobs:
   clang_check:
