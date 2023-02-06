@@ -72,9 +72,6 @@ if(OS_WINDOWS AND MSVC)
     /utf-8)
 
   add_link_options(
-    # ToDo figure out how to properly escape this (currently it gets turned into
-    # %%%%PDB%%%%, thanks cmake!)
-    "LINKER:/PDBALTPATH:%_PDB%"
     "LINKER:/Brepro"
     "LINKER:/OPT:REF"
     "LINKER:/WX"
