@@ -247,6 +247,7 @@ target_link_libraries(
           FFmpeg::swresample
           Jansson::Jansson
           OBS::caption
+          OBS::uthash
           ZLIB::ZLIB
   PUBLIC Threads::Threads)
 
@@ -461,6 +462,8 @@ target_compile_definitions(libobs PUBLIC HAVE_OBSCONFIG_H)
 if(ENABLE_FFMPEG_MUX_DEBUG)
   target_compile_definitions(libobs PRIVATE SHOW_SUBPROCESSES)
 endif()
+
+target_compile_definitions(libobs PRIVATE "HASH_FUNCTION=HASH_SFH")
 
 get_target_property(_OBS_SOURCES libobs SOURCES)
 set(_OBS_HEADERS ${_OBS_SOURCES})
