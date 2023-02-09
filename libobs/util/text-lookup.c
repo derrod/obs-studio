@@ -189,9 +189,6 @@ static void lookup_addfiledata(struct text_lookup *lookup,
 		item->lookup = bstrdup_n(name.array, name.len);
 		item->value = convert_string(value.array, value.len);
 
-		for (size_t i = 0; i < name.len; i++)
-			item->lookup[i] = toupper(item->lookup[i]);
-
 		HASH_REPLACE_STR(lookup->items, lookup, item, old);
 
 		if (old)
@@ -212,14 +209,7 @@ static inline bool lookup_getstring(const char *lookup_val, const char **out,
 	if (!lookup->items)
 		return false;
 
-	int len = (int)strlen(lookup_val);
-	char *key = bmalloc(len + 1);
-	for (int i = 0; i < len; ++i)
-		key[i] = toupper(lookup_val[i]);
-	key[len] = 0;
-
-	HASH_FIND_STR(lookup->items, key, item);
-	bfree(key);
+	HASH_FIND_STR(lookup->items, lookup_val, item);
 
 	if (!item)
 		return false;
