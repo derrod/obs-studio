@@ -913,6 +913,7 @@ static bool obs_init_data(void)
 	if (!obs_view_init(&data->main_view))
 		goto fail;
 
+	data->sources = NULL;
 	data->private_data = obs_data_create();
 	data->valid = true;
 
@@ -930,6 +931,17 @@ void obs_main_view_free(struct obs_view *view)
 
 	memset(view->channels, 0, sizeof(view->channels));
 	pthread_mutex_destroy(&view->channels_mutex);
+}
+
+static void free_sources_hash_table(obs_source_t **ht)
+{
+	struct obs_context_data *ctx, *tmp;
+
+	HASH_ITER(hh, *(struct obs_context_data **)ht, ctx, tmp)
+	{
+		HASH_DEL(*(struct obs_context_data **)ht, ctx);
+		obs_source_destroy((obs_source_t *)ctx);
+	}
 }
 
 #define FREE_OBS_LINKED_LIST(type)                                         \
@@ -955,11 +967,13 @@ static void obs_free_data(void)
 
 	blog(LOG_INFO, "Freeing OBS context data");
 
-	FREE_OBS_LINKED_LIST(source);
+	FREE_OBS_LINKED_LIST(private_source);
 	FREE_OBS_LINKED_LIST(output);
 	FREE_OBS_LINKED_LIST(encoder);
 	FREE_OBS_LINKED_LIST(display);
 	FREE_OBS_LINKED_LIST(service);
+
+	free_sources_hash_table(&data->sources);
 
 	os_task_queue_wait(obs->destruction_task_thread);
 
@@ -1780,20 +1794,31 @@ void obs_set_output_source(uint32_t channel, obs_source_t *source)
 void obs_enum_sources(bool (*enum_proc)(void *, obs_source_t *), void *param)
 {
 	obs_source_t *source;
+	struct obs_context_data *ctx, *tmp;
 
 	pthread_mutex_lock(&obs->data.sources_mutex);
-	source = obs->data.first_source;
+
+	HASH_ITER(hh, (struct obs_context_data *)obs->data.sources, ctx, tmp)
+	{
+		obs_source_t *s = obs_source_get_ref((obs_source_t *)ctx);
+		if (s) {
+			if (s->info.type == OBS_SOURCE_TYPE_INPUT &&
+			    !enum_proc(param, s)) {
+				obs_source_release(s);
+				goto unlock;
+			}
+			obs_source_release(s);
+		}
+	}
+
+	/* ToDo: do we even want private groups to be enumerable? */
+	source = obs->data.first_private_source;
 
 	while (source) {
 		obs_source_t *s = obs_source_get_ref(source);
 		if (s) {
 			if (strcmp(s->info.id, group_info.id) == 0 &&
 			    !enum_proc(param, s)) {
-				obs_source_release(s);
-				break;
-			} else if (s->info.type == OBS_SOURCE_TYPE_INPUT &&
-				   !s->context.private &&
-				   !enum_proc(param, s)) {
 				obs_source_release(s);
 				break;
 			}
@@ -1803,28 +1828,28 @@ void obs_enum_sources(bool (*enum_proc)(void *, obs_source_t *), void *param)
 		source = (obs_source_t *)source->context.next;
 	}
 
+unlock:
 	pthread_mutex_unlock(&obs->data.sources_mutex);
 }
 
 void obs_enum_scenes(bool (*enum_proc)(void *, obs_source_t *), void *param)
 {
 	obs_source_t *source;
+	struct obs_context_data *ctx, *tmp;
 
 	pthread_mutex_lock(&obs->data.sources_mutex);
-	source = obs->data.first_source;
 
-	while (source) {
-		obs_source_t *s = obs_source_get_ref(source);
-		if (s) {
+	HASH_ITER(hh, (struct obs_context_data *)obs->data.sources, ctx, tmp)
+	{
+		source = obs_source_get_ref((obs_source_t *)ctx);
+		if (source) {
 			if (source->info.type == OBS_SOURCE_TYPE_SCENE &&
-			    !source->context.private && !enum_proc(param, s)) {
-				obs_source_release(s);
+			    !enum_proc(param, source)) {
+				obs_source_release(source);
 				break;
 			}
-			obs_source_release(s);
+			obs_source_release(source);
 		}
-
-		source = (obs_source_t *)source->context.next;
 	}
 
 	pthread_mutex_unlock(&obs->data.sources_mutex);
@@ -1853,11 +1878,34 @@ static inline void obs_enum(void *pstart, pthread_mutex_t *mutex, void *proc,
 	pthread_mutex_unlock(mutex);
 }
 
+static inline void obs_enum_hash(void *pstart, pthread_mutex_t *mutex,
+				 void *proc, void *param)
+{
+	struct obs_context_data **start = pstart, *context, *tmp;
+	bool (*enum_proc)(void *, void *) = proc;
+
+	assert(start);
+	assert(mutex);
+	assert(enum_proc);
+
+	pthread_mutex_lock(mutex);
+
+	HASH_ITER(hh, *start, context, tmp)
+	{
+		if (!enum_proc(param, context))
+			break;
+	}
+
+	pthread_mutex_unlock(mutex);
+}
+
 void obs_enum_all_sources(bool (*enum_proc)(void *, obs_source_t *),
 			  void *param)
 {
-	obs_enum(&obs->data.first_source, &obs->data.sources_mutex, enum_proc,
-		 param);
+	obs_enum_hash(&obs->data.sources, &obs->data.sources_mutex, enum_proc,
+		      param);
+	obs_enum(&obs->data.first_private_source, &obs->data.sources_mutex,
+		 enum_proc, param);
 }
 
 void obs_enum_outputs(bool (*enum_proc)(void *, obs_output_t *), void *param)
@@ -1900,6 +1948,23 @@ static inline void *get_context_by_name(void *vfirst, const char *name,
 	return context;
 }
 
+static void *get_context_by_name_hash(void *vfirst, const char *name,
+				      pthread_mutex_t *mutex,
+				      void *(*addref)(void *))
+{
+	struct obs_context_data **ht = vfirst;
+	struct obs_context_data *context;
+
+	pthread_mutex_lock(mutex);
+
+	HASH_FIND_STR(*ht, name, context);
+	if (context)
+		addref(context);
+
+	pthread_mutex_unlock(mutex);
+	return context;
+}
+
 static inline void *obs_source_addref_safe_(void *ref)
 {
 	return obs_source_get_ref(ref);
@@ -1927,14 +1992,14 @@ static inline void *obs_id_(void *data)
 
 obs_source_t *obs_get_source_by_name(const char *name)
 {
-	return get_context_by_name(&obs->data.first_source, name,
-				   &obs->data.sources_mutex,
-				   obs_source_addref_safe_);
+	return get_context_by_name_hash(&obs->data.sources, name,
+					&obs->data.sources_mutex,
+					obs_source_addref_safe_);
 }
 
 obs_source_t *obs_get_transition_by_name(const char *name)
 {
-	struct obs_source **first = &obs->data.first_source;
+	struct obs_source **first = &obs->data.first_private_source;
 	struct obs_source *source;
 
 	pthread_mutex_lock(&obs->data.sources_mutex);
@@ -2382,6 +2447,7 @@ obs_data_array_t *obs_save_sources_filtered(obs_save_source_filter_cb cb,
 					    void *data_)
 {
 	struct obs_core_data *data = &obs->data;
+	struct obs_context_data *ctx, *tmp;
 	obs_data_array_t *array;
 	obs_source_t *source;
 
@@ -2389,19 +2455,17 @@ obs_data_array_t *obs_save_sources_filtered(obs_save_source_filter_cb cb,
 
 	pthread_mutex_lock(&data->sources_mutex);
 
-	source = data->first_source;
-
-	while (source) {
-		if ((source->info.type != OBS_SOURCE_TYPE_FILTER) != 0 &&
-		    !source->context.private && !source->removed &&
-		    !source->temp_removed && cb(data_, source)) {
+	HASH_ITER(hh, (struct obs_context_data *)data->sources, ctx, tmp)
+	{
+		source = (obs_source_t *)ctx;
+		if (source->info.type != OBS_SOURCE_TYPE_FILTER &&
+		    !source->removed && !source->temp_removed &&
+		    cb(data_, source)) {
 			obs_data_t *source_data = obs_save_source(source);
 
 			obs_data_array_push_back(array, source_data);
 			obs_data_release(source_data);
 		}
-
-		source = (obs_source_t *)source->context.next;
 	}
 
 	pthread_mutex_unlock(&data->sources_mutex);
@@ -2527,6 +2591,22 @@ void obs_context_data_insert(struct obs_context_data *context,
 	pthread_mutex_unlock(mutex);
 }
 
+void obs_context_data_insert_hash(struct obs_context_data *context,
+				  pthread_mutex_t *mutex, void *pfirst)
+{
+	struct obs_context_data **first = pfirst;
+
+	assert(context);
+	assert(mutex);
+	assert(first);
+
+	context->mutex = mutex;
+
+	pthread_mutex_lock(mutex);
+	HASH_ADD_STR(*first, name, context);
+	pthread_mutex_unlock(mutex);
+}
+
 void obs_context_data_remove(struct obs_context_data *context)
 {
 	if (context && context->prev_next) {
@@ -2535,6 +2615,19 @@ void obs_context_data_remove(struct obs_context_data *context)
 		if (context->next)
 			context->next->prev_next = context->prev_next;
 		context->prev_next = NULL;
+		pthread_mutex_unlock(context->mutex);
+	}
+}
+
+void obs_context_data_remove_hash(struct obs_context_data *context, void *phead)
+{
+	struct obs_context_data **head = phead;
+
+	assert(head);
+
+	if (context) {
+		pthread_mutex_lock(context->mutex);
+		HASH_DELETE(hh, *head, context);
 		pthread_mutex_unlock(context->mutex);
 	}
 }
@@ -2553,6 +2646,21 @@ void obs_context_data_setname(struct obs_context_data *context,
 	if (context->name)
 		da_push_back(context->rename_cache, &context->name);
 	context->name = dup_name(name, context->private);
+
+	pthread_mutex_unlock(&context->rename_cache_mutex);
+}
+
+void obs_context_data_setname_hash(struct obs_context_data *context,
+				   const char *name, void *phead)
+{
+	struct obs_context_data **head = phead;
+	pthread_mutex_lock(&context->rename_cache_mutex);
+
+	HASH_DEL(*head, context);
+	if (context->name)
+		da_push_back(context->rename_cache, &context->name);
+	context->name = dup_name(name, context->private);
+	HASH_ADD_STR(*head, name, context);
 
 	pthread_mutex_unlock(&context->rename_cache_mutex);
 }

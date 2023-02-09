@@ -244,8 +244,14 @@ static void obs_source_init_finalize(struct obs_source *source)
 		pthread_mutex_unlock(&obs->data.audio_sources_mutex);
 	}
 
-	obs_context_data_insert(&source->context, &obs->data.sources_mutex,
-				&obs->data.first_source);
+	if (!source->context.private)
+		obs_context_data_insert_hash(&source->context,
+					     &obs->data.sources_mutex,
+					     &obs->data.sources);
+	else
+		obs_context_data_insert(&source->context,
+					&obs->data.sources_mutex,
+					&obs->data.first_private_source);
 }
 
 static bool obs_source_hotkey_mute(void *data, obs_hotkey_pair_id id,
@@ -339,6 +345,26 @@ static void obs_source_init_audio_hotkeys(struct obs_source *source)
 		obs_source_hotkey_push_to_talk, source);
 }
 
+static void obs_source_deduplicate_name(const char **name)
+{
+	struct obs_context_data *tmp;
+	HASH_FIND_STR((struct obs_context_data *)obs->data.sources, *name, tmp);
+
+	if (tmp) {
+		struct dstr new_name = {0};
+		int suffix = 2;
+
+		while (tmp) {
+			dstr_free(&new_name);
+			dstr_printf(&new_name, "%s %d", *name, suffix++);
+			HASH_FIND_STR(
+				(struct obs_context_data *)obs->data.sources,
+				new_name.array, tmp);
+		}
+		*name = new_name.array;
+	}
+}
+
 static obs_source_t *
 obs_source_create_internal(const char *id, const char *name,
 			   obs_data_t *settings, obs_data_t *hotkey_data,
@@ -369,6 +395,10 @@ obs_source_create_internal(const char *id, const char *name,
 	source->push_to_mute_key = OBS_INVALID_HOTKEY_ID;
 	source->push_to_talk_key = OBS_INVALID_HOTKEY_ID;
 	source->last_obs_ver = last_obs_ver;
+
+	/* Deduplicate names for non-private sources. */
+	if (!private)
+		obs_source_deduplicate_name(&name);
 
 	if (!obs_source_init_context(source, settings, name, hotkey_data,
 				     private))
@@ -661,12 +691,21 @@ void obs_source_destroy(struct obs_source *source)
 	while (source->filters.num)
 		obs_source_filter_remove(source, source->filters.array[0]);
 
-	obs_context_data_remove(&source->context);
+	if (!source->context.private)
+		obs_context_data_remove_hash(&source->context,
+					     &obs->data.sources);
+	else
+		obs_context_data_remove(&source->context);
 
 	/* defer source destroy */
 	os_task_queue_queue_task(obs->destruction_task_thread,
 				 (os_task_t)obs_source_destroy_defer, source);
 }
+
+void obs_private_source_destroy(struct obs_source *source)
+{
+	obs_source_destroy(source);
+};
 
 static void obs_source_destroy_defer(struct obs_source *source)
 {
@@ -4205,7 +4244,14 @@ void obs_source_set_name(obs_source_t *source, const char *name)
 	    strcmp(name, source->context.name) != 0) {
 		struct calldata data;
 		char *prev_name = bstrdup(source->context.name);
-		obs_context_data_setname(&source->context, name);
+
+		if (!source->context.private) {
+			obs_source_deduplicate_name(&name);
+			obs_context_data_setname_hash(&source->context, name,
+						      &obs->data.sources);
+		} else {
+			obs_context_data_setname(&source->context, name);
+		}
 
 		calldata_init(&data);
 		calldata_set_ptr(&data, "source", source);
