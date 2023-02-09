@@ -38,6 +38,7 @@
 #include "obs.h"
 
 #include <caption/caption.h>
+#include <uthash/uthash.h>
 
 #define NUM_TEXTURES 2
 #define NUM_CHANNELS 3
@@ -372,7 +373,8 @@ struct obs_core_audio {
 
 /* user sources, output channels, and displays */
 struct obs_core_data {
-	struct obs_source *first_source;
+	struct obs_source *sources;
+	struct obs_source *first_private_source;
 	struct obs_source *first_audio_source;
 	struct obs_display *first_display;
 	struct obs_output *first_output;
@@ -539,6 +541,7 @@ struct obs_context_data {
 	pthread_mutex_t *mutex;
 	struct obs_context_data *next;
 	struct obs_context_data **prev_next;
+	UT_hash_handle hh;
 
 	bool private;
 };
@@ -553,11 +556,17 @@ extern void obs_context_data_free(struct obs_context_data *context);
 
 extern void obs_context_data_insert(struct obs_context_data *context,
 				    pthread_mutex_t *mutex, void *first);
+extern void obs_context_data_insert_hash(struct obs_context_data *context,
+					 pthread_mutex_t *mutex, void *first);
 extern void obs_context_data_remove(struct obs_context_data *context);
+extern void obs_context_data_remove_hash(struct obs_context_data *context,
+					 void *phead);
 extern void obs_context_wait(struct obs_context_data *context);
 
 extern void obs_context_data_setname(struct obs_context_data *context,
 				     const char *name);
+extern void obs_context_data_setname_hash(struct obs_context_data *context,
+					  const char *name, void *phead);
 
 /* ------------------------------------------------------------------------- */
 /* ref-counting  */
@@ -854,6 +863,7 @@ obs_source_create_set_last_ver(const char *id, const char *name,
 			       obs_data_t *settings, obs_data_t *hotkey_data,
 			       uint32_t last_obs_ver, bool is_private);
 extern void obs_source_destroy(struct obs_source *source);
+extern void obs_private_source_destroy(struct obs_source *source);
 
 enum view_type {
 	MAIN_VIEW,
