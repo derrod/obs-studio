@@ -244,8 +244,12 @@ static void obs_source_init_finalize(struct obs_source *source)
 		pthread_mutex_unlock(&obs->data.audio_sources_mutex);
 	}
 
-	obs_context_data_insert(&source->context, &obs->data.sources_mutex,
-				&obs->data.first_source);
+	obs_context_data_insert_uuid(&source->context, &obs->data.sources_mutex,
+				     &obs->data.sources_uuid);
+	if (!source->context.private)
+		obs_context_data_insert_name(&source->context,
+					     &obs->data.sources_mutex,
+					     &obs->data.sources);
 }
 
 static bool obs_source_hotkey_mute(void *data, obs_hotkey_pair_id id,
@@ -339,11 +343,32 @@ static void obs_source_init_audio_hotkeys(struct obs_source *source)
 		obs_source_hotkey_push_to_talk, source);
 }
 
+static char *obs_source_deduplicate_name(const char *name)
+{
+	struct obs_context_data *tmp;
+	HASH_FIND_STR((struct obs_context_data *)obs->data.sources, name, tmp);
+
+	if (!tmp)
+		return NULL;
+
+	struct dstr new_name = {0};
+	int suffix = 2;
+
+	while (tmp) {
+		dstr_printf(&new_name, "%s %d", name, suffix++);
+		HASH_FIND_STR((struct obs_context_data *)obs->data.sources,
+			      new_name.array, tmp);
+	}
+
+	return new_name.array;
+}
+
 static obs_source_t *
 obs_source_create_internal(const char *id, const char *name, const char *uuid,
 			   obs_data_t *settings, obs_data_t *hotkey_data,
 			   bool private, uint32_t last_obs_ver)
 {
+	char *new_name = NULL;
 	struct obs_source *source = bzalloc(sizeof(struct obs_source));
 
 	const struct obs_source_info *info = get_source_info(id);
@@ -370,8 +395,13 @@ obs_source_create_internal(const char *id, const char *name, const char *uuid,
 	source->push_to_talk_key = OBS_INVALID_HOTKEY_ID;
 	source->last_obs_ver = last_obs_ver;
 
-	if (!obs_source_init_context(source, settings, name, uuid, hotkey_data,
-				     private))
+	/* Deduplicate names for non-private sources. */
+	if (!private)
+		new_name = obs_source_deduplicate_name(name);
+
+	if (!obs_source_init_context(source, settings,
+				     new_name ? new_name : name, uuid,
+				     hotkey_data, private))
 		goto fail;
 
 	if (info) {
@@ -396,10 +426,11 @@ obs_source_create_internal(const char *id, const char *name, const char *uuid,
 		source->context.data =
 			info->create(source->context.settings, source);
 	if ((!info || info->create) && !source->context.data)
-		blog(LOG_ERROR, "Failed to create source '%s'!", name);
+		blog(LOG_ERROR, "Failed to create source '%s'!",
+		     new_name ? new_name : name);
 
 	blog(LOG_DEBUG, "%ssource '%s' (%s) created", private ? "private " : "",
-	     name, id);
+	     new_name ? new_name : name, id);
 
 	source->flags = source->default_flags;
 	source->enabled = true;
@@ -408,12 +439,18 @@ obs_source_create_internal(const char *id, const char *name, const char *uuid,
 		obs_source_dosignal(source, "source_create", NULL);
 	}
 
+	if (new_name)
+		bfree(new_name);
+
 	obs_source_init_finalize(source);
 	return source;
 
 fail:
 	blog(LOG_ERROR, "obs_source_create failed");
 	obs_source_destroy(source);
+	if (new_name)
+		bfree(new_name);
+
 	return NULL;
 }
 
@@ -662,7 +699,10 @@ void obs_source_destroy(struct obs_source *source)
 	while (source->filters.num)
 		obs_source_filter_remove(source, source->filters.array[0]);
 
-	obs_context_data_remove(&source->context);
+	obs_context_data_remove_uuid(&source->context, &obs->data.sources_uuid);
+	if (!source->context.private)
+		obs_context_data_remove_name(&source->context,
+					     &obs->data.sources);
 
 	/* defer source destroy */
 	os_task_queue_queue_task(obs->destruction_task_thread,
@@ -4259,7 +4299,21 @@ void obs_source_set_name(obs_source_t *source, const char *name)
 	    strcmp(name, source->context.name) != 0) {
 		struct calldata data;
 		char *prev_name = bstrdup(source->context.name);
-		obs_context_data_setname(&source->context, name);
+
+		if (!source->context.private) {
+			char *deduped = obs_source_deduplicate_name(name);
+			obs_context_data_remove_name(&source->context,
+						     &obs->data.sources);
+			obs_context_data_setname(&source->context,
+						 deduped ? deduped : name);
+			obs_context_data_insert_name(&source->context,
+						     &obs->data.sources_mutex,
+						     &obs->data.sources);
+			if (deduped)
+				bfree(deduped);
+		} else {
+			obs_context_data_setname(&source->context, name);
+		}
 
 		calldata_init(&data);
 		calldata_set_ptr(&data, "source", source);

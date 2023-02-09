@@ -38,6 +38,13 @@
 #include "obs.h"
 
 #include <caption/caption.h>
+#include <uthash/uthash.h>
+
+/* Custom helpers for the UUID hash table */
+#define HASH_FIND_UUID(head, uuid, out) \
+	HASH_FIND(hh_uuid, head, uuid, UUID_STR_LENGTH, out)
+#define HASH_ADD_UUID(head, uuid_field, add) \
+	HASH_ADD(hh_uuid, head, uuid_field[0], UUID_STR_LENGTH, add)
 
 #define NUM_TEXTURES 2
 #define NUM_CHANNELS 3
@@ -372,7 +379,8 @@ struct obs_core_audio {
 
 /* user sources, output channels, and displays */
 struct obs_core_data {
-	struct obs_source *first_source;
+	struct obs_source *sources;
+	struct obs_source *sources_uuid;
 	struct obs_source *first_audio_source;
 	struct obs_display *first_display;
 	struct obs_output *first_output;
@@ -541,6 +549,9 @@ struct obs_context_data {
 	struct obs_context_data *next;
 	struct obs_context_data **prev_next;
 
+	UT_hash_handle hh;
+	UT_hash_handle hh_uuid;
+
 	bool private;
 };
 
@@ -554,7 +565,18 @@ extern void obs_context_data_free(struct obs_context_data *context);
 
 extern void obs_context_data_insert(struct obs_context_data *context,
 				    pthread_mutex_t *mutex, void *first);
+extern void obs_context_data_insert_name(struct obs_context_data *context,
+					 pthread_mutex_t *mutex, void *first);
+extern void obs_context_data_insert_uuid(struct obs_context_data *context,
+					 pthread_mutex_t *mutex,
+					 void *first_uuid);
+
 extern void obs_context_data_remove(struct obs_context_data *context);
+extern void obs_context_data_remove_name(struct obs_context_data *context,
+					 void *phead);
+extern void obs_context_data_remove_uuid(struct obs_context_data *context,
+					 void *puuid_head);
+
 extern void obs_context_wait(struct obs_context_data *context);
 
 extern void obs_context_data_setname(struct obs_context_data *context,

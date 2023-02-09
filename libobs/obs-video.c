@@ -32,6 +32,7 @@
 static uint64_t tick_sources(uint64_t cur_time, uint64_t last_time)
 {
 	struct obs_core_data *data = &obs->data;
+	struct obs_context_data *ctx, *tmp;
 	struct obs_source *source;
 	uint64_t delta_time;
 	float seconds;
@@ -60,16 +61,13 @@ static uint64_t tick_sources(uint64_t cur_time, uint64_t last_time)
 
 	pthread_mutex_lock(&data->sources_mutex);
 
-	source = data->first_source;
-	while (source) {
-		obs_source_t *s = obs_source_get_ref(source);
-
-		if (s) {
-			obs_source_video_tick(s, seconds);
-			obs_source_release(s);
+	HASH_ITER (hh_uuid, (struct obs_context_data *)data->sources_uuid, ctx,
+		   tmp) {
+		source = obs_source_get_ref((obs_source_t *)ctx);
+		if (source) {
+			obs_source_video_tick(source, seconds);
+			obs_source_release(source);
 		}
-
-		source = (struct obs_source *)source->context.next;
 	}
 
 	pthread_mutex_unlock(&data->sources_mutex);
