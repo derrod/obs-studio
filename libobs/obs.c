@@ -1793,7 +1793,6 @@ void obs_set_output_source(uint32_t channel, obs_source_t *source)
 
 void obs_enum_sources(bool (*enum_proc)(void *, obs_source_t *), void *param)
 {
-	obs_source_t *source;
 	struct obs_context_data *ctx, *tmp;
 
 	pthread_mutex_lock(&obs->data.sources_mutex);
@@ -1805,30 +1804,16 @@ void obs_enum_sources(bool (*enum_proc)(void *, obs_source_t *), void *param)
 			if (s->info.type == OBS_SOURCE_TYPE_INPUT &&
 			    !enum_proc(param, s)) {
 				obs_source_release(s);
-				goto unlock;
-			}
-			obs_source_release(s);
-		}
-	}
-
-	/* ToDo: do we even want private groups to be enumerable? */
-	source = obs->data.first_private_source;
-
-	while (source) {
-		obs_source_t *s = obs_source_get_ref(source);
-		if (s) {
-			if (strcmp(s->info.id, group_info.id) == 0 &&
-			    !enum_proc(param, s)) {
+				break;
+			} else if (strcmp(s->info.id, group_info.id) == 0 &&
+				   !enum_proc(param, s)) {
 				obs_source_release(s);
 				break;
 			}
 			obs_source_release(s);
 		}
-
-		source = (obs_source_t *)source->context.next;
 	}
 
-unlock:
 	pthread_mutex_unlock(&obs->data.sources_mutex);
 }
 
