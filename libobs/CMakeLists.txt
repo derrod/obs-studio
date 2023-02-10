@@ -463,7 +463,12 @@ if(ENABLE_FFMPEG_MUX_DEBUG)
   target_compile_definitions(libobs PRIVATE SHOW_SUBPROCESSES)
 endif()
 
-target_compile_definitions(libobs PRIVATE "HASH_FUNCTION=HASH_SFH")
+if(UTHASH_HASH_FUNCTION)
+  target_compile_definitions(
+    libobs PRIVATE "HASH_FUNCTION=HASH_${UTHASH_HASH_FUNCTION}")
+else()
+  target_compile_definitions(libobs PRIVATE "HASH_FUNCTION=HASH_SFH")
+endif()
 
 get_target_property(_OBS_SOURCES libobs SOURCES)
 set(_OBS_HEADERS ${_OBS_SOURCES})
