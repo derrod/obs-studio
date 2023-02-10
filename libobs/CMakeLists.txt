@@ -10,6 +10,7 @@ find_package(
   COMPONENTS avformat avutil swscale swresample
   OPTIONAL_COMPONENTS avcodec)
 find_package(ZLIB REQUIRED)
+find_package(xxHash)
 
 if(ENABLE_UI)
   find_qt(COMPONENTS Core)
@@ -472,6 +473,20 @@ endif()
 
 if(UTHASH_USE_OBS_ALLOCATOR)
   target_compile_definitions(libobs PRIVATE UTHASH_USE_OBS_ALLOCATOR)
+endif()
+
+if(xxHash_FOUND)
+  target_link_libraries(libobs PRIVATE xxHash::xxhash)
+  target_compile_definitions(libobs PRIVATE UTHASH_USE_XXHASH)
+  target_compile_definitions(libobs PRIVATE XXH_INLINE_ALL)
+  target_compile_definitions(libobs PRIVATE XXH_FORCE_ALIGN_CHECK)
+  target_compile_definitions(libobs PRIVATE XXH_NO_STREAM)
+  # ToDo: Properly check for x86
+  if(OS_WINDOWS)
+    # Restrict to SSE2 as that's the OBS minimum (and totally not just because
+    # my 2600K doesn't support AVX2)
+    target_compile_definitions(libobs PRIVATE "XXH_VECTOR=XXH_SSE2")
+  endif()
 endif()
 
 get_target_property(_OBS_SOURCES libobs SOURCES)

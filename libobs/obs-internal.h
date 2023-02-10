@@ -47,6 +47,12 @@
 #define uthash_free(ptr, sz) bfree(ptr);
 #endif
 
+#ifdef UTHASH_USE_XXHASH
+#include <xxhash/xxhash.h>
+#undef HASH_FUNCTION
+#define HASH_FUNCTION(ptr, len, hv) (hv) = (unsigned)XXH3_64bits(ptr, len);
+#endif
+
 #define NUM_TEXTURES 2
 #define NUM_CHANNELS 3
 #define MICROSECOND_DEN 1000000

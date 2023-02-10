@@ -30,6 +30,12 @@
 #define uthash_free(ptr, sz) bfree(ptr);
 #endif
 
+#ifdef UTHASH_USE_XXHASH
+#include <xxhash/xxhash.h>
+#undef HASH_FUNCTION
+#define HASH_FUNCTION(ptr, len, hv) (hv) = (unsigned)XXH3_64bits(ptr, len);
+#endif
+
 /* ------------------------------------------------------------------------- */
 
 struct text_item {
