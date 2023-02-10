@@ -40,6 +40,13 @@
 #include <caption/caption.h>
 #include <uthash/uthash.h>
 
+#ifdef UTHASH_USE_OBS_ALLOCATOR
+#undef uthash_malloc
+#undef uthash_free
+#define uthash_malloc(sz) bmalloc(sz)
+#define uthash_free(ptr, sz) bfree(ptr);
+#endif
+
 #define NUM_TEXTURES 2
 #define NUM_CHANNELS 3
 #define MICROSECOND_DEN 1000000

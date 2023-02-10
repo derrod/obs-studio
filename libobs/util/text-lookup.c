@@ -23,6 +23,13 @@
 
 #include <uthash/uthash.h>
 
+#ifdef UTHASH_USE_OBS_ALLOCATOR
+#undef uthash_malloc
+#undef uthash_free
+#define uthash_malloc(sz) bmalloc(sz)
+#define uthash_free(ptr, sz) bfree(ptr);
+#endif
+
 /* ------------------------------------------------------------------------- */
 
 struct text_item {
