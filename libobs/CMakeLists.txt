@@ -474,6 +474,8 @@ if(UTHASH_USE_OBS_ALLOCATOR)
   target_compile_definitions(libobs PRIVATE UTHASH_USE_OBS_ALLOCATOR)
 endif()
 
+target_sources(libobs PRIVATE util/experimental/cwisstable.h)
+
 get_target_property(_OBS_SOURCES libobs SOURCES)
 set(_OBS_HEADERS ${_OBS_SOURCES})
 set(_OBS_FILTERS ${_OBS_SOURCES})

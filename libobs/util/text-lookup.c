@@ -21,6 +21,11 @@
 #include "lexer.h"
 #include "platform.h"
 
+#define USE_SWISSTABLES
+
+#ifdef USE_SWISSTABLES
+#include "util/experimental/cwisstable.h"
+#else
 #include <uthash/uthash.h>
 
 #ifdef UTHASH_USE_OBS_ALLOCATOR
@@ -29,9 +34,76 @@
 #define uthash_malloc(sz) bmalloc(sz)
 #define uthash_free(ptr, sz) bfree(ptr);
 #endif
+#endif
 
 /* ------------------------------------------------------------------------- */
+#ifdef USE_SWISSTABLES
 
+// NOTE: THIS REQUIRES FUCKING MSVC TO USE THE STANDARDS CONFORMING PREPROCESSOR AS WELL
+// AS C11. YES THIS IS ANNOYING AND MICROSOFT IS STUPID, BUT IT'LL WORK!
+// WELL, YOU ALSO NEED TWO OF THE PATCHES FROM GOOGLE'S PR TO ENABLE MSVC SUPPORT FOR
+// CWISSTABLES. AND THAT PR IS SO OLD, MICROSOFT ACTUALLY CAUGHT UP WITH STANDARDS SUPPORT!
+// SO YOU ONLY NEED THE ONE TO REMOVE ATOMICS AND THE ONE WITH NATIVE 128 BIT SHIT.
+// AND THEN IT'LL "WORK" BUT IT'S SLOWER THAN FUCKING UTHASH SO IT'S NOT EVEN WORTH IT.
+// ALSO I HAVE MY CAPSLOCK KEY DISABLED ON THIS KEYBOARD SO I HOPE YOU APPRECIATE ME
+// MANUALLY HOLDING DOWN SHIFT TO YELL ALL OF THIS.
+
+static inline void kCStrPolicy_copy(void *dst, const void *src)
+{
+	typedef struct {
+		char *k;
+		char *v;
+	} entry;
+	const entry *e = (const entry *)src;
+	entry *d = (entry *)dst;
+
+	d->k = bstrdup(e->k);
+	d->v = bstrdup(e->v);
+}
+
+static inline void kCStrPolicy_dtor(void *val)
+{
+	typedef struct {
+		char *k;
+		char *v;
+	} entry;
+
+	entry *e = (entry *)val;
+	bfree(e->k);
+	bfree(e->v);
+}
+
+static inline size_t kCStrPolicy_hash(const void *val)
+{
+	const char *str = *(const char *const *)val;
+	size_t len = strlen(str);
+	// CWISS_FxHash_State state = 0;
+	// CWISS_FxHash_Write(&state, str, len);
+	CWISS_AbslHash_State state = CWISS_AbslHash_kInit;
+	CWISS_AbslHash_Write(&state, str, len);
+	return state;
+}
+
+static inline bool kCStrPolicy_eq(const void *a, const void *b)
+{
+	const char *ap = *(const char *const *)a;
+	const char *bp = *(const char *const *)b;
+	return strcmp(ap, bp) == 0;
+}
+
+CWISS_DECLARE_NODE_MAP_POLICY(kCStrPolicy, const char *, char *,
+			      (obj_copy, kCStrPolicy_copy),
+			      (obj_dtor, kCStrPolicy_dtor),
+			      (key_hash, kCStrPolicy_hash),
+			      (key_eq, kCStrPolicy_eq));
+
+CWISS_DECLARE_HASHMAP_WITH(LookupMap, const char *, char *, kCStrPolicy);
+
+struct text_lookup {
+	struct dstr language;
+	LookupMap map;
+};
+#else
 struct text_item {
 	char *lookup, *value;
 	UT_hash_handle hh;
@@ -44,12 +116,13 @@ static inline void text_item_destroy(struct text_item *item)
 	bfree(item);
 }
 
-/* ------------------------------------------------------------------------- */
-
 struct text_lookup {
 	struct dstr language;
 	struct text_item *items;
 };
+#endif
+
+/* ------------------------------------------------------------------------- */
 
 static void lookup_getstringtoken(struct lexer *lex, struct strref *token)
 {
@@ -176,8 +249,6 @@ static void lookup_addfiledata(struct text_lookup *lookup,
 	strref_clear(&value);
 
 	while (lookup_gettoken(&lex, &name)) {
-		struct text_item *item;
-		struct text_item *old;
 		bool got_eq = false;
 
 		if (*name.array == '\n')
@@ -192,6 +263,13 @@ static void lookup_addfiledata(struct text_lookup *lookup,
 			goto getval;
 		}
 
+#ifdef USE_SWISSTABLES
+		LookupMap_Entry item = {0};
+		item.key = bstrdup_n(name.array, name.len);
+		item.val = convert_string(value.array, value.len);
+
+		LookupMap_insert(&lookup->map, &item);
+#else
 		item = bzalloc(sizeof(struct text_item));
 		item->lookup = bstrdup_n(name.array, name.len);
 		item->value = convert_string(value.array, value.len);
@@ -200,7 +278,7 @@ static void lookup_addfiledata(struct text_lookup *lookup,
 
 		if (old)
 			text_item_destroy(old);
-
+#endif
 		if (!lookup_goto_nextline(&lex))
 			break;
 	}
@@ -211,8 +289,20 @@ static void lookup_addfiledata(struct text_lookup *lookup,
 static inline bool lookup_getstring(const char *lookup_val, const char **out,
 				    struct text_lookup *lookup)
 {
-	struct text_item *item;
+#ifdef USE_SWISSTABLES
+	if (!&lookup->map)
+		return false;
 
+	LookupMap_Iter it = LookupMap_find(&lookup->map, &lookup_val);
+	LookupMap_Entry *e = LookupMap_Iter_get(&it);
+
+	if (!e)
+		return false;
+
+	*out = e->val;
+
+#else
+	struct text_item *item;
 	if (!lookup->items)
 		return false;
 
@@ -222,6 +312,7 @@ static inline bool lookup_getstring(const char *lookup_val, const char **out,
 		return false;
 
 	*out = item->value;
+#endif
 	return true;
 }
 
@@ -230,6 +321,8 @@ static inline bool lookup_getstring(const char *lookup_val, const char **out,
 lookup_t *text_lookup_create(const char *path)
 {
 	struct text_lookup *lookup = bzalloc(sizeof(struct text_lookup));
+
+	lookup->map = LookupMap_new(8);
 
 	if (!text_lookup_add(lookup, path)) {
 		bfree(lookup);
@@ -266,13 +359,14 @@ bool text_lookup_add(lookup_t *lookup, const char *path)
 void text_lookup_destroy(lookup_t *lookup)
 {
 	if (lookup) {
+#ifndef USE_SWISSTABLES
 		struct text_item *item, *tmp;
 		HASH_ITER(hh, lookup->items, item, tmp)
 		{
 			HASH_DELETE(hh, lookup->items, item);
 			text_item_destroy(item);
 		}
-
+#endif
 		dstr_free(&lookup->language);
 		bfree(lookup);
 	}
