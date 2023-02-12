@@ -589,8 +589,7 @@ static json_t *obs_data_to_json(obs_data_t *data)
 	obs_data_item_t *item = NULL;
 	obs_data_item_t *temp = NULL;
 
-	HASH_ITER(hh, data->items, item, temp)
-	{
+	HASH_ITER (hh, data->items, item, temp) {
 		enum obs_data_type type = obs_data_item_gettype(item);
 		const char *name = get_item_name(item);
 
@@ -699,8 +698,7 @@ static inline void obs_data_destroy(struct obs_data *data)
 	struct obs_data_item *item;
 	struct obs_data_item *temp;
 
-	HASH_ITER(hh, data->items, item, temp)
-	{
+	HASH_ITER (hh, data->items, item, temp) {
 		obs_data_item_detach(item);
 		obs_data_item_release(&item);
 	}
@@ -785,8 +783,7 @@ obs_data_t *obs_data_get_defaults(obs_data_t *data)
 	struct obs_data_item *item;
 	struct obs_data_item *temp;
 
-	HASH_ITER(hh, data->items, item, temp)
-	{
+	HASH_ITER (hh, data->items, item, temp) {
 		const char *name = get_item_name(item);
 		switch (item->type) {
 		case OBS_DATA_NULL:
@@ -1011,8 +1008,7 @@ void obs_data_apply(obs_data_t *target, obs_data_t *apply_data)
 	struct obs_data_item *item;
 	struct obs_data_item *temp;
 
-	HASH_ITER(hh, apply_data->items, item, temp)
-	{
+	HASH_ITER (hh, apply_data->items, item, temp) {
 		copy_item(target, item);
 	}
 }
@@ -1063,7 +1059,9 @@ void obs_data_clear(obs_data_t *target)
 	struct obs_data_item *item;
 	struct obs_data_item *temp;
 
-	HASH_ITER(hh, target->items, item, temp) { clear_item(item); }
+	HASH_ITER (hh, target->items, item, temp) {
+		clear_item(item);
+	}
 }
 
 typedef void (*set_item_t)(obs_data_t *, obs_data_item_t **, const char *,

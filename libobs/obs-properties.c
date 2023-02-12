@@ -281,8 +281,7 @@ void obs_properties_destroy(obs_properties_t *props)
 		if (props->destroy && props->param)
 			props->destroy(props->param);
 
-		HASH_ITER(hh, props->properties, p, tmp)
-		{
+		HASH_ITER (hh, props->properties, p, tmp) {
 			HASH_DEL(props->properties, p);
 			obs_property_destroy(p);
 		}
@@ -311,8 +310,7 @@ obs_property_t *obs_properties_get(obs_properties_t *props, const char *name)
 		return NULL;
 
 	/* Recursively check groups as well, if any */
-	HASH_ITER(hh, props->properties, property, tmp)
-	{
+	HASH_ITER (hh, props->properties, property, tmp) {
 		if (property->type != OBS_PROPERTY_GROUP)
 			continue;
 
@@ -352,8 +350,7 @@ void obs_properties_remove_by_name(obs_properties_t *props, const char *name)
 	if (!props->groups)
 		return;
 
-	HASH_ITER(hh, props->properties, cur, tmp)
-	{
+	HASH_ITER (hh, props->properties, cur, tmp) {
 		if (cur->type != OBS_PROPERTY_GROUP)
 			continue;
 
@@ -368,8 +365,7 @@ void obs_properties_apply_settings_internal(obs_properties_t *props,
 {
 	struct obs_property *p, *tmp;
 
-	HASH_ITER(hh, props->properties, p, tmp)
-	{
+	HASH_ITER (hh, props->properties, p, tmp) {
 		if (p->type == OBS_PROPERTY_GROUP) {
 			obs_properties_apply_settings_internal(
 				obs_property_group_content(p), settings,
@@ -473,8 +469,7 @@ static inline bool contains_prop(struct obs_properties *props, const char *name)
 	if (!props->groups)
 		return false;
 
-	HASH_ITER(hh, props->properties, p, tmp)
-	{
+	HASH_ITER (hh, props->properties, p, tmp) {
 		if (p->type != OBS_PROPERTY_GROUP)
 			continue;
 		if (contains_prop(obs_property_group_content(p), name))
@@ -729,8 +724,7 @@ static bool check_property_group_recursion(obs_properties_t *parent,
 	/* Scan the group for the parent. */
 	obs_property_t *p, *tmp;
 
-	HASH_ITER(hh, group->properties, p, tmp)
-	{
+	HASH_ITER (hh, group->properties, p, tmp) {
 		if (p->type != OBS_PROPERTY_GROUP)
 			continue;
 
@@ -755,8 +749,7 @@ static bool check_property_group_duplicates(obs_properties_t *parent,
 {
 	obs_property_t *p, *tmp;
 
-	HASH_ITER(hh, group->properties, p, tmp)
-	{
+	HASH_ITER (hh, group->properties, p, tmp) {
 		if (has_prop(parent, p->name))
 			return true;
 	}

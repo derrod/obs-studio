@@ -260,8 +260,7 @@ void text_lookup_destroy(lookup_t *lookup)
 {
 	if (lookup) {
 		struct text_item *item, *tmp;
-		HASH_ITER(hh, lookup->items, item, tmp)
-		{
+		HASH_ITER (hh, lookup->items, item, tmp) {
 			HASH_DELETE(hh, lookup->items, item);
 			text_item_destroy(item);
 		}

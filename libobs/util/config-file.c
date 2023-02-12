@@ -51,8 +51,7 @@ static inline void config_section_free(struct config_section *section)
 {
 	struct config_item *item;
 	struct config_item *temp;
-	HASH_ITER(hh, section->items, item, temp)
-	{
+	HASH_ITER (hh, section->items, item, temp) {
 		HASH_DELETE(hh, section->items, item);
 		config_item_free(item);
 	}
@@ -377,8 +376,7 @@ int config_save(config_t *config)
 	struct config_item *item, *itmp;
 
 	int idx = 0;
-	HASH_ITER(hh, config->sections, section, stmp)
-	{
+	HASH_ITER (hh, config->sections, section, stmp) {
 		if (idx++)
 			dstr_cat(&str, "\n");
 
@@ -386,8 +384,7 @@ int config_save(config_t *config)
 		dstr_cat(&str, section->name);
 		dstr_cat(&str, "]\n");
 
-		HASH_ITER(hh, section->items, item, itmp)
-		{
+		HASH_ITER (hh, section->items, item, itmp) {
 			dstr_copy(&tmp, item->value ? item->value : "");
 			dstr_replace(&tmp, "\\", "\\\\");
 			dstr_replace(&tmp, "\r", "\\r");
@@ -477,14 +474,12 @@ void config_close(config_t *config)
 	if (!config)
 		return;
 
-	HASH_ITER(hh, config->sections, section, temp)
-	{
+	HASH_ITER (hh, config->sections, section, temp) {
 		HASH_DELETE(hh, config->sections, section);
 		config_section_free(section);
 	}
 
-	HASH_ITER(hh, config->defaults, section, temp)
-	{
+	HASH_ITER (hh, config->defaults, section, temp) {
 		HASH_DELETE(hh, config->defaults, section);
 		config_section_free(section);
 	}
@@ -511,8 +506,7 @@ const char *config_get_section(config_t *config, size_t idx)
 	if (idx >= config_num_sections(config))
 		goto unlock;
 
-	HASH_ITER(hh, config->sections, section, temp)
-	{
+	HASH_ITER (hh, config->sections, section, temp) {
 		if (idx == ctr++) {
 			name = section->name;
 			break;

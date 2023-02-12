@@ -129,8 +129,7 @@ void obs_hotkey_name_map_free(void)
 	obs_hotkey_name_map_item_t *root = obs->hotkeys.name_map;
 	obs_hotkey_name_map_item_t *n, *tmp;
 
-	HASH_ITER(hh, root, n, tmp)
-	{
+	HASH_ITER (hh, root, n, tmp) {
 		HASH_DEL(root, n);
 		bfree(n->key);
 		bfree(n);

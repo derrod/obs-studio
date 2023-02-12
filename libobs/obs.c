@@ -1024,8 +1024,7 @@ static void free_sources_hash_table(obs_source_t **ht)
 {
 	struct obs_context_data *ctx, *tmp;
 
-	HASH_ITER(hh, *(struct obs_context_data **)ht, ctx, tmp)
-	{
+	HASH_ITER (hh, *(struct obs_context_data **)ht, ctx, tmp) {
 		HASH_DEL(*(struct obs_context_data **)ht, ctx);
 		obs_source_destroy((obs_source_t *)ctx);
 	}
@@ -1885,8 +1884,7 @@ void obs_enum_sources(bool (*enum_proc)(void *, obs_source_t *), void *param)
 
 	pthread_mutex_lock(&obs->data.sources_mutex);
 
-	HASH_ITER(hh, (struct obs_context_data *)obs->data.sources, ctx, tmp)
-	{
+	HASH_ITER (hh, (struct obs_context_data *)obs->data.sources, ctx, tmp) {
 		obs_source_t *s = obs_source_get_ref((obs_source_t *)ctx);
 		if (s) {
 			if (s->info.type == OBS_SOURCE_TYPE_INPUT &&
@@ -1912,8 +1910,7 @@ void obs_enum_scenes(bool (*enum_proc)(void *, obs_source_t *), void *param)
 
 	pthread_mutex_lock(&obs->data.sources_mutex);
 
-	HASH_ITER(hh, (struct obs_context_data *)obs->data.sources, ctx, tmp)
-	{
+	HASH_ITER (hh, (struct obs_context_data *)obs->data.sources, ctx, tmp) {
 		source = obs_source_get_ref((obs_source_t *)ctx);
 		if (source) {
 			if (source->info.type == OBS_SOURCE_TYPE_SCENE &&
@@ -1963,8 +1960,7 @@ static inline void obs_enum_hash(void *pstart, pthread_mutex_t *mutex,
 
 	pthread_mutex_lock(mutex);
 
-	HASH_ITER(hh, *start, context, tmp)
-	{
+	HASH_ITER (hh, *start, context, tmp) {
 		if (!enum_proc(param, context))
 			break;
 	}
@@ -2531,8 +2527,7 @@ obs_data_array_t *obs_save_sources_filtered(obs_save_source_filter_cb cb,
 
 	pthread_mutex_lock(&data->sources_mutex);
 
-	HASH_ITER(hh, (struct obs_context_data *)data->sources, ctx, tmp)
-	{
+	HASH_ITER (hh, (struct obs_context_data *)data->sources, ctx, tmp) {
 		source = (obs_source_t *)ctx;
 		if (source->info.type != OBS_SOURCE_TYPE_FILTER &&
 		    !source->removed && !source->temp_removed &&
