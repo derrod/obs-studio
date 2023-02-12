@@ -131,6 +131,8 @@ target_sources(
           obs-app.hpp
           obs-proxy-style.cpp
           obs-proxy-style.hpp
+          obs-widgets.cpp
+          obs-widgets.hpp
           api-interface.cpp
           auth-base.cpp
           auth-base.hpp

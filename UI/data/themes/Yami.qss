@@ -344,6 +344,15 @@ OBSBasicStatusBar {
 /* Group Box */
 
 QGroupBox {
+    /* background: palette(dark); */
+    border-radius: 4px;
+    padding-top: 32px;
+    padding-bottom: 8px;
+    font-weight: bold;
+    margin-bottom: 6px;
+}
+
+QVBoxLayout {
     background: palette(dark);
     border-radius: 4px;
     padding-top: 32px;

@@ -39,6 +39,7 @@
 #include "hotkey-edit.hpp"
 #include "source-label.hpp"
 #include "obs-app.hpp"
+#include "obs-widgets.hpp"
 #include "platform.hpp"
 #include "properties-view.hpp"
 #include "qt-wrappers.hpp"
@@ -920,6 +921,21 @@ OBSBasicSettings::OBSBasicSettings(QWidget *parent)
 
 	UpdateAudioWarnings();
 	UpdateAdvNetworkGroup();
+
+	// Test Widget
+	auto gb = new QGroupBox();
+	gb->setTitle("Custom Widget Example");
+
+	auto hboxlayout = new QVBoxLayout;
+	auto test = new OBSSettingsContainer(this, QString("Example"),
+					     QString("Description"));
+
+	auto test2 = new OBSSettingsContainer(this, QString("Example 2"));
+	hboxlayout->addWidget(test);
+	hboxlayout->addWidget(test2);
+	gb->setLayout(hboxlayout);
+
+	ui->widget_2->layout()->addWidget(gb);
 }
 
 OBSBasicSettings::~OBSBasicSettings()
