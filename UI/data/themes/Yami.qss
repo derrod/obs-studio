@@ -1529,3 +1529,33 @@ OBSBasicStats {
 OBSBasicAdvAudio #scrollAreaWidgetContents {
     background: palette(dark);
 }
+
+OBSToggleSwitch {
+    qproperty-handle: rgb(255, 255, 255);
+    qproperty-backgroundActive: #284cb8;
+    qproperty-backgroundInactive: #3c404b;
+}
+
+OBSGroupBox {
+    border-radius: 4px;
+    font-weight: bold;
+}
+
+QLabel#groupName {
+    font-weight: bold;
+}
+
+QLabel#actionRowName {
+    font-weight: bold;
+}
+
+OBSPropertiesList {
+    background: palette(mid);
+    border-radius: 4px;
+}
+
+OBSActionRow {
+    background: palette(dark);
+    border-radius: 4px;
+}
+
