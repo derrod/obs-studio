@@ -923,19 +923,38 @@ OBSBasicSettings::OBSBasicSettings(QWidget *parent)
 	UpdateAdvNetworkGroup();
 
 	// Test Widget
-	auto gb = new QGroupBox();
-	gb->setTitle("Custom Widget Example");
+	auto test = new OBSGroupBox(QString("Example"), this);
 
-	auto hboxlayout = new QVBoxLayout;
-	auto test = new OBSSettingsContainer(this, QString("Example"),
-					     QString("Description"));
+	auto test2 = new OBSGroupBox("Example 2", "This one's checkable!", true,
+				     this);
 
-	auto test2 = new OBSSettingsContainer(this, QString("Example 2"));
-	hboxlayout->addWidget(test);
-	hboxlayout->addWidget(test2);
-	gb->setLayout(hboxlayout);
+	auto ar1 = new OBSActionRow("This is an option!");
+	ar1->setSuffix(new OBSToggleSwitch());
+	auto ar2 = new OBSActionRow("This is also an option...", "...with a subtitle.");
+	ar2->setSuffix(new QLineEdit());
+	auto ar4 = new OBSActionRow("Yet another option.");
+	ar4->setSuffix(new QPushButton("Hello!"));
+	auto ar6 = new OBSActionRow("Madness");
+	auto qs = new QSlider(Qt::Horizontal);
+	qs->setMaximum(100);
+	qs->setFixedWidth(250);
 
-	ui->widget_2->layout()->addWidget(gb);
+	ar6->setSuffix(qs);
+
+	auto ar3 = new OBSActionRow("This is a disabled option.");
+	ar3->setPrefix(new QCheckBox());
+	auto ar5 = new OBSActionRow("Yet another option.");
+	ar5->setSuffix(new QSpinBox());
+
+	test->properties()->addProperty(ar1);
+	test->properties()->addProperty(ar2);
+	test->properties()->addProperty(ar4);
+	test->properties()->addProperty(ar6);
+	test2->properties()->addProperty(ar3);
+	test2->properties()->addProperty(ar5);
+
+	ui->widget_2->layout()->addWidget(test);
+	ui->widget_2->layout()->addWidget(test2);
 }
 
 OBSBasicSettings::~OBSBasicSettings()
