@@ -81,6 +81,7 @@ OBSPropertiesList::OBSPropertiesList(QWidget *parent) : QFrame(parent)
 	layout->setSpacing(0);
 	layout->setContentsMargins(0, 0, 0, 0);
 
+	setMinimumWidth(600);
 	setMaximumWidth(600);
 	setLayout(layout);
 }
@@ -100,11 +101,6 @@ void OBSPropertiesList::addProperty(OBSActionRow *ar)
 	// In case widget was disabled to be invisible while it contained no items
 	setEnabled(true);
 	setVisible(true);
-}
-
-QSize OBSPropertiesList::sizeHint() const
-{
-	return QSize(600, height());
 }
 
 ///

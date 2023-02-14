@@ -146,8 +146,6 @@ public:
 
 	void addProperty(OBSActionRow *ar);
 
-	QSize sizeHint() const override;
-
 private:
 	QVBoxLayout *layout = nullptr;
 };
