@@ -1576,6 +1576,5 @@ OBSActionRow#secondary {
 }
 
 OBSActionRow:hover {
-    background: palette(light);
+    background: rgb(51,55,65);
 }
-
