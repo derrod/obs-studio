@@ -3,49 +3,42 @@
 
 #include "obs-widgets.hpp"
 
+#define UNUSED_PARAMETER(param) (void)param
+
 ///
 /// OBS GROUP BOX
 ///
-OBSGroupBox::OBSGroupBox(const QString &name, QWidget *parent) : QFrame(parent)
+OBSGroupBox::OBSGroupBox(QWidget *parent) : QFrame(parent)
 {
 	layout = new QGridLayout(this);
 	plist = new OBSPropertiesList(this);
+
+	layout->setAlignment(Qt::AlignHCenter);
+
+	QSizePolicy policy(QSizePolicy::Expanding, QSizePolicy::Fixed);
+	setSizePolicy(policy);
 	setLayout(layout);
+
+	layout->addWidget(plist, 2, 0, -1, -1);
+}
+
+OBSGroupBox::OBSGroupBox(const QString &name, QWidget *parent)
+	: OBSGroupBox(parent)
+{
 
 	nameLbl = new QLabel();
 	nameLbl->setText(name);
 	nameLbl->setObjectName("groupName");
 
-	QSizePolicy policy(QSizePolicy::Expanding, QSizePolicy::Fixed);
-	setSizePolicy(policy);
-
 	layout->addWidget(nameLbl, 0, 0);
-	layout->addWidget(plist, 2, 0, -1, -1);
 }
 
 OBSGroupBox::OBSGroupBox(const QString &name, bool checkable, QWidget *parent)
 	: OBSGroupBox(name, parent)
 {
 	if (checkable) {
-		toggleSwitch = new OBSToggleSwitch();
-		layout->addWidget(toggleSwitch, 0, 1, 1, 1, Qt::AlignRight);
-		connect(toggleSwitch, &OBSToggleSwitch::toggled, this,
-			[=](bool checked) { plist->setEnabled(checked); });
-	}
-}
-
-OBSGroupBox::OBSGroupBox(const QString &name, const QString &desc,
-			 bool checkable, QWidget *parent)
-	: OBSGroupBox(name, parent)
-{
-	descLbl = new QLabel();
-	descLbl->setText(desc);
-	descLbl->setObjectName("groupSubtitle");
-	layout->addWidget(descLbl, 1, 0);
-
-	if (checkable) {
-		toggleSwitch = new OBSToggleSwitch();
-		layout->addWidget(toggleSwitch, 0, 1, 2, 1, Qt::AlignRight);
+		toggleSwitch = new OBSToggleSwitch(true);
+		layout->addWidget(toggleSwitch, 0, 1, Qt::AlignRight);
 		connect(toggleSwitch, &OBSToggleSwitch::toggled, this,
 			[=](bool checked) { plist->setEnabled(checked); });
 	}
@@ -53,8 +46,24 @@ OBSGroupBox::OBSGroupBox(const QString &name, const QString &desc,
 
 OBSGroupBox::OBSGroupBox(const QString &name, const QString &desc,
 			 QWidget *parent)
-	: OBSGroupBox(name, desc, false, parent)
+	: OBSGroupBox(name, parent)
 {
+	descLbl = new QLabel();
+	descLbl->setText(desc);
+	descLbl->setObjectName("groupSubtitle");
+	layout->addWidget(descLbl, 1, 0);
+}
+
+OBSGroupBox::OBSGroupBox(const QString &name, const QString &desc,
+			 bool checkable, QWidget *parent)
+	: OBSGroupBox(name, desc, parent)
+{
+	if (checkable) {
+		toggleSwitch = new OBSToggleSwitch(true);
+		layout->addWidget(toggleSwitch, 0, 1, 2, 1, Qt::AlignRight);
+		connect(toggleSwitch, &OBSToggleSwitch::toggled, this,
+			[=](bool checked) { plist->setEnabled(checked); });
+	}
 }
 
 ///
@@ -64,10 +73,10 @@ OBSPropertiesList::OBSPropertiesList(QWidget *parent) : QFrame(parent)
 {
 	layout = new QVBoxLayout();
 	layout->setSpacing(0);
-	
+	layout->setContentsMargins(0, 0, 0, 0);
+
+	setMaximumWidth(600);
 	setLayout(layout);
-	//QSizePolicy policy(QSizePolicy::Expanding, QSizePolicy::Expanding);
-	//setSizePolicy(policy);
 }
 
 void OBSPropertiesList::addProperty(OBSActionRow *ar)
@@ -80,10 +89,16 @@ void OBSPropertiesList::addProperty(OBSActionRow *ar)
 
 	ar->setParent(this);
 	layout->addWidget(ar);
+	adjustSize();
 
 	// In case widget was disabled to be invisible while it contained no items
 	setEnabled(true);
 	setVisible(true);
+}
+
+QSize OBSPropertiesList::sizeHint() const
+{
+	return QSize(600, height());
 }
 
 ///
@@ -93,11 +108,10 @@ OBSActionRow::OBSActionRow(const QString &name, QWidget *parent)
 	: QFrame(parent)
 {
 	layout = new QGridLayout(this);
-	vlayout = new QVBoxLayout(this);
-	plist = new OBSPropertiesList(this);
 
-	vlayout->addLayout(layout);
-	setLayout(vlayout);
+	QSizePolicy policy(QSizePolicy::MinimumExpanding, QSizePolicy::Fixed);
+	setSizePolicy(policy);
+	setLayout(layout);
 
 	layout->setColumnMinimumWidth(0, 0);
 	layout->setColumnStretch(0, 0);
@@ -109,10 +123,6 @@ OBSActionRow::OBSActionRow(const QString &name, QWidget *parent)
 	nameLbl->setObjectName("actionRowName");
 
 	layout->addWidget(nameLbl, 0, 1, Qt::AlignLeft);
-
-	plist->setVisible(false);
-	plist->setEnabled(false);
-	vlayout->addWidget(plist);
 }
 
 OBSActionRow::OBSActionRow(const QString &name, const QString &desc,
@@ -131,6 +141,11 @@ void OBSActionRow::setPrefix(QWidget *w)
 	int rowspan = !!descLbl ? 2 : 1;
 	prefix = w;
 
+	// HACK: Remove text from checkbox
+	QCheckBox *cbox = dynamic_cast<QCheckBox *>(w);
+	if (cbox)
+		cbox->setText("");
+
 	prefix->setParent(this);
 	layout->addWidget(prefix, 0, 0, rowspan, 1, Qt::AlignLeft);
 	layout->setColumnStretch(0, 5);
@@ -144,7 +159,6 @@ void OBSActionRow::setSuffix(QWidget *w)
 	suffix->setParent(this);
 	layout->addWidget(suffix, 0, 2, rowspan, 1,
 			  Qt::AlignRight | Qt::AlignVCenter);
-	suffix->adjustSize();
 }
 
 ///
@@ -175,20 +189,30 @@ OBSToggleSwitch::OBSToggleSwitch(QWidget *parent)
 		&OBSToggleSwitch::onClicked);
 }
 
+OBSToggleSwitch::OBSToggleSwitch(bool defaultState, QWidget *parent)
+	: OBSToggleSwitch(parent)
+{
+	setChecked(defaultState);
+	if (defaultState)
+		xpos = 2 * targetHeight - targetHeight / 2;
+}
+
 void OBSToggleSwitch::paintEvent(QPaintEvent *e)
 {
+	UNUSED_PARAMETER(e);
+
 	QPainter p(this);
 	p.setPen(Qt::NoPen);
 
 	p.setOpacity(isEnabled() ? 1.0f : 0.5f);
 	int offset = isChecked() ? 0 : targetHeight / 2;
-	float progress =
-		(float)(xpos - offset) / (float)(width() - targetHeight / 2);
+	float progress = (float)(xpos - offset) /
+			 (float)(2 * targetHeight - targetHeight / 2);
 
 	p.setBrush(blendColors(backgroundInactive, backgroundActive, progress));
 	p.setRenderHint(QPainter::Antialiasing, true);
-	p.drawRoundedRect(QRect(0, 0, width(), targetHeight), targetHeight / 2,
-			  targetHeight / 2);
+	p.drawRoundedRect(QRect(0, 0, 2 * targetHeight, targetHeight),
+			  targetHeight / 2, targetHeight / 2);
 
 	p.setBrush(handle);
 	p.drawEllipse(QRectF(xpos - (targetHeight / 2) + margin / 2, margin / 2,
@@ -200,7 +224,7 @@ void OBSToggleSwitch::onClicked(bool checked)
 {
 	if (checked) {
 		animation->setStartValue(targetHeight / 2 + margin / 2);
-		animation->setEndValue(width() - targetHeight / 2);
+		animation->setEndValue(2 * targetHeight - targetHeight / 2);
 		animation->setDuration(120);
 		animation->start();
 	} else {

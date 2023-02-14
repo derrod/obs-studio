@@ -1,6 +1,6 @@
 #pragma once
 
-#include <QCheckbox>
+#include <QCheckBox>
 #include <QLabel>
 #include <QWidget>
 #include <QEvent>
@@ -28,6 +28,7 @@ class OBSToggleSwitch : public QAbstractButton {
 
 public:
 	OBSToggleSwitch(QWidget *parent = nullptr);
+	OBSToggleSwitch(bool defaultState, QWidget *parent = nullptr);
 
 	QSize sizeHint() const override;
 
@@ -71,20 +72,19 @@ public:
 	void setPrefix(QWidget *w);
 	void setSuffix(QWidget *w);
 
-	OBSPropertiesList *properties() const { return plist; }
-
 private:
 	QGridLayout *layout;
-	QVBoxLayout *vlayout;
 
 	QLabel *nameLbl = nullptr;
 	QLabel *descLbl = nullptr;
 
 	QWidget *prefix = nullptr;
 	QWidget *suffix = nullptr;
-
-	OBSPropertiesList *plist = nullptr;
 };
+
+// ToDo subclass OBSActionRow with one that has its own properties list
+// that can be expanded/enabled like a groupbox itself.
+// OBSExpandableActionRow or something
 
 /**
 * Container for OBS properties, mainly exists to manage the contained VLayout
@@ -97,6 +97,8 @@ public:
 
 	void addProperty(OBSActionRow *ar);
 
+	QSize sizeHint() const override;
+
 private:
 	QVBoxLayout *layout = nullptr;
 };
@@ -108,15 +110,20 @@ class OBSGroupBox : public QFrame {
 	Q_OBJECT
 
 public:
+	OBSGroupBox(QWidget *parent = nullptr);
 	OBSGroupBox(const QString &name, QWidget *parent = nullptr);
 	OBSGroupBox(const QString &name, bool checkable,
 		    QWidget *parent = nullptr);
 	OBSGroupBox(const QString &name, const QString &desc,
-		    bool checkable = false, QWidget *parent = nullptr);
-	OBSGroupBox(const QString &name, const QString &desc,
 		    QWidget *parent = nullptr);
+	OBSGroupBox(const QString &name, const QString &desc,
+		    bool checkable = false, QWidget *parent = nullptr);
 
 	OBSPropertiesList *properties() const { return plist; }
+
+	// ToDo add event for checkable group being enabled/disabled
+	// ToDo add option for hiding properties list when disabled
+	// ToDo allow setting enabled state
 
 private:
 	QGridLayout *layout = nullptr;
