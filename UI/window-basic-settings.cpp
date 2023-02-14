@@ -923,38 +923,71 @@ OBSBasicSettings::OBSBasicSettings(QWidget *parent)
 	UpdateAdvNetworkGroup();
 
 	// Test Widget
-	auto test = new OBSGroupBox(QString("Example"), this);
 
-	auto test2 = new OBSGroupBox("Example 2", "This one's checkable!", true,
-				     this);
+	// General settings
+	OBSGroupBox *test;
+	OBSActionRow *tmp;
 
-	auto ar1 = new OBSActionRow("This is an option!");
-	ar1->setSuffix(new OBSToggleSwitch());
-	auto ar2 = new OBSActionRow("This is also an option...", "...with a subtitle.");
-	ar2->setSuffix(new QLineEdit());
-	auto ar4 = new OBSActionRow("Yet another option.");
-	ar4->setSuffix(new QPushButton("Hello!"));
-	auto ar6 = new OBSActionRow("Madness");
-	auto qs = new QSlider(Qt::Horizontal);
-	qs->setMaximum(100);
-	qs->setFixedWidth(250);
+	test = new OBSGroupBox(QTStr("Basic.Settings.General"), this);
+	tmp = new OBSActionRow(QTStr("Basic.Settings.General.Language"));
+	tmp->setSuffix(ui->language);
+	test->properties()->addProperty(tmp);
 
-	ar6->setSuffix(qs);
+	tmp = new OBSActionRow(QTStr("Basic.Settings.General.Theme"));
+	tmp->setSuffix(ui->theme);
+	test->properties()->addProperty(tmp);
 
-	auto ar3 = new OBSActionRow("This is a disabled option.");
-	ar3->setPrefix(new QCheckBox());
-	auto ar5 = new OBSActionRow("Yet another option.");
-	ar5->setSuffix(new QSpinBox());
+	tmp = new OBSActionRow(
+		QTStr("Basic.Settings.General.OpenStatsOnStartup"));
+	tmp->setSuffix(new OBSToggleSwitch());
+	test->properties()->addProperty(tmp);
 
-	test->properties()->addProperty(ar1);
-	test->properties()->addProperty(ar2);
-	test->properties()->addProperty(ar4);
-	test->properties()->addProperty(ar6);
-	test2->properties()->addProperty(ar3);
-	test2->properties()->addProperty(ar5);
+	tmp = new OBSActionRow(
+		QTStr("Basic.Settings.General.HideOBSWindowsFromCapture"));
+	tmp->setSuffix(new OBSToggleSwitch());
+	test->properties()->addProperty(tmp);
+	ui->scrollAreaWidgetContents_2->layout()->addWidget(test);
 
-	ui->widget_2->layout()->addWidget(test);
-	ui->widget_2->layout()->addWidget(test2);
+	// Updater Settings
+	test = new OBSGroupBox(QTStr("Basic.Settings.General.Updater"), this);
+
+	tmp = new OBSActionRow(QTStr("Basic.Settings.General.UpdateChannel"));
+	tmp->setSuffix(ui->updateChannelBox);
+	test->properties()->addProperty(tmp);
+
+	tmp = new OBSActionRow(
+		QTStr("Basic.Settings.General.EnableAutoUpdates"));
+	tmp->setSuffix(new OBSToggleSwitch());
+	test->properties()->addProperty(tmp);
+
+	ui->scrollAreaWidgetContents_2->layout()->addWidget(test);
+
+	// Output Settings
+	test = new OBSGroupBox(QTStr("Basic.Settings.General.Output"), this);
+
+	tmp = new OBSActionRow(
+		QTStr("Basic.Settings.General.WarnBeforeStartingStream"));
+	tmp->setSuffix(new OBSToggleSwitch());
+	test->properties()->addProperty(tmp);
+
+	tmp = new OBSActionRow(
+		QTStr("Basic.Settings.General.WarnBeforeStoppingStream"));
+	tmp->setSuffix(new OBSToggleSwitch());
+	test->properties()->addProperty(tmp);
+
+	tmp = new OBSActionRow(
+		QTStr("Basic.Settings.General.WarnBeforeStoppingRecord"));
+	tmp->setSuffix(new OBSToggleSwitch());
+	test->properties()->addProperty(tmp);
+
+	tmp = new OBSActionRow("I can't be arsed to do more right now");
+	tmp->setSuffix(new OBSToggleSwitch());
+	test->properties()->addProperty(tmp);
+
+	ui->scrollAreaWidgetContents_2->layout()->addWidget(test);
+
+	ui->widget_2->setVisible(false);
+	ui->scrollAreaWidgetContents_2->layout()->setAlignment(Qt::AlignTop);
 }
 
 OBSBasicSettings::~OBSBasicSettings()

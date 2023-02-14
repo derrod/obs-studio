@@ -16,6 +16,9 @@ OBSGroupBox::OBSGroupBox(const QString &name, QWidget *parent) : QFrame(parent)
 	nameLbl->setText(name);
 	nameLbl->setObjectName("groupName");
 
+	QSizePolicy policy(QSizePolicy::Expanding, QSizePolicy::Fixed);
+	setSizePolicy(policy);
+
 	layout->addWidget(nameLbl, 0, 0);
 	layout->addWidget(plist, 2, 0, -1, -1);
 }
@@ -60,6 +63,8 @@ OBSGroupBox::OBSGroupBox(const QString &name, const QString &desc,
 OBSPropertiesList::OBSPropertiesList(QWidget *parent) : QFrame(parent)
 {
 	layout = new QVBoxLayout();
+	layout->setSpacing(0);
+	
 	setLayout(layout);
 	//QSizePolicy policy(QSizePolicy::Expanding, QSizePolicy::Expanding);
 	//setSizePolicy(policy);
@@ -67,12 +72,16 @@ OBSPropertiesList::OBSPropertiesList(QWidget *parent) : QFrame(parent)
 
 void OBSPropertiesList::addProperty(OBSActionRow *ar)
 {
+	// All non-first objects get a special name so they can have a top border.
+	// Alternatively we could insert a widget here that acts as a separator and could
+	// be styled separately.
 	if (layout->count() > 0)
-		layout->addSpacing(1);
+		ar->setObjectName("secondary");
 
 	ar->setParent(this);
 	layout->addWidget(ar);
 
+	// In case widget was disabled to be invisible while it contained no items
 	setEnabled(true);
 	setVisible(true);
 }
