@@ -1011,19 +1011,19 @@ OBSBasicSettings::OBSBasicSettings(QWidget *parent)
 			       this);
 
 	tmp = new OBSActionRow(QTStr("Basic.Settings.General.SnapDistance"));
-	tmp->setSuffix(ui->snapDistance);
+	tmp->setSuffix(new OBSDoubleSpinBox());
 	test->properties()->addProperty(tmp);
 
 	tmp = new OBSActionRow(QTStr("Basic.Settings.General.ScreenSnapping"));
-	tmp->setSuffix(new OBSToggleSwitch(true));
+	tmp->setPrefix(ui->screenSnapping);
 	test->properties()->addProperty(tmp);
 
 	tmp = new OBSActionRow(QTStr("Basic.Settings.General.SourceSnapping"));
-	tmp->setSuffix(new OBSToggleSwitch(false));
+	tmp->setPrefix(ui->sourceSnapping);
 	test->properties()->addProperty(tmp);
 
 	tmp = new OBSActionRow(QTStr("Basic.Settings.General.CenterSnapping"));
-	tmp->setSuffix(new OBSToggleSwitch(true));
+	tmp->setPrefix(ui->centerSnapping);
 	test->properties()->addProperty(tmp);
 
 	ui->scrollAreaWidgetContents_2->layout()->addWidget(test);
