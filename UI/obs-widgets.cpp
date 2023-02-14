@@ -67,6 +67,11 @@ OBSGroupBox::OBSGroupBox(const QString &name, const QString &desc,
 	}
 }
 
+void OBSGroupBox::addProperty(OBSActionRow *ar)
+{
+	plist->addProperty(ar);
+}
+
 ///
 /// OBS PROPERTY LIST
 ///
@@ -139,6 +144,9 @@ OBSActionRow::OBSActionRow(const QString &name, const QString &desc,
 
 void OBSActionRow::setPrefix(QWidget *w)
 {
+	if (suffix)
+		return;
+
 	int rowspan = !!descLbl ? 2 : 1;
 	prefix = w;
 
@@ -147,6 +155,12 @@ void OBSActionRow::setPrefix(QWidget *w)
 	if (cbox)
 		cbox->setText("");
 
+	// If element is checkable, forward clicks on the widget
+	QAbstractButton *abtn = dynamic_cast<QAbstractButton *>(w);
+	if (abtn && abtn->isCheckable())
+		connect(this, &OBSActionRow::clicked, abtn,
+			&QAbstractButton::click);
+
 	prefix->setParent(this);
 	layout->addWidget(prefix, 0, 0, rowspan, 1, Qt::AlignLeft);
 	layout->setColumnStretch(0, 5);
@@ -154,12 +168,29 @@ void OBSActionRow::setPrefix(QWidget *w)
 
 void OBSActionRow::setSuffix(QWidget *w)
 {
+	if (prefix)
+		return;
+
 	int rowspan = !!descLbl ? 2 : 1;
 	suffix = w;
+
+	// If element is checkable, forward clicks on the widget
+	QAbstractButton *abtn = dynamic_cast<QAbstractButton *>(w);
+	if (abtn && abtn->isCheckable())
+		connect(this, &OBSActionRow::clicked, abtn,
+			&QAbstractButton::click);
 
 	suffix->setParent(this);
 	layout->addWidget(suffix, 0, 2, rowspan, 1,
 			  Qt::AlignRight | Qt::AlignVCenter);
+}
+
+void OBSActionRow::mouseReleaseEvent(QMouseEvent *e)
+{
+	if (e->button() & Qt::LeftButton) {
+		emit clicked();
+	}
+	QFrame::mouseReleaseEvent(e);
 }
 
 ///

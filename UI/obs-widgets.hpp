@@ -110,6 +110,12 @@ public:
 	void setPrefix(QWidget *w);
 	void setSuffix(QWidget *w);
 
+protected:
+	void mouseReleaseEvent(QMouseEvent *) override;
+
+signals:
+	void clicked();
+
 private:
 	QGridLayout *layout;
 
@@ -162,6 +168,8 @@ public:
 	// ToDo add event for checkable group being enabled/disabled
 	// ToDo add option for hiding properties list when disabled
 	// ToDo allow setting enabled state
+
+	void addProperty(OBSActionRow *ar);
 
 private:
 	QGridLayout *layout = nullptr;
