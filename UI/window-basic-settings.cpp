@@ -1015,11 +1015,11 @@ OBSBasicSettings::OBSBasicSettings(QWidget *parent)
 	test->properties()->addProperty(tmp);
 
 	tmp = new OBSActionRow(QTStr("Basic.Settings.General.ScreenSnapping"));
-	tmp->setPrefix(ui->screenSnapping);
+	tmp->setSuffix(ui->screenSnapping);
 	test->properties()->addProperty(tmp);
 
 	tmp = new OBSActionRow(QTStr("Basic.Settings.General.SourceSnapping"));
-	tmp->setPrefix(ui->sourceSnapping);
+	tmp->setSuffix(new OBSToggleSwitch(true));
 	test->properties()->addProperty(tmp);
 
 	tmp = new OBSActionRow(QTStr("Basic.Settings.General.CenterSnapping"));

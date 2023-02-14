@@ -174,6 +174,11 @@ void OBSActionRow::setSuffix(QWidget *w)
 	int rowspan = !!descLbl ? 2 : 1;
 	suffix = w;
 
+	// HACK: Remove text from checkbox
+	QCheckBox *cbox = dynamic_cast<QCheckBox *>(w);
+	if (cbox)
+		cbox->setText("");
+
 	// If element is checkable, forward clicks on the widget
 	QAbstractButton *abtn = dynamic_cast<QAbstractButton *>(w);
 	if (abtn && abtn->isCheckable())
