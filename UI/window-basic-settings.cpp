@@ -928,7 +928,7 @@ OBSBasicSettings::OBSBasicSettings(QWidget *parent)
 	OBSGroupBox *test;
 	OBSActionRow *tmp;
 
-	test = new OBSGroupBox(QTStr("Basic.Settings.General"), this);
+	test = new OBSGroupBox(this);
 	tmp = new OBSActionRow(QTStr("Basic.Settings.General.Language"));
 	tmp->setSuffix(ui->language);
 	test->properties()->addProperty(tmp);
@@ -949,39 +949,81 @@ OBSBasicSettings::OBSBasicSettings(QWidget *parent)
 	ui->scrollAreaWidgetContents_2->layout()->addWidget(test);
 
 	// Updater Settings
-	test = new OBSGroupBox(QTStr("Basic.Settings.General.Updater"), this);
+	if (ui->updateChannelBox) {
+		test = new OBSGroupBox(QTStr("Basic.Settings.General.Updater"),
+				       this);
 
-	tmp = new OBSActionRow(QTStr("Basic.Settings.General.UpdateChannel"));
-	tmp->setSuffix(ui->updateChannelBox);
-	test->properties()->addProperty(tmp);
+		tmp = new OBSActionRow(
+			QTStr("Basic.Settings.General.UpdateChannel"));
+		tmp->setSuffix(ui->updateChannelBox);
+		test->properties()->addProperty(tmp);
 
-	tmp = new OBSActionRow(
-		QTStr("Basic.Settings.General.EnableAutoUpdates"));
-	tmp->setSuffix(new OBSToggleSwitch());
-	test->properties()->addProperty(tmp);
+		tmp = new OBSActionRow(
+			QTStr("Basic.Settings.General.EnableAutoUpdates"));
+		tmp->setSuffix(new OBSToggleSwitch(true));
+		test->properties()->addProperty(tmp);
 
-	ui->scrollAreaWidgetContents_2->layout()->addWidget(test);
+		ui->scrollAreaWidgetContents_2->layout()->addWidget(test);
+	}
 
 	// Output Settings
-	test = new OBSGroupBox(QTStr("Basic.Settings.General.Output"), this);
+	test = new OBSGroupBox(QTStr("Basic.Settings.Output"), this);
 
 	tmp = new OBSActionRow(
 		QTStr("Basic.Settings.General.WarnBeforeStartingStream"));
-	tmp->setSuffix(new OBSToggleSwitch());
+	tmp->setPrefix(ui->warnBeforeStreamStart);
 	test->properties()->addProperty(tmp);
 
 	tmp = new OBSActionRow(
 		QTStr("Basic.Settings.General.WarnBeforeStoppingStream"));
-	tmp->setSuffix(new OBSToggleSwitch());
+	tmp->setPrefix(ui->warnBeforeStreamStop);
 	test->properties()->addProperty(tmp);
 
 	tmp = new OBSActionRow(
 		QTStr("Basic.Settings.General.WarnBeforeStoppingRecord"));
-	tmp->setSuffix(new OBSToggleSwitch());
+	tmp->setPrefix(ui->warnBeforeRecordStop);
 	test->properties()->addProperty(tmp);
 
-	tmp = new OBSActionRow("I can't be arsed to do more right now");
-	tmp->setSuffix(new OBSToggleSwitch());
+	tmp = new OBSActionRow(
+		QTStr("Basic.Settings.General.RecordWhenStreaming"));
+	tmp->setPrefix(ui->recordWhenStreaming);
+	test->properties()->addProperty(tmp);
+
+	tmp = new OBSActionRow(
+		QTStr("Basic.Settings.General.KeepRecordingWhenStreamStops"));
+	tmp->setPrefix(ui->keepRecordStreamStops);
+	test->properties()->addProperty(tmp);
+
+	tmp = new OBSActionRow(
+		QTStr("Basic.Settings.General.ReplayBufferWhileStreaming"));
+	tmp->setPrefix(ui->replayWhileStreaming);
+	test->properties()->addProperty(tmp);
+
+	tmp = new OBSActionRow(
+		QTStr("Basic.Settings.General.KeepReplayBufferStreamStops"));
+	tmp->setPrefix(ui->keepReplayStreamStops);
+	test->properties()->addProperty(tmp);
+
+	ui->scrollAreaWidgetContents_2->layout()->addWidget(test);
+
+	// Snapping settings
+	test = new OBSGroupBox(QTStr("Basic.Settings.General.Snapping"), true,
+			       this);
+
+	tmp = new OBSActionRow(QTStr("Basic.Settings.General.SnapDistance"));
+	tmp->setSuffix(ui->snapDistance);
+	test->properties()->addProperty(tmp);
+
+	tmp = new OBSActionRow(QTStr("Basic.Settings.General.ScreenSnapping"));
+	tmp->setSuffix(new OBSToggleSwitch(true));
+	test->properties()->addProperty(tmp);
+
+	tmp = new OBSActionRow(QTStr("Basic.Settings.General.SourceSnapping"));
+	tmp->setSuffix(new OBSToggleSwitch(false));
+	test->properties()->addProperty(tmp);
+
+	tmp = new OBSActionRow(QTStr("Basic.Settings.General.CenterSnapping"));
+	tmp->setSuffix(new OBSToggleSwitch(true));
 	test->properties()->addProperty(tmp);
 
 	ui->scrollAreaWidgetContents_2->layout()->addWidget(test);
