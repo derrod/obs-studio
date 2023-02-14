@@ -272,7 +272,11 @@ void OBSToggleSwitch::onClicked(bool checked)
 	}
 }
 
+#if QT_VERSION < QT_VERSION_CHECK(6, 0, 0)
+void OBSToggleSwitch::enterEvent(QEvent *e)
+#else
 void OBSToggleSwitch::enterEvent(QEnterEvent *e)
+#endif
 {
 	setCursor(Qt::PointingHandCursor);
 	QAbstractButton::enterEvent(e);
