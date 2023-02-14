@@ -3,9 +3,7 @@ name: 'BUILD'
 on:
   push:
     paths-ignore: ['**.md']
-    branches:
-      - master
-      - 'release/**'
+    branches: ['*']
     tags: ['*']
   pull_request:
     paths-ignore: ['**.md']
