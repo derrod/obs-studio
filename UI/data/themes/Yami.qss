@@ -1543,7 +1543,7 @@ OBSGroupBox {
 
 QLabel#groupName {
     font-weight: bold;
-    font-size: 14pt;
+    font-size: 10pt;
 }
 
 QLabel#actionRowName {
@@ -1559,10 +1559,16 @@ OBSPropertiesList {
 }
 
 OBSActionRow {
-    padding: 0px;
-    border-width: 0px;
-    margin: 0px 0px 0px 0px;
+    margin: 0;
+    padding: 0;
+    border: none;
+    min-height: 50px;
     background: transparent;
+}
+
+OBSActionRow QComboBox,
+OBSActionRow QPushButton {
+    margin: 0;
 }
 
 OBSActionRow#secondary {
