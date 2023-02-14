@@ -1029,7 +1029,7 @@ OBSBasicSettings::OBSBasicSettings(QWidget *parent)
 	ui->scrollAreaWidgetContents_2->layout()->addWidget(test);
 
 	ui->widget_2->setVisible(false);
-	ui->scrollAreaWidgetContents_2->layout()->setAlignment(Qt::AlignTop);
+	ui->scrollAreaWidgetContents_2->layout()->setAlignment(Qt::AlignTop | Qt::AlignHCenter);
 }
 
 OBSBasicSettings::~OBSBasicSettings()
