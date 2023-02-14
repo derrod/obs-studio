@@ -190,6 +190,19 @@ void OBSActionRow::setSuffix(QWidget *w)
 			  Qt::AlignRight | Qt::AlignVCenter);
 }
 
+// ToDo Figure out what the fuck to do with an expandable actionrow and the indicaotr
+void OBSActionRow::setSuffixNoConnect(QWidget *w)
+{
+	if (prefix)
+		return;
+
+	int rowspan = !!descLbl ? 2 : 1;
+	suffix = w;
+	suffix->setParent(this);
+	layout->addWidget(suffix, 0, 2, rowspan, 1,
+			  Qt::AlignRight | Qt::AlignVCenter);
+}
+
 void OBSActionRow::mouseReleaseEvent(QMouseEvent *e)
 {
 	if (e->button() & Qt::LeftButton) {

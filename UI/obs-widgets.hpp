@@ -127,6 +127,7 @@ signals:
 	void clicked();
 
 protected:
+	void setSuffixNoConnect(QWidget *w);
 	void mouseReleaseEvent(QMouseEvent *) override;
 	bool hasSubtitle() const { return descLbl != nullptr; }
 
@@ -138,6 +139,8 @@ private:
 
 	QWidget *prefix = nullptr;
 	QWidget *suffix = nullptr;
+
+	friend class OBSCollapsibleActionRow;
 };
 
 /**
