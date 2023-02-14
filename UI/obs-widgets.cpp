@@ -1,6 +1,6 @@
 #include <QLayout>
 #include <QSizePolicy>
-#include <QAbstractSpinbox>
+#include <QAbstractSpinBox>
 
 #include "obs-widgets.hpp"
 
