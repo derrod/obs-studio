@@ -67,7 +67,7 @@ OBSGroupBox::OBSGroupBox(const QString &name, const QString &desc,
 	}
 }
 
-void OBSGroupBox::addProperty(OBSActionRow *ar)
+void OBSGroupBox::addProperty(OBSActionBaseClass *ar)
 {
 	plist->addProperty(ar);
 }
@@ -80,33 +80,38 @@ OBSPropertiesList::OBSPropertiesList(QWidget *parent) : QFrame(parent)
 	layout = new QVBoxLayout();
 	layout->setSpacing(0);
 	layout->setContentsMargins(0, 0, 0, 0);
+	// layout->setSizeConstraint(QLayout::SetMinimumSize);
 
 	//setFixedWidth(600);
 	setLayout(layout);
 }
 
-void OBSPropertiesList::addProperty(OBSActionRow *ar)
+void OBSPropertiesList::addProperty(OBSActionBaseClass *ar)
 {
 	// All non-first objects get a special name so they can have a top border.
 	// Alternatively we could insert a widget here that acts as a separator and could
 	// be styled separately.
-	if (layout->count() > 0)
+	if (layout->count() > 0) {
 		ar->setObjectName("secondary");
+		/*
+		QWidget *spacer = new QWidget(this);
+		spacer->setObjectName("obsSpacer");
+		spacer->setSizePolicy(QSizePolicy::Expanding,
+				      QSizePolicy::Fixed);
+		layout->addWidget(spacer);
+		*/
+	}
 
 	ar->setParent(this);
 	layout->addWidget(ar);
 	adjustSize();
-
-	// In case widget was disabled to be invisible while it contained no items
-	setEnabled(true);
-	setVisible(true);
 }
 
 ///
 /// OBS ACTION ROW
 ///
 OBSActionRow::OBSActionRow(const QString &name, QWidget *parent)
-	: QFrame(parent)
+	: OBSActionBaseClass(parent)
 {
 	layout = new QGridLayout(this);
 
@@ -191,6 +196,75 @@ void OBSActionRow::mouseReleaseEvent(QMouseEvent *e)
 		emit clicked();
 	}
 	QFrame::mouseReleaseEvent(e);
+}
+
+///
+/// OBS ACTION ROW WITH PROPERTY LIST
+///
+
+OBSCollapsibleActionRow::OBSCollapsibleActionRow(const QString &name,
+						 const QString &desc,
+						 QWidget *parent)
+	: OBSActionBaseClass(parent)
+{
+	layout = new QVBoxLayout;
+	layout->setContentsMargins(0, 0, 0, 0);
+	layout->setSpacing(0);
+	setLayout(layout);
+
+	if (desc != nullptr)
+		ar = new OBSActionRow(name, desc, this);
+	else
+		ar = new OBSActionRow(name, this);
+
+	layout->addWidget(ar);
+
+	plist = new OBSPropertiesList(this);
+	plist->setVisible(false);
+	layout->addWidget(plist);
+
+	/*
+	sa = new OBSScrollArea(this);
+
+	sa->setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+	sa->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+	sa->setContentsMargins(0, 0, 0, 0);
+	sa->setSizeAdjustPolicy(QAbstractScrollArea::AdjustToContents);
+	sa->setAlignment(Qt::AlignHCenter);
+	sa->setWidgetResizable(false);
+	sa->setWidget(plist);
+
+	anim = new QPropertyAnimation(sa, "maximumHeight", this);
+
+	layout->addWidget(sa);
+	*/
+	sw = new OBSToggleSwitch(false);
+	ar->setSuffix(sw);
+
+	
+	// connect(sw, &OBSToggleSwitch::toggled, this, 	&OBSCollapsibleActionRow::collapse);
+	connect(sw, &OBSToggleSwitch::toggled, plist,
+		&OBSPropertiesList::setVisible);
+}
+
+void OBSCollapsibleActionRow::collapse(bool enabled)
+{
+	if (!enabled) {
+		anim->setStartValue(plist->sizeHint().height());
+		anim->setEndValue(0);
+		anim->setDuration(1200);
+		anim->start();
+	} else {
+		anim->setStartValue(0);
+		anim->setEndValue(plist->sizeHint().height());
+		anim->setDuration(1200);
+		anim->start();
+	}
+}
+
+void OBSCollapsibleActionRow::addProperty(OBSActionBaseClass *ar)
+{
+	plist->addProperty(ar);
 }
 
 ///

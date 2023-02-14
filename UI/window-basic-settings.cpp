@@ -1007,29 +1007,41 @@ OBSBasicSettings::OBSBasicSettings(QWidget *parent)
 	ui->scrollAreaWidgetContents_2->layout()->addWidget(test);
 
 	// Snapping settings
-	test = new OBSGroupBox(QTStr("Basic.Settings.General.Snapping"), true,
-			       this);
+	test = new OBSGroupBox(QTStr("Basic.Settings.General.Snapping"), this);
+
+	tmp = new OBSActionRow("Placeholder");
+	tmp->setSuffix( new OBSToggleSwitch);
+	test->properties()->addProperty(tmp);
+
+	OBSCollapsibleActionRow *tmp2 = new OBSCollapsibleActionRow(
+		QTStr("Basic.Settings.General.Snapping"), nullptr, this);
+	test->addProperty(tmp2);
 
 	tmp = new OBSActionRow(QTStr("Basic.Settings.General.SnapDistance"));
 	tmp->setSuffix(new OBSDoubleSpinBox());
-	test->properties()->addProperty(tmp);
+	tmp2->addProperty(tmp);
 
 	tmp = new OBSActionRow(QTStr("Basic.Settings.General.ScreenSnapping"));
 	tmp->setSuffix(ui->screenSnapping);
-	test->properties()->addProperty(tmp);
+	tmp2->addProperty(tmp);
 
 	tmp = new OBSActionRow(QTStr("Basic.Settings.General.SourceSnapping"));
 	tmp->setSuffix(new OBSToggleSwitch(true));
-	test->properties()->addProperty(tmp);
+	tmp2->addProperty(tmp);
 
 	tmp = new OBSActionRow(QTStr("Basic.Settings.General.CenterSnapping"));
 	tmp->setPrefix(ui->centerSnapping);
+	tmp2->addProperty(tmp);
+
+	tmp = new OBSActionRow("Placeholder 2");
+	tmp->setSuffix(new OBSToggleSwitch);
 	test->properties()->addProperty(tmp);
 
 	ui->scrollAreaWidgetContents_2->layout()->addWidget(test);
 
 	ui->widget_2->setVisible(false);
-	ui->scrollAreaWidgetContents_2->layout()->setAlignment(Qt::AlignTop | Qt::AlignHCenter);
+	ui->scrollAreaWidgetContents_2->layout()->setAlignment(
+		Qt::AlignTop | Qt::AlignHCenter);
 }
 
 OBSBasicSettings::~OBSBasicSettings()

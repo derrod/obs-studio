@@ -10,6 +10,7 @@
 #include <QMouseEvent>
 #include <QSpinBox>
 #include <QPushButton>
+#include <QScrollArea>
 
 class OBSPropertiesList;
 
@@ -104,7 +105,14 @@ private:
 * Generic OBS property container
 */
 
-class OBSActionRow : public QFrame {
+class OBSActionBaseClass : public QFrame {
+	Q_OBJECT
+
+public:
+	OBSActionBaseClass(QWidget *parent = nullptr) : QFrame(parent){};
+};
+
+class OBSActionRow : public OBSActionBaseClass {
 	Q_OBJECT
 
 public:
@@ -115,11 +123,12 @@ public:
 	void setPrefix(QWidget *w);
 	void setSuffix(QWidget *w);
 
-protected:
-	void mouseReleaseEvent(QMouseEvent *) override;
-
 signals:
 	void clicked();
+
+protected:
+	void mouseReleaseEvent(QMouseEvent *) override;
+	bool hasSubtitle() const { return descLbl != nullptr; }
 
 private:
 	QGridLayout *layout;
@@ -129,6 +138,42 @@ private:
 
 	QWidget *prefix = nullptr;
 	QWidget *suffix = nullptr;
+};
+
+/**
+* Proxy for QScrollArea for QSS styling
+*/
+class OBSScrollArea : public QScrollArea {
+	Q_OBJECT
+public:
+	OBSScrollArea(QWidget *parent = nullptr) : QScrollArea(parent) {}
+};
+
+/**
+* Collapsible Generic OBS property container
+*/
+class OBSCollapsibleActionRow : public OBSActionBaseClass {
+	Q_OBJECT
+
+public:
+	OBSCollapsibleActionRow(const QString &name,
+				const QString &desc = nullptr,
+				QWidget *parent = nullptr);
+
+	OBSToggleSwitch *getSwitch() const { return sw; }
+
+	void addProperty(OBSActionBaseClass *ar);
+
+private:
+	void collapse(bool collapsed);
+
+	QVBoxLayout *layout;
+	QPropertyAnimation *anim;
+
+	OBSActionRow *ar;
+	OBSScrollArea *sa;
+	OBSToggleSwitch *sw;
+	OBSPropertiesList *plist;
 };
 
 // ToDo subclass OBSActionRow with one that has its own properties list
@@ -144,7 +189,7 @@ class OBSPropertiesList : public QFrame {
 public:
 	OBSPropertiesList(QWidget *parent = nullptr);
 
-	void addProperty(OBSActionRow *ar);
+	void addProperty(OBSActionBaseClass *ar);
 
 private:
 	QVBoxLayout *layout = nullptr;
@@ -172,7 +217,7 @@ public:
 	// ToDo add option for hiding properties list when disabled
 	// ToDo allow setting enabled state
 
-	void addProperty(OBSActionRow *ar);
+	void addProperty(OBSActionBaseClass *ar);
 
 private:
 	QGridLayout *layout = nullptr;

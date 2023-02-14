@@ -1571,10 +1571,27 @@ OBSActionRow QPushButton {
     margin: 0;
 }
 
-OBSActionRow#secondary {
+OBSActionRow#secondary,
+OBSCollapsibleActionRow#secondary {
     border-top: 1px solid palette(mid);
+}
+
+QWidget#obsSpacer {
+    max-height: 1px;
+    min-height: 1px;
+    background-color: palette(mid);
 }
 
 OBSActionRow:hover {
     background: rgb(51,55,65);
+}
+
+OBSCollapsibleActionRow {
+    margin: 0;
+    padding: 0;
+    border: none;
+}
+
+OBSScrollArea OBSPropertiesList {
+    background: rgb(33,36,46);
 }
