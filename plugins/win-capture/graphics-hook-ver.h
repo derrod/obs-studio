@@ -15,7 +15,6 @@
 #define HOOK_VER_MINOR 8
 #define HOOK_VER_PATCH 0
 
-#define STRINGIFY(s) #s
 #define MAKE_VERSION_NAME(major, minor, patch) \
 	STRINGIFY(major) "." STRINGIFY(minor) "." STRINGIFY(patch) ".0"
 #define HOOK_VERSION_NAME \
