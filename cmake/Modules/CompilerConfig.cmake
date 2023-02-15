@@ -69,7 +69,10 @@ if(OS_WINDOWS AND MSVC)
     /D_CRT_SECURE_NO_WARNINGS
     /D_CRT_NONSTDC_NO_WARNINGS
     /utf-8
-    /permissive-)
+    /permissive-
+    /Zc:__cplusplus
+    /Zc:preprocessor
+    /std:c17)
 
   add_link_options(
     "LINKER:/OPT:REF"
