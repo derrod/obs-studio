@@ -1010,7 +1010,7 @@ OBSBasicSettings::OBSBasicSettings(QWidget *parent)
 	test = new OBSGroupBox(QTStr("Basic.Settings.General.Snapping"), this);
 
 	tmp = new OBSActionRow("Placeholder");
-	tmp->setSuffix( new OBSToggleSwitch);
+	tmp->setSuffix(new OBSToggleSwitch);
 	test->properties()->addProperty(tmp);
 
 	OBSCollapsibleActionRow *tmp2 = new OBSCollapsibleActionRow(
