@@ -120,8 +120,11 @@ public:
 	OBSActionRow(const QString &name, const QString &desc,
 		     QWidget *parent = nullptr);
 
-	void setPrefix(QWidget *w);
-	void setSuffix(QWidget *w);
+	void setPrefix(QWidget *w, bool auto_connect = true);
+	void setSuffix(QWidget *w, bool auto_connect = true);
+
+	void setPrefixEnabled(bool enabled);
+	void setSuffixEnabled(bool enabled);
 
 signals:
 	void clicked();

@@ -142,10 +142,9 @@ OBSActionRow::OBSActionRow(const QString &name, const QString &desc,
 	layout->addWidget(descLbl, 1, 1, Qt::AlignLeft);
 }
 
-void OBSActionRow::setPrefix(QWidget *w)
+void OBSActionRow::setPrefix(QWidget *w, bool auto_connect)
 {
-	if (suffix)
-		return;
+	setSuffixEnabled(false);
 
 	int rowspan = !!descLbl ? 2 : 1;
 	prefix = w;
@@ -157,7 +156,7 @@ void OBSActionRow::setPrefix(QWidget *w)
 
 	// If element is checkable, forward clicks on the widget
 	QAbstractButton *abtn = dynamic_cast<QAbstractButton *>(w);
-	if (abtn && abtn->isCheckable())
+	if (auto_connect && abtn && abtn->isCheckable())
 		connect(this, &OBSActionRow::clicked, abtn,
 			&QAbstractButton::click);
 
@@ -166,10 +165,9 @@ void OBSActionRow::setPrefix(QWidget *w)
 	layout->setColumnStretch(0, 5);
 }
 
-void OBSActionRow::setSuffix(QWidget *w)
+void OBSActionRow::setSuffix(QWidget *w, bool auto_connect)
 {
-	if (prefix)
-		return;
+	setPrefixEnabled(false);
 
 	int rowspan = !!descLbl ? 2 : 1;
 	suffix = w;
@@ -181,7 +179,7 @@ void OBSActionRow::setSuffix(QWidget *w)
 
 	// If element is checkable, forward clicks on the widget
 	QAbstractButton *abtn = dynamic_cast<QAbstractButton *>(w);
-	if (abtn && abtn->isCheckable())
+	if (auto_connect && abtn && abtn->isCheckable())
 		connect(this, &OBSActionRow::clicked, abtn,
 			&QAbstractButton::click);
 
@@ -190,17 +188,30 @@ void OBSActionRow::setSuffix(QWidget *w)
 			  Qt::AlignRight | Qt::AlignVCenter);
 }
 
-// ToDo Figure out what the fuck to do with an expandable actionrow and the indicaotr
-void OBSActionRow::setSuffixNoConnect(QWidget *w)
+void OBSActionRow::setPrefixEnabled(bool enabled)
 {
-	if (prefix)
+	if (!prefix)
+		return;
+	if (enabled)
+		setSuffixEnabled(false);
+	if (enabled == prefix->isEnabled() && enabled == prefix->isVisible())
 		return;
 
-	int rowspan = !!descLbl ? 2 : 1;
-	suffix = w;
-	suffix->setParent(this);
-	layout->addWidget(suffix, 0, 2, rowspan, 1,
-			  Qt::AlignRight | Qt::AlignVCenter);
+	prefix->setEnabled(enabled);
+	prefix->setVisible(enabled);
+}
+
+void OBSActionRow::setSuffixEnabled(bool enabled)
+{
+	if (!suffix)
+		return;
+	if (enabled)
+		setPrefixEnabled(false);
+	if (enabled == suffix->isEnabled() && enabled == suffix->isVisible())
+		return;
+
+	suffix->setEnabled(enabled);
+	suffix->setVisible(enabled);
 }
 
 void OBSActionRow::mouseReleaseEvent(QMouseEvent *e)
@@ -254,7 +265,6 @@ OBSCollapsibleActionRow::OBSCollapsibleActionRow(const QString &name,
 	sw = new OBSToggleSwitch(false);
 	ar->setSuffix(sw);
 
-	
 	// connect(sw, &OBSToggleSwitch::toggled, this, 	&OBSCollapsibleActionRow::collapse);
 	connect(sw, &OBSToggleSwitch::toggled, plist,
 		&OBSPropertiesList::setVisible);
