@@ -554,7 +554,6 @@ static void create_audio_stream(struct ffmpeg_mux *ffm, int idx)
 #endif
 	context->sample_rate = ffm->audio[idx].sample_rate;
 	context->frame_size = ffm->audio[idx].frame_size;
-	context->sample_fmt = AV_SAMPLE_FMT_S16;
 	context->time_base = stream->time_base;
 	context->extradata = extradata;
 	context->extradata_size = ffm->audio_header[idx].size;
@@ -1050,6 +1049,8 @@ static int ffmpeg_mux_init_context(struct ffmpeg_mux *ffm)
 	ffm->output->oformat->video_codec = AV_CODEC_ID_NONE;
 	ffm->output->oformat->audio_codec = AV_CODEC_ID_NONE;
 #endif
+	// Allow things such as FLAC/OPUS in MP4
+	ffm->output->strict_std_compliance = FF_COMPLIANCE_EXPERIMENTAL;
 
 	if (!init_streams(ffm)) {
 		free_avformat(ffm);
