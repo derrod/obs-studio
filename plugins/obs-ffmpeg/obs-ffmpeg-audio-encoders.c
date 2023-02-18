@@ -547,6 +547,7 @@ struct obs_encoder_info pcm24_encoder_info = {
 struct obs_encoder_info pcm32_encoder_info = {
 	.id = "ffmpeg_pcm_f32le",
 	.type = OBS_ENCODER_AUDIO,
+	.caps = OBS_ENCODER_CAP_ALLOW_CLIPPING,
 	.codec = "pcm_f32le",
 	.get_name = pcm32_getname,
 	.create = pcm32_create,

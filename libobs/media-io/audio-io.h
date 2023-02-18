@@ -102,6 +102,7 @@ struct audio_output_info {
 };
 
 struct audio_convert_info {
+	bool allow_clipping;
 	uint32_t samples_per_sec;
 	enum audio_format format;
 	enum speaker_layout speakers;

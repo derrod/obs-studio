@@ -154,6 +154,10 @@ static inline void get_audio_info(const struct obs_encoder *encoder,
 
 	if (encoder->info.get_audio_info)
 		encoder->info.get_audio_info(encoder->context.data, info);
+
+	uint32_t caps = obs_encoder_get_caps(encoder);
+	if (caps & OBS_ENCODER_CAP_ALLOW_CLIPPING)
+		info->allow_clipping = true;
 }
 
 static inline void get_video_info(struct obs_encoder *encoder,
