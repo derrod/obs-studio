@@ -478,6 +478,12 @@ static void enc_audio_info(void *data, struct audio_convert_info *info)
 		info->speakers = SPEAKERS_UNKNOWN;
 }
 
+static void enc_audio_info_float(void *data, struct audio_convert_info *info)
+{
+	enc_audio_info(data, info);
+	info->allow_clipping = true;
+}
+
 static size_t enc_frame_size(void *data)
 {
 	struct enc_encoder *enc = data;
@@ -556,7 +562,7 @@ struct obs_encoder_info pcm32_encoder_info = {
 	.get_defaults = enc_defaults,
 	.get_properties = enc_properties,
 	.get_extra_data = enc_extra_data,
-	.get_audio_info = enc_audio_info,
+	.get_audio_info = enc_audio_info_float,
 };
 
 struct obs_encoder_info alac_encoder_info = {
