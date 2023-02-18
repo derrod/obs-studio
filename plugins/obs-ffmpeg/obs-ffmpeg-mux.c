@@ -313,11 +313,18 @@ static void build_command_line(struct ffmpeg_muxer *stream, struct dstr *cmd,
 		add_video_encoder_params(stream, cmd, vencoder);
 
 	if (num_tracks) {
-		dstr_cat(cmd, "aac ");
+		struct dstr name = {0};
+		dstr_init_copy(&name, obs_encoder_get_codec(aencoders[0]));
+		dstr_cat(&name, " ");
+		// Name needs to be lowercase
+		dstr_to_lower(&name);
+		dstr_cat_dstr(cmd, &name);
 
 		for (int i = 0; i < num_tracks; i++) {
 			add_audio_encoder_params(cmd, aencoders[i]);
 		}
+
+		dstr_free(&name);
 	}
 
 	add_stream_key(cmd, stream);
