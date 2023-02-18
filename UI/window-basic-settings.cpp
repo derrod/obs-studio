@@ -447,6 +447,7 @@ OBSBasicSettings::OBSBasicSettings(QWidget *parent)
 	HookWidget(ui->advOutNoSpace,        CHECK_CHANGED,  OUTPUTS_CHANGED);
 	HookWidget(ui->advOutRecFormat,      COMBO_CHANGED,  OUTPUTS_CHANGED);
 	HookWidget(ui->advOutRecEncoder,     COMBO_CHANGED,  OUTPUTS_CHANGED);
+	HookWidget(ui->advOutAudioEncoder,   COMBO_CHANGED,  OUTPUTS_CHANGED);
 	HookWidget(ui->advOutRecUseRescale,  CHECK_CHANGED,  OUTPUTS_CHANGED);
 	HookWidget(ui->advOutRecRescale,     CBEDIT_CHANGED, OUTPUTS_CHANGED);
 	HookWidget(ui->advOutMuxCustom,      EDIT_CHANGED,   OUTPUTS_CHANGED);
@@ -812,6 +813,8 @@ OBSBasicSettings::OBSBasicSettings(QWidget *parent)
 		SLOT(AdvReplayBufferChanged()));
 	connect(ui->advOutRecEncoder, SIGNAL(currentIndexChanged(int)), this,
 		SLOT(AdvReplayBufferChanged()));
+	connect(ui->advOutAudioEncoder, SIGNAL(currentIndexChanged(int)), this,
+		SLOT(AdvReplayBufferChanged()));
 	connect(ui->advRBSecMax, SIGNAL(valueChanged(int)), this,
 		SLOT(AdvReplayBufferChanged()));
 
@@ -898,6 +901,8 @@ OBSBasicSettings::OBSBasicSettings(QWidget *parent)
 	connect(ui->advOutRecFormat, SIGNAL(currentIndexChanged(int)), this,
 		SLOT(AdvOutRecCheckWarnings()));
 	connect(ui->advOutRecEncoder, SIGNAL(currentIndexChanged(int)), this,
+		SLOT(AdvOutRecCheckWarnings()));
+	connect(ui->advOutAudioEncoder, SIGNAL(currentIndexChanged(int)), this,
 		SLOT(AdvOutRecCheckWarnings()));
 
 	SimpleRecordingQualityChanged();
@@ -2072,6 +2077,8 @@ void OBSBasicSettings::LoadAdvOutputRecordingEncoderProperties()
 {
 	const char *type =
 		config_get_string(main->Config(), "AdvOut", "RecEncoder");
+	const char *atype =
+		config_get_string(main->Config(), "AdvOut", "AudioEncoder");
 
 	delete recordEncoderProps;
 	recordEncoderProps = nullptr;
@@ -2097,6 +2104,17 @@ void OBSBasicSettings::LoadAdvOutputRecordingEncoderProperties()
 			ui->advOutRecEncoder->insertItem(1, QT_UTF8(name),
 							 QT_UTF8(type));
 			SetComboByValue(ui->advOutRecEncoder, type);
+		}
+	}
+
+	if (!SetComboByValue(ui->advOutAudioEncoder, atype)) {
+		uint32_t caps = obs_get_encoder_caps(atype);
+		if ((caps & ENCODER_HIDE_FLAGS) != 0) {
+			const char *name = obs_encoder_get_display_name(atype);
+
+			ui->advOutAudioEncoder->insertItem(1, QT_UTF8(name),
+							   QT_UTF8(atype));
+			SetComboByValue(ui->advOutAudioEncoder, atype);
 		}
 	}
 }
@@ -3642,6 +3660,7 @@ void OBSBasicSettings::SaveOutputSettings()
 	SaveCheckBox(ui->advOutNoSpace, "AdvOut", "RecFileNameWithoutSpace");
 	SaveCombo(ui->advOutRecFormat, "AdvOut", "RecFormat");
 	SaveComboData(ui->advOutRecEncoder, "AdvOut", "RecEncoder");
+	SaveComboData(ui->advOutAudioEncoder, "AdvOut", "AudioEncoder");
 	SaveCheckBox(ui->advOutRecUseRescale, "AdvOut", "RecRescale");
 	SaveCombo(ui->advOutRecRescale, "AdvOut", "RecRescaleRes");
 	SaveEdit(ui->advOutMuxCustom, "AdvOut", "RecMuxerCustom");

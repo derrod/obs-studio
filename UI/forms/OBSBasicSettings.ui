@@ -2915,7 +2915,7 @@
                                  </property>
                                 </widget>
                                </item>
-                               <item row="5" column="0">
+                               <item row="6" column="0">
                                 <widget class="QCheckBox" name="advOutRecUseRescale">
                                  <property name="sizePolicy">
                                   <sizepolicy hsizetype="Minimum" vsizetype="Preferred">
@@ -2931,7 +2931,7 @@
                                  </property>
                                 </widget>
                                </item>
-                               <item row="5" column="1">
+                               <item row="6" column="1">
                                 <widget class="QFrame" name="advOutRecRescaleContainer">
                                  <layout class="QHBoxLayout" name="horizontalLayout_4">
                                   <property name="leftMargin">
@@ -2965,14 +2965,14 @@
                                  </layout>
                                 </widget>
                                </item>
-                               <item row="6" column="0">
+                               <item row="7" column="0">
                                 <widget class="QLabel" name="label_9001">
                                  <property name="text">
                                   <string>Basic.Settings.Output.CustomMuxerSettings</string>
                                  </property>
                                 </widget>
                                </item>
-                               <item row="6" column="1">
+                               <item row="7" column="1">
                                 <widget class="QLineEdit" name="advOutMuxCustom">
                                  <property name="sizePolicy">
                                   <sizepolicy hsizetype="Expanding" vsizetype="Preferred">
@@ -2982,7 +2982,7 @@
                                  </property>
                                 </widget>
                                </item>
-                               <item row="7" column="0">
+                               <item row="8" column="0">
                                 <widget class="QCheckBox" name="advOutSplitFile">
                                  <property name="sizePolicy">
                                   <sizepolicy hsizetype="Minimum" vsizetype="Expanding">
@@ -2998,7 +2998,7 @@
                                  </property>
                                 </widget>
                                </item>
-                               <item row="7" column="1">
+                               <item row="8" column="1">
                                 <widget class="QComboBox" name="advOutSplitFileType">
                                  <property name="enabled">
                                   <bool>false</bool>
@@ -3020,14 +3020,14 @@
                                  </item>
                                 </widget>
                                </item>
-                               <item row="8" column="0">
+                               <item row="9" column="0">
                                 <widget class="QLabel" name="advOutSplitFileTimeLabel">
                                  <property name="text">
                                   <string>Basic.Settings.Output.SplitFile.Time</string>
                                  </property>
                                 </widget>
                                </item>
-                               <item row="8" column="1">
+                               <item row="9" column="1">
                                 <widget class="QSpinBox" name="advOutSplitFileTime">
                                  <property name="suffix">
                                   <string> min</string>
@@ -3043,14 +3043,14 @@
                                  </property>
                                 </widget>
                                </item>
-                               <item row="9" column="0">
+                               <item row="10" column="0">
                                 <widget class="QLabel" name="advOutSplitFileSizeLabel">
                                  <property name="text">
                                   <string>Basic.Settings.Output.SplitFile.Size</string>
                                  </property>
                                 </widget>
                                </item>
-                               <item row="9" column="1">
+                               <item row="10" column="1">
                                 <widget class="QSpinBox" name="advOutSplitFileSize">
                                  <property name="suffix">
                                   <string> MB</string>
@@ -3065,6 +3065,16 @@
                                   <number>2048</number>
                                  </property>
                                 </widget>
+                               </item>
+                               <item row="5" column="0">
+                                <widget class="QLabel" name="advOutAudioEncoderLabel">
+                                 <property name="text">
+                                  <string>Basic.Settings.Output.Adv.AudioEncoder</string>
+                                 </property>
+                                </widget>
+                               </item>
+                               <item row="5" column="1">
+                                <widget class="QComboBox" name="advOutAudioEncoder"/>
                                </item>
                               </layout>
                              </widget>
@@ -7612,6 +7622,7 @@
   <tabstop>advOutRecTrack5</tabstop>
   <tabstop>advOutRecTrack6</tabstop>
   <tabstop>advOutRecEncoder</tabstop>
+  <tabstop>advOutAudioEncoder</tabstop>
   <tabstop>advOutRecUseRescale</tabstop>
   <tabstop>advOutRecRescale</tabstop>
   <tabstop>advOutMuxCustom</tabstop>

@@ -210,6 +210,23 @@ static bool CreateAACEncoder(OBSEncoder &res, string &id, int bitrate,
 	return false;
 }
 
+static bool CreateAudioEncoder(OBSEncoder &res, string &id, const char *type,
+			       const char *name, size_t idx)
+{
+	if (id == type)
+		return true;
+
+	id = type;
+	res = obs_audio_encoder_create(type, name, nullptr, idx, nullptr);
+
+	if (res) {
+		obs_encoder_release(res);
+		return true;
+	}
+
+	return false;
+}
+
 /* ------------------------------------------------------------------------ */
 
 inline BasicOutputHandler::BasicOutputHandler(OBSBasic *main_) : main(main_)
@@ -1267,6 +1284,8 @@ AdvancedOutput::AdvancedOutput(OBSBasic *main_) : BasicOutputHandler(main_)
 		config_get_string(main->Config(), "AdvOut", "Encoder");
 	const char *recordEncoder =
 		config_get_string(main->Config(), "AdvOut", "RecEncoder");
+	const char *audioEncoder =
+		config_get_string(main->Config(), "AdvOut", "AudioEncoder");
 #ifdef __APPLE__
 	translate_macvth264_encoder(streamEncoder);
 	translate_macvth264_encoder(recordEncoder);
@@ -1356,13 +1375,23 @@ AdvancedOutput::AdvancedOutput(OBSBasic *main_) : BasicOutputHandler(main_)
 		      astrcmpi(rate_control, "ABR") == 0;
 
 	for (int i = 0; i < MAX_AUDIO_MIXES; i++) {
-		char name[9];
-		snprintf(name, sizeof(name), "adv_aac%d", i);
+		if (!audioEncoder || strcmp(audioEncoder, "aac") == 0) {
+			char name[9];
+			snprintf(name, sizeof(name), "adv_aac%d", i);
 
-		if (!CreateAACEncoder(aacTrack[i], aacEncoderID[i],
-				      GetAudioBitrate(i), name, i))
-			throw "Failed to create audio encoder "
-			      "(advanced output)";
+			if (!CreateAACEncoder(aacTrack[i], aacEncoderID[i],
+					      GetAudioBitrate(i), name, i))
+				throw "Failed to create audio encoder "
+				      "(advanced output)";
+		} else {
+			char name[11];
+			snprintf(name, sizeof(name), "adv_audio%d", i);
+
+			if (!CreateAudioEncoder(aacTrack[i], aacEncoderID[i],
+						audioEncoder, name, i))
+				throw "Failed to create audio encoder "
+				      "(advanced output)";
+		}
 	}
 
 	std::string id;

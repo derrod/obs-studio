@@ -1361,6 +1361,12 @@ void OBSBasicSettings::ResetEncoders(bool streamOnly)
 	if (!streamOnly) {
 		ui->advOutRecEncoder->clear();
 		ui->advOutRecEncoder->addItem(TEXT_USE_STREAM_ENC, "none");
+
+		ui->advOutRecEncoder->clear();
+		// AAC automatically selects the best one, so just one generic item
+		ui->advOutAudioEncoder->addItem(
+			QTStr("Basic.Settings.Output.Adv.Encoder.Audio.AAC"),
+			"aac");
 	}
 
 	/* ------------------------------------------------- */
@@ -1399,6 +1405,30 @@ void OBSBasicSettings::ResetEncoders(bool streamOnly)
 		if (!streamOnly)
 			ui->advOutRecEncoder->addItem(qName, qType);
 	}
+
+	/* ------------------------------------------------- */
+	/* load advanced recording audio encoders            */
+
+	idx = 0;
+	while (obs_enum_encoder_types(idx++, &type)) {
+		const char *name = obs_encoder_get_display_name(type);
+		const char *codec = obs_get_encoder_codec(type);
+		uint32_t caps = obs_get_encoder_caps(type);
+
+		if (obs_get_encoder_type(type) != OBS_ENCODER_AUDIO)
+			continue;
+		if ((caps & ENCODER_HIDE_FLAGS) != 0)
+			continue;
+		if (strcmp(codec, "AAC") == 0)
+			continue;
+
+		QString qName = QT_UTF8(name);
+		QString qType = QT_UTF8(type);
+
+		ui->advOutAudioEncoder->addItem(qName, qType);
+	}
+
+	ui->advOutAudioEncoder->model()->sort(0);
 
 	/* ------------------------------------------------- */
 	/* load simple stream encoders                       */
