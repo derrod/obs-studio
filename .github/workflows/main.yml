@@ -122,7 +122,7 @@ jobs:
       - name: 'Prepare release notes'
         if: env.HAVE_SPARKLE_KEY == 'true'
         run: |
-          pandoc -f rst -t html notes.rst > builds/obs-studio-29.0.0-beta1-f6ed7c43b-macos-${{ matrix.arch }}.html
+          pandoc -f rst -t html notes.rst > output/appcasts/notes_${{ steps.branch.outputs.branch }}.html
 
       - name: 'Update Appcast'
         if: env.HAVE_SPARKLE_KEY == 'true'
@@ -130,9 +130,9 @@ jobs:
           mv artifacts/*.dmg builds/
           ./sparkle/bin/generate_appcast \
               --verbose \
-              --embed-release-notes \
               --ed-key-file ./eddsa_private.key \
               --download-url-prefix "https://cdn-fastly.obsproject.com/downloads/" \
+              --full-release-notes-url "https://obsproject.com/osx_update/notes_${{ steps.branch.outputs.branch }}.html" \
               --maximum-versions 0 \
               --maximum-deltas ${{ steps.branch.outputs.deltas }} \
               --channel "${{ steps.branch.outputs.branch }}" builds/
