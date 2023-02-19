@@ -85,7 +85,9 @@ jobs:
           echo "Git tag: ${GIT_TAG}"
           
           # Write tag description to file
-          git show -s --no-notes --format= ${GIT_TAG}
+          git show -s --format= ${GIT_TAG}
+          echo "FUCK"
+          git show -s ${GIT_TAG}
           git tag -l --format='%(contents)' ${GIT_TAG} >> ../notes.rst
 
       - name: 'Download Sparkle'
