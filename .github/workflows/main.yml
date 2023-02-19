@@ -121,7 +121,7 @@ jobs:
       - name: 'Prepare release notes'
         if: env.HAVE_SPARKLE_KEY == 'true'
         run: |
-          pandoc -f rst -t html notes.rst > artifacts/obs-studio-29.0.0-beta1-f6ed7c43b-macos-${{ matrix.arch }}.html
+          pandoc -f rst -t html notes.rst > builds/obs-studio-29.0.0-beta1-f6ed7c43b-macos-${{ matrix.arch }}.html
 
       - name: 'Update Appcast'
         if: env.HAVE_SPARKLE_KEY == 'true'
