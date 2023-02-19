@@ -82,7 +82,10 @@ jobs:
             echo "deltas=1" >> $GITHUB_OUTPUT
           fi
           
+          echo "Git tag: ${GIT_TAG}"
+          
           # Write tag description to file
+          git tag -l --format='%(contents)' ${GIT_TAG}
           git tag -l --format='%(contents)' ${GIT_TAG} >> ../notes.rst
 
       - name: 'Download Sparkle'
