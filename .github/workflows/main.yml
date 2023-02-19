@@ -123,7 +123,7 @@ jobs:
         if: env.HAVE_SPARKLE_KEY == 'true'
         run: |
           # insert massive underline at line 2 to turn first line into HTML header
-          sed -i '' '2 i ###################################################' notes.rst
+          sed -i '' '2i\'$'\n''###################################################' notes.rst
           pandoc -f rst -t html notes.rst -o output/appcasts/notes_${{ steps.branch.outputs.branch }}.html
 
       - name: 'Update Appcast'
