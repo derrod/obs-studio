@@ -83,10 +83,9 @@ jobs:
           fi
           
           echo "Git tag: ${GIT_TAG}"
-          
           # Write tag description to file
-          git tag -l --format='%(contents)' ${GIT_TAG}
-          git tag -l --format='%(contents)' ${GIT_TAG} >> ../notes.rst
+          git tag -l --format=%(contents) ${GIT_TAG}
+          git tag -l --format=%(contents) ${GIT_TAG} >> ../notes.rst
 
       - name: 'Download Sparkle'
         if: env.HAVE_SPARKLE_KEY == 'true'
