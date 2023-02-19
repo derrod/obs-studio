@@ -53,7 +53,6 @@ jobs:
         with:
           path: 'repo'
           ref: ${{ github.ref }}
-          fetch-depth: 0
 
       - name: 'Setup folder structure'
         if: env.HAVE_SPARKLE_KEY == 'true'
@@ -83,11 +82,7 @@ jobs:
             echo "deltas=1" >> $GITHUB_OUTPUT
           fi
           
-          echo "Git tag: ${GIT_TAG}"
-          
           # Write tag description to file
-          git -v
-          echo "FUCK"
           git tag -l --format='%(contents)' ${GIT_TAG}
           git tag -l --format='%(contents)' ${GIT_TAG} >> ../notes.rst
 
