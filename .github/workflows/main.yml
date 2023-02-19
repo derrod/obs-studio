@@ -130,6 +130,7 @@ jobs:
           mv artifacts/*.dmg builds/
           ./sparkle/bin/generate_appcast \
               --verbose \
+              --embed-release-notes \
               --ed-key-file ./eddsa_private.key \
               --download-url-prefix "https://cdn-fastly.obsproject.com/downloads/" \
               --maximum-versions 0 \
