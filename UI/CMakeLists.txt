@@ -152,6 +152,21 @@ target_sources(
 
 target_sources(
   obs
+  PRIVATE obs-adw/obs-actionrow.hpp
+          obs-adw/obs-controls.hpp
+          obs-adw/obs-groupbox.hpp
+          obs-adw/obs-propertieslist.hpp
+          obs-adw/obs-toggleswitch.hpp
+          obs-adw/obs-widgets.hpp
+          obs-adw/obs-actionrow.cpp
+          obs-adw/obs-controls.cpp
+          obs-adw/obs-groupbox.cpp
+          obs-adw/obs-propertieslist.cpp
+          obs-adw/obs-toggleswitch.cpp
+          obs-adw/obs-widgets.cpp)
+
+target_sources(
+  obs
   PRIVATE adv-audio-control.cpp
           adv-audio-control.hpp
           audio-encoders.cpp

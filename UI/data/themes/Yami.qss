@@ -1520,3 +1520,69 @@ OBSBasicStats {
 OBSBasicAdvAudio #scrollAreaWidgetContents {
     background: palette(dark);
 }
+
+OBSToggleSwitch {
+    qproperty-handle: rgb(255, 255, 255);
+    qproperty-backgroundActive: #284cb8;
+    qproperty-backgroundInactive: #3c404b;
+}
+
+OBSGroupBox {
+    border-radius: 4px;
+    font-weight: bold;
+}
+
+QLabel#groupName {
+    font-weight: bold;
+    font-size: 12pt;
+}
+
+OBSPropertiesList {
+    background: palette(dark);
+    border-radius: 4px;
+    border-width: 0px;
+    padding: 0px;
+    margin: 0px;
+}
+
+OBSActionRow {
+    margin: 0;
+    padding: 0;
+    border: none;
+    /* min-height: 50px; */
+    background: transparent;
+}
+
+OBSActionRow QLabel {
+    font-weight: 500;
+}
+
+OBSActionRow QComboBox,
+OBSActionRow QPushButton {
+    margin: 0;
+}
+
+OBSActionRow#secondary,
+OBSCollapsibleActionRow#secondary {
+    border-top: 1px solid palette(mid);
+}
+
+OBSPropertiesListSpacer {
+    max-height: 1px;
+    min-height: 1px;
+    background-color: palette(mid);
+}
+
+OBSActionRow:hover {
+    background: rgb(51,55,65);
+}
+
+OBSCollapsibleActionRow {
+    margin: 0;
+    padding: 0;
+    border: none;
+}
+
+OBSScrollArea OBSPropertiesList {
+    background: rgb(33,36,46);
+}
