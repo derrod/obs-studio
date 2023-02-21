@@ -131,8 +131,6 @@ target_sources(
           obs-app.hpp
           obs-proxy-style.cpp
           obs-proxy-style.hpp
-          obs-widgets.cpp
-          obs-widgets.hpp
           api-interface.cpp
           auth-base.cpp
           auth-base.hpp
@@ -151,6 +149,21 @@ target_sources(
           ${CMAKE_SOURCE_DIR}/deps/libff/libff/ff-util.c
           ${CMAKE_SOURCE_DIR}/deps/libff/libff/ff-util.h
           ${CMAKE_CURRENT_BINARY_DIR}/ui-config.h)
+
+target_sources(
+  obs
+  PRIVATE obs-adw/obs-actionrow.hpp
+          obs-adw/obs-controls.hpp
+          obs-adw/obs-groupbox.hpp
+          obs-adw/obs-propertieslist.hpp
+          obs-adw/obs-toggleswitch.hpp
+          obs-adw/obs-widgets.hpp
+          obs-adw/obs-actionrow.cpp
+          obs-adw/obs-controls.cpp
+          obs-adw/obs-groupbox.cpp
+          obs-adw/obs-propertieslist.cpp
+          obs-adw/obs-toggleswitch.cpp
+          obs-adw/obs-widgets.cpp)
 
 target_sources(
   obs
