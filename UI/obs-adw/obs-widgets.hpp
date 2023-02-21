@@ -1,7 +1,7 @@
 #pragma once
 
 /*
-* Custom OBS Widgets inspired by GNOME/Adawaita styling
+* Custom OBS Widgets inspired by GTK/Adawaita
 */
 
 #include "obs-actionrow.hpp"

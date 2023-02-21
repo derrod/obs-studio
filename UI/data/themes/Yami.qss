@@ -1558,7 +1558,7 @@ OBSActionRow {
     margin: 0;
     padding: 0;
     border: none;
-    min-height: 50px;
+    /* min-height: 50px; */
     background: transparent;
 }
 
@@ -1576,7 +1576,7 @@ OBSCollapsibleActionRow#secondary {
     border-top: 1px solid palette(mid);
 }
 
-QWidget#obsSpacer {
+OBSPropertiesListSpacer {
     max-height: 1px;
     min-height: 1px;
     background-color: palette(mid);

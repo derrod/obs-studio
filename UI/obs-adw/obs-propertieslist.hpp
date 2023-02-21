@@ -21,3 +21,15 @@ private:
 	QVBoxLayout *layout;
 	QList<OBSActionBaseClass *> *plist;
 };
+
+/**
+* Spacer with only cosmetic functionality
+*/
+class OBSPropertiesListSpacer : public QFrame {
+	Q_OBJECT
+public:
+	OBSPropertiesListSpacer(QWidget *parent = nullptr) : QFrame(parent)
+	{
+		setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
+	}
+};

@@ -14,19 +14,9 @@ OBSPropertiesList::OBSPropertiesList(QWidget *parent) : QFrame(parent)
 
 void OBSPropertiesList::addProperty(OBSActionBaseClass *ar)
 {
-	// All non-first objects get a special name so they can have a top border.
-	// Alternatively we could insert a widget here that acts as a separator and could
-	// be styled separately.
-	if (layout->count() > 0) {
-		ar->setObjectName("secondary");
-		/*
-		QWidget *spacer = new QWidget(this);
-		spacer->setObjectName("obsSpacer");
-		spacer->setSizePolicy(QSizePolicy::Expanding,
-				      QSizePolicy::Fixed);
-		layout->addWidget(spacer);
-		*/
-	}
+	// Add custom spacer once more than one element exists
+	if (layout->count() > 0)
+		layout->addWidget(new OBSPropertiesListSpacer(this));
 
 	ar->setParent(this);
 	plist->append(ar);

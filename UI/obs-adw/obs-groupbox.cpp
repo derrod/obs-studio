@@ -8,7 +8,6 @@ OBSGroupBox::OBSGroupBox(QWidget *parent) : QFrame(parent)
 	QSizePolicy policy(QSizePolicy::Expanding, QSizePolicy::Fixed);
 	setSizePolicy(policy);
 	setLayout(layout);
-
 	setFixedWidth(600);
 
 	layout->addWidget(plist, 2, 0, -1, -1);

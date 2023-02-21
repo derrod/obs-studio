@@ -35,6 +35,5 @@ private:
 	QHBoxLayout *layout;
 	QPushButton *decr;
 	QPushButton *incr;
-
 	QDoubleSpinBox *sbox;
 };
