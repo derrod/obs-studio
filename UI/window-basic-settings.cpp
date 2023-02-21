@@ -939,7 +939,15 @@ OBSBasicSettings::OBSBasicSettings(QWidget *parent)
 
 	tmp = new OBSActionRow(
 		QTStr("Basic.Settings.General.OpenStatsOnStartup"));
-	tmp->setSuffix(new OBSToggleSwitch());
+	auto tswitch = new OBSToggleSwitch;
+	tswitch->setManualStatusChange(true);
+	connect(tswitch, &OBSToggleSwitch::toggled, this, [=](bool toggled) {
+		QTimer::singleShot(1000, [=]() {
+			tswitch->setStatus(toggled);
+		});
+	});
+
+	tmp->setSuffix(tswitch);
 	test->properties()->addProperty(tmp);
 
 	tmp = new OBSActionRow(

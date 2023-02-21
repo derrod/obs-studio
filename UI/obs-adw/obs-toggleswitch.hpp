@@ -18,6 +18,7 @@ class OBSToggleSwitch : public QAbstractButton {
 	Q_PROPERTY(QColor handle MEMBER handle DESIGNABLE true)
 	Q_PROPERTY(int margin MEMBER margin DESIGNABLE true)
 	Q_PROPERTY(int height MEMBER targetHeight DESIGNABLE true)
+	Q_PROPERTY(float blend MEMBER blend WRITE setBlend DESIGNABLE false)
 
 public:
 	OBSToggleSwitch(QWidget *parent = nullptr);
@@ -30,6 +31,15 @@ public:
 		xpos = x;
 		update();
 	}
+
+	void setBlend(float newBlend)
+	{
+		blend = newBlend;
+		update();
+	}
+
+	void setManualStatusChange(bool manual) { manualStatusChange = manual; }
+	void setStatus(bool status);
 
 protected:
 	void paintEvent(QPaintEvent *) override;
@@ -48,9 +58,15 @@ private:
 	int targetHeight;
 	int margin;
 
+	float blend = 0.0f;
+
+	bool manualStatus = false;
+	bool manualStatusChange = false;
+
 	QColor backgroundInactive;
 	QColor backgroundActive;
 	QColor handle;
 
 	QPropertyAnimation *animation = nullptr;
+	QPropertyAnimation *blendAnimation = nullptr;
 };

@@ -16,7 +16,8 @@ OBSToggleSwitch::OBSToggleSwitch(QWidget *parent)
 	: QAbstractButton(parent),
 	  targetHeight(24),
 	  margin(6),
-	  animation(new QPropertyAnimation(this, "xpos", this))
+	  animation(new QPropertyAnimation(this, "xpos", this)),
+	  blendAnimation(new QPropertyAnimation(this, "blend", this))
 {
 	xpos = targetHeight / 2;
 	setCheckable(true);
@@ -30,6 +31,7 @@ OBSToggleSwitch::OBSToggleSwitch(bool defaultState, QWidget *parent)
 	: OBSToggleSwitch(parent)
 {
 	setChecked(defaultState);
+	manualStatus = defaultState;
 	if (defaultState)
 		xpos = 2 * targetHeight - targetHeight / 2;
 }
@@ -42,11 +44,14 @@ void OBSToggleSwitch::paintEvent(QPaintEvent *e)
 	p.setPen(Qt::NoPen);
 
 	p.setOpacity(isEnabled() ? 1.0f : 0.5f);
-	int offset = isChecked() ? 0 : targetHeight / 2;
-	float progress = (float)(xpos - offset) /
-			 (float)(2 * targetHeight - targetHeight / 2);
 
-	p.setBrush(blendColors(backgroundInactive, backgroundActive, progress));
+	if (!manualStatusChange) {
+		int offset = isChecked() ? 0 : targetHeight / 2;
+		blend = (float)(xpos - offset) /
+			(float)(2 * targetHeight - targetHeight / 2);
+	}
+
+	p.setBrush(blendColors(backgroundInactive, backgroundActive, blend));
 	p.setRenderHint(QPainter::Antialiasing, true);
 	p.drawRoundedRect(QRect(0, 0, 2 * targetHeight, targetHeight),
 			  targetHeight / 2, targetHeight / 2);
@@ -61,14 +66,34 @@ void OBSToggleSwitch::onClicked(bool checked)
 	if (checked) {
 		animation->setStartValue(targetHeight / 2 + margin / 2);
 		animation->setEndValue(2 * targetHeight - targetHeight / 2);
-		animation->setDuration(120);
-		animation->start();
 	} else {
 		animation->setStartValue(xpos);
 		animation->setEndValue(targetHeight / 2);
-		animation->setDuration(120);
-		animation->start();
 	}
+
+	animation->setDuration(120);
+	animation->start();
+}
+
+void OBSToggleSwitch::setStatus(bool status)
+{
+	if (!manualStatusChange)
+		return;
+	if (status == manualStatus)
+		return;
+
+	manualStatus = status;
+	if (manualStatus) {
+		blendAnimation->setStartValue(0.0f);
+		blendAnimation->setEndValue(1.0f);
+	} else {
+		blendAnimation->setStartValue(1.0f);
+		blendAnimation->setEndValue(0.0f);
+	}
+
+	blendAnimation->setEasingCurve(QEasingCurve::InOutCubic);
+	blendAnimation->setDuration(240);
+	blendAnimation->start();
 }
 
 #if QT_VERSION < QT_VERSION_CHECK(6, 0, 0)
