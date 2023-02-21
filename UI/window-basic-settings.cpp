@@ -39,7 +39,6 @@
 #include "hotkey-edit.hpp"
 #include "source-label.hpp"
 #include "obs-app.hpp"
-#include "obs-widgets.hpp"
 #include "platform.hpp"
 #include "properties-view.hpp"
 #include "qt-wrappers.hpp"
@@ -47,6 +46,7 @@
 #include "window-basic-settings.hpp"
 #include "window-basic-main-outputs.hpp"
 #include "window-projector.hpp"
+#include "obs-adw/obs-widgets.hpp"
 
 #include <util/platform.h>
 #include <util/dstr.hpp>
