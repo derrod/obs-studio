@@ -7,7 +7,7 @@ OBSPropertiesList::OBSPropertiesList(QWidget *parent) : QFrame(parent)
 	layout->setSpacing(0);
 	layout->setContentsMargins(0, 0, 0, 0);
 
-	plist = new QList<OBSActionBaseClass *>;
+	rowsList = new QList<OBSActionBaseClass *>;
 
 	setLayout(layout);
 }
@@ -19,7 +19,7 @@ void OBSPropertiesList::addProperty(OBSActionBaseClass *ar)
 		layout->addWidget(new OBSPropertiesListSpacer(this));
 
 	ar->setParent(this);
-	plist->append(ar);
+	rowsList->append(ar);
 	layout->addWidget(ar);
 	adjustSize();
 }

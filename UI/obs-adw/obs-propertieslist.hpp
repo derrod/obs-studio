@@ -15,11 +15,11 @@ public:
 	void addProperty(OBSActionBaseClass *ar);
 
 	// This has too many fucking *'s
-	QList<OBSActionBaseClass *> *properties() const { return plist; }
+	QList<OBSActionBaseClass *> *rows() const { return rowsList; }
 
 private:
 	QVBoxLayout *layout;
-	QList<OBSActionBaseClass *> *plist;
+	QList<OBSActionBaseClass *> *rowsList;
 };
 
 /**
