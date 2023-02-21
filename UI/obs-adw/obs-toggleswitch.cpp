@@ -19,7 +19,10 @@ OBSToggleSwitch::OBSToggleSwitch(QWidget *parent)
 	  animation(new QPropertyAnimation(this, "xpos", this)),
 	  blendAnimation(new QPropertyAnimation(this, "blend", this))
 {
-	xpos = targetHeight / 2;
+	offPos = targetHeight / 2;
+	onPos = 2 * targetHeight - targetHeight / 2;
+	xPos = offPos;
+
 	setCheckable(true);
 	setFocusPolicy(Qt::TabFocus);
 
@@ -33,7 +36,7 @@ OBSToggleSwitch::OBSToggleSwitch(bool defaultState, QWidget *parent)
 	setChecked(defaultState);
 	manualStatus = defaultState;
 	if (defaultState)
-		xpos = 2 * targetHeight - targetHeight / 2;
+		xPos = onPos;
 }
 
 void OBSToggleSwitch::paintEvent(QPaintEvent *e)
@@ -43,12 +46,10 @@ void OBSToggleSwitch::paintEvent(QPaintEvent *e)
 	QPainter p(this);
 	p.setPen(Qt::NoPen);
 
-	p.setOpacity(isEnabled() ? 1.0f : 0.5f);
-
+	p.setOpacity((isEnabled() || waiting) ? 1.0f : 0.5f);
 	if (!manualStatusChange) {
-		int offset = isChecked() ? 0 : targetHeight / 2;
-		blend = (float)(xpos - offset) /
-			(float)(2 * targetHeight - targetHeight / 2);
+		int offset = isChecked() ? 0 : offPos;
+		blend = (float)(xPos - offset) / (float)(onPos);
 	}
 
 	p.setBrush(blendColors(backgroundInactive, backgroundActive, blend));
@@ -57,18 +58,24 @@ void OBSToggleSwitch::paintEvent(QPaintEvent *e)
 			  targetHeight / 2, targetHeight / 2);
 
 	p.setBrush(handle);
-	p.drawEllipse(QRectF(xpos - (targetHeight / 2) + margin / 2, margin / 2,
+	p.drawEllipse(QRectF(xPos - (targetHeight / 2 - margin / 2), margin / 2,
 			     targetHeight - margin, targetHeight - margin));
 }
 
 void OBSToggleSwitch::onClicked(bool checked)
 {
+	if (manualStatusChange) {
+		// ToDo: figure out a prettier way of accomplishing this
+		waiting = true;
+		setEnabled(false);
+	}
+
 	if (checked) {
-		animation->setStartValue(targetHeight / 2 + margin / 2);
-		animation->setEndValue(2 * targetHeight - targetHeight / 2);
+		animation->setStartValue(xPos);
+		animation->setEndValue(onPos);
 	} else {
-		animation->setStartValue(xpos);
-		animation->setEndValue(targetHeight / 2);
+		animation->setStartValue(xPos);
+		animation->setEndValue(offPos);
 	}
 
 	animation->setDuration(120);
@@ -82,7 +89,10 @@ void OBSToggleSwitch::setStatus(bool status)
 	if (status == manualStatus)
 		return;
 
+	setEnabled(true);
+	waiting = false;
 	manualStatus = status;
+
 	if (manualStatus) {
 		blendAnimation->setStartValue(0.0f);
 		blendAnimation->setEndValue(1.0f);

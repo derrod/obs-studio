@@ -10,7 +10,7 @@
 
 class OBSToggleSwitch : public QAbstractButton {
 	Q_OBJECT
-	Q_PROPERTY(int xpos MEMBER xpos WRITE setPos)
+	Q_PROPERTY(int xpos MEMBER xPos WRITE setPos)
 	Q_PROPERTY(QColor backgroundInactive MEMBER backgroundInactive
 			   DESIGNABLE true)
 	Q_PROPERTY(
@@ -28,7 +28,7 @@ public:
 
 	void setPos(int x)
 	{
-		xpos = x;
+		xPos = x;
 		update();
 	}
 
@@ -54,12 +54,15 @@ private slots:
 	void onClicked(bool checked);
 
 private:
-	int xpos;
-	int targetHeight;
+	int xPos;
+	int onPos;
+	int offPos;
 	int margin;
+	int targetHeight;
 
 	float blend = 0.0f;
 
+	bool waiting = false;
 	bool manualStatus = false;
 	bool manualStatusChange = false;
 
