@@ -996,11 +996,14 @@ static bool obs_init_data(void)
 		goto fail;
 	if (pthread_mutex_init_recursive(&obs->data.draw_callbacks_mutex) != 0)
 		goto fail;
+	if (pthread_mutex_init_recursive(&data->objects_mutex) != 0)
+		goto fail;
 
 	if (!obs_view_init(&data->main_view))
 		goto fail;
 
 	data->sources = NULL;
+	data->objects = NULL;
 	data->private_data = obs_data_create();
 	data->valid = true;
 
@@ -1070,6 +1073,7 @@ static void obs_free_data(void)
 	pthread_mutex_destroy(&data->encoders_mutex);
 	pthread_mutex_destroy(&data->services_mutex);
 	pthread_mutex_destroy(&data->draw_callbacks_mutex);
+	pthread_mutex_destroy(&data->objects_mutex);
 	da_free(data->draw_callbacks);
 	da_free(data->tick_callbacks);
 	obs_data_release(data->private_data);
@@ -2034,6 +2038,27 @@ static void *get_context_by_name_hash(void *vfirst, const char *name,
 	return context;
 }
 
+static void *get_context_by_uuid(enum obs_obj_type type, const char *uuid,
+				 pthread_mutex_t *mutex,
+				 void *(*addref)(void *))
+{
+	struct obs_context_data *context;
+
+	pthread_mutex_lock(mutex);
+	pthread_mutex_lock(&obs->data.objects_mutex);
+
+	HASH_FIND_UUID(obs->data.objects, uuid, context);
+
+	if (context && context->type == type)
+		addref(context);
+	else
+		context = NULL;
+
+	pthread_mutex_unlock(&obs->data.objects_mutex);
+	pthread_mutex_unlock(mutex);
+	return context;
+}
+
 static inline void *obs_source_addref_safe_(void *ref)
 {
 	return obs_source_get_ref(ref);
@@ -2068,22 +2093,9 @@ obs_source_t *obs_get_source_by_name(const char *name)
 
 obs_source_t *obs_get_source_by_uuid(const char *uuid)
 {
-	struct obs_source **first = &obs->data.first_source;
-	struct obs_source *source;
-
-	pthread_mutex_lock(&obs->data.sources_mutex);
-
-	source = *first;
-	while (source) {
-		if (strcmp(source->context.uuid, uuid) == 0) {
-			source = obs_source_addref_safe_(source);
-			break;
-		}
-		source = (void *)source->context.next;
-	}
-
-	pthread_mutex_unlock(&obs->data.sources_mutex);
-	return source;
+	return get_context_by_uuid(OBS_OBJ_TYPE_SOURCE, uuid,
+				   &obs->data.sources_mutex,
+				   obs_source_addref_safe_);
 }
 
 obs_source_t *obs_get_transition_by_name(const char *name)
@@ -2107,11 +2119,23 @@ obs_source_t *obs_get_transition_by_name(const char *name)
 	return source;
 }
 
+obs_source_t *obs_get_transition_by_uuid(const char *uuid)
+{
+	return obs_get_source_by_uuid(uuid);
+}
+
 obs_output_t *obs_get_output_by_name(const char *name)
 {
 	return get_context_by_name(&obs->data.first_output, name,
 				   &obs->data.outputs_mutex,
 				   obs_output_addref_safe_);
+}
+
+obs_output_t *obs_get_output_by_uuid(const char *uuid)
+{
+	return get_context_by_uuid(OBS_OBJ_TYPE_OUTPUT, uuid,
+				   &obs->data.sources_mutex,
+				   obs_source_addref_safe_);
 }
 
 obs_encoder_t *obs_get_encoder_by_name(const char *name)
@@ -2121,11 +2145,25 @@ obs_encoder_t *obs_get_encoder_by_name(const char *name)
 				   obs_encoder_addref_safe_);
 }
 
+obs_encoder_t *obs_get_encoder_by_uuid(const char *uuid)
+{
+	return get_context_by_uuid(OBS_OBJ_TYPE_ENCODER, uuid,
+				   &obs->data.sources_mutex,
+				   obs_source_addref_safe_);
+}
+
 obs_service_t *obs_get_service_by_name(const char *name)
 {
 	return get_context_by_name(&obs->data.first_service, name,
 				   &obs->data.services_mutex,
 				   obs_service_addref_safe_);
+}
+
+obs_service_t *obs_get_service_by_uuid(const char *uuid)
+{
+	return get_context_by_uuid(OBS_OBJ_TYPE_SERVICE, uuid,
+				   &obs->data.sources_mutex,
+				   obs_source_addref_safe_);
 }
 
 gs_effect_t *obs_get_base_effect(enum obs_base_effect effect)
@@ -2622,8 +2660,7 @@ obs_context_data_init_wrap(struct obs_context_data *context,
 
 	if (uuid && strlen(uuid) == UUID_STR_LENGTH)
 		context->uuid = bstrdup(uuid);
-	/* Only automatically generate UUIDs for sources */
-	else if (type == OBS_OBJ_TYPE_SOURCE)
+	else
 		context->uuid = os_get_uuid();
 
 	context->name = dup_name(name, private);
@@ -2690,6 +2727,13 @@ void obs_context_data_insert(struct obs_context_data *context,
 	if (context->next)
 		context->next->prev_next = &context->next;
 	pthread_mutex_unlock(mutex);
+
+	if (!context->uuid)
+		return;
+
+	pthread_mutex_lock(&obs->data.objects_mutex);
+	HASH_ADD_UUID(obs->data.objects, uuid, context);
+	pthread_mutex_unlock(&obs->data.objects_mutex);
 }
 
 void obs_context_data_insert_hash(struct obs_context_data *context,
@@ -2706,17 +2750,33 @@ void obs_context_data_insert_hash(struct obs_context_data *context,
 	pthread_mutex_lock(mutex);
 	HASH_ADD_STR(*first, name, context);
 	pthread_mutex_unlock(mutex);
+
+	if (!context->uuid)
+		return;
+
+	pthread_mutex_lock(&obs->data.objects_mutex);
+	HASH_ADD_UUID(obs->data.objects, uuid, context);
+	pthread_mutex_unlock(&obs->data.objects_mutex);
 }
 
 void obs_context_data_remove(struct obs_context_data *context)
 {
-	if (context && context->prev_next) {
+	if (!context)
+		return;
+
+	if (context->prev_next) {
 		pthread_mutex_lock(context->mutex);
 		*context->prev_next = context->next;
 		if (context->next)
 			context->next->prev_next = context->prev_next;
 		context->prev_next = NULL;
 		pthread_mutex_unlock(context->mutex);
+	}
+
+	if (context->uuid && obs->data.objects) {
+		pthread_mutex_lock(&obs->data.objects_mutex);
+		HASH_DELETE(hh_uuid, obs->data.objects, context);
+		pthread_mutex_unlock(&obs->data.objects_mutex);
 	}
 }
 
@@ -2726,11 +2786,19 @@ void obs_context_data_remove_hash(struct obs_context_data *context, void *phead)
 
 	assert(head);
 
-	if (context) {
-		pthread_mutex_lock(context->mutex);
-		HASH_DELETE(hh, *head, context);
-		pthread_mutex_unlock(context->mutex);
-	}
+	if (!context)
+		return;
+
+	pthread_mutex_lock(context->mutex);
+	HASH_DELETE(hh, *head, context);
+	pthread_mutex_unlock(context->mutex);
+
+	if (!context->uuid || !obs->data.objects)
+		return;
+
+	pthread_mutex_lock(&obs->data.objects_mutex);
+	HASH_DELETE(hh_uuid, obs->data.objects, context);
+	pthread_mutex_unlock(&obs->data.objects_mutex);
 }
 
 void obs_context_wait(struct obs_context_data *context)

@@ -38,7 +38,18 @@
 #include "obs.h"
 
 #include <caption/caption.h>
+
+/* Hash table stuff */
 #include <uthash/uthash.h>
+#undef uthash_malloc
+#undef uthash_free
+#define uthash_malloc(sz) bmalloc(sz)
+#define uthash_free(ptr, sz) bfree(ptr);
+
+#define HASH_FIND_UUID(head, finduuid, out) \
+	HASH_FIND(hh_uuid, head, finduuid, UUID_STR_LENGTH, out)
+#define HASH_ADD_UUID(head, uuidfield, add) \
+	HASH_ADD(hh_uuid, head, uuidfield[0], UUID_STR_LENGTH, add)
 
 #define NUM_TEXTURES 2
 #define NUM_CHANNELS 3
@@ -385,6 +396,9 @@ struct obs_core_data {
 	struct obs_encoder *first_encoder;
 	struct obs_service *first_service;
 
+	/* Hash table indexing all data objects by UUID */
+	struct obs_context_data *objects;
+
 	pthread_mutex_t sources_mutex;
 	pthread_mutex_t displays_mutex;
 	pthread_mutex_t outputs_mutex;
@@ -392,6 +406,7 @@ struct obs_core_data {
 	pthread_mutex_t services_mutex;
 	pthread_mutex_t audio_sources_mutex;
 	pthread_mutex_t draw_callbacks_mutex;
+	pthread_mutex_t objects_mutex;
 	DARRAY(struct draw_callback) draw_callbacks;
 	DARRAY(struct tick_callback) tick_callbacks;
 
@@ -546,7 +561,9 @@ struct obs_context_data {
 	pthread_mutex_t *mutex;
 	struct obs_context_data *next;
 	struct obs_context_data **prev_next;
+
 	UT_hash_handle hh;
+	UT_hash_handle hh_uuid;
 
 	bool private;
 };

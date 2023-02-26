@@ -707,15 +707,19 @@ EXPORT obs_source_t *obs_get_source_by_uuid(const char *uuid);
 
 /** Get a transition source by its name. */
 EXPORT obs_source_t *obs_get_transition_by_name(const char *name);
+EXPORT obs_source_t *obs_get_transition_by_uuid(const char *uuid);
 
-/** Gets an output by its name. */
+/** Gets an output by its name/UUID. */
 EXPORT obs_output_t *obs_get_output_by_name(const char *name);
+EXPORT obs_output_t *obs_get_output_by_uuid(const char *uuid);
 
-/** Gets an encoder by its name. */
+/** Gets an encoder by its name/UUID. */
 EXPORT obs_encoder_t *obs_get_encoder_by_name(const char *name);
+EXPORT obs_encoder_t *obs_get_encoder_by_uuid(const char *uuid);
 
-/** Gets an service by its name. */
+/** Gets an service by its name/UUID. */
 EXPORT obs_service_t *obs_get_service_by_name(const char *name);
+EXPORT obs_service_t *obs_get_service_by_uuid(const char *uuid);
 
 enum obs_base_effect {
 	OBS_EFFECT_DEFAULT,         /**< RGB/YUV */
