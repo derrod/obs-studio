@@ -308,7 +308,7 @@ if(OS_WINDOWS)
     libobs PRIVATE UNICODE _UNICODE _CRT_SECURE_NO_WARNINGS
                    _CRT_NONSTDC_NO_WARNINGS)
 
-  target_link_libraries(libobs PRIVATE dxgi Avrt Dwmapi winmm)
+  target_link_libraries(libobs PRIVATE dxgi Avrt Dwmapi winmm Rpcrt4)
 
   if(MSVC)
     target_link_libraries(libobs PUBLIC OBS::w32-pthreads)
