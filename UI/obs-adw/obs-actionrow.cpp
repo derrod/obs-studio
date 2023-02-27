@@ -119,6 +119,7 @@ void OBSActionRow::mouseReleaseEvent(QMouseEvent *e)
 */
 OBSCollapsibleActionRow::OBSCollapsibleActionRow(const QString &name,
 						 const QString &desc,
+						 bool toggleable,
 						 QWidget *parent)
 	: OBSActionBaseClass(parent)
 {
@@ -138,6 +139,15 @@ OBSCollapsibleActionRow::OBSCollapsibleActionRow(const QString &name,
 	plist->setVisible(false);
 	layout->addWidget(plist);
 
+	// ToDo, make this a property
+	extendDown = QPixmap(":res/images/hide.svg");
+	QTransform tr;
+	tr.rotate(180);
+	extendUp = extendDown.transformed(tr);
+
+	extendIcon = new QLabel(this);
+	extendIcon->setPixmap(extendDown);
+
 	/*
 	sa = new OBSScrollArea(this);
 
@@ -150,15 +160,30 @@ OBSCollapsibleActionRow::OBSCollapsibleActionRow(const QString &name,
 	sa->setWidget(plist);
 
 	anim = new QPropertyAnimation(sa, "maximumHeight", this);
-
 	layout->addWidget(sa);
 	*/
-	sw = new OBSToggleSwitch(false);
-	ar->setSuffix(sw);
 
-	// connect(sw, &OBSToggleSwitch::toggled, this, 	&OBSCollapsibleActionRow::collapse);
-	connect(sw, &OBSToggleSwitch::toggled, plist,
-		&OBSPropertiesList::setVisible);
+	if (toggleable) {
+		plist->setEnabled(false);
+		sw = new OBSToggleSwitch(false);
+		QWidget *multiSuffix = new QWidget(ar);
+		QHBoxLayout *multiLayout = new QHBoxLayout;
+
+		multiLayout->setContentsMargins(0, 0, 0, 0);
+		multiLayout->addWidget(sw);
+		multiLayout->addWidget(extendIcon);
+
+		multiSuffix->setLayout(multiLayout);
+
+		ar->setSuffix(multiSuffix, false);
+		connect(sw, &OBSToggleSwitch::toggled, plist,
+			&OBSPropertiesList::setEnabled);
+	} else {
+		ar->setSuffix(extendIcon);
+	}
+
+	connect(ar, &OBSActionRow::clicked, this,
+		&OBSCollapsibleActionRow::toggleVisibility);
 }
 
 void OBSCollapsibleActionRow::collapse(bool enabled)
@@ -174,6 +199,14 @@ void OBSCollapsibleActionRow::collapse(bool enabled)
 		anim->setDuration(1200);
 		anim->start();
 	}
+}
+
+void OBSCollapsibleActionRow::toggleVisibility()
+{
+	bool visible = !plist->isVisible();
+
+	plist->setVisible(visible);
+	extendIcon->setPixmap(visible ? extendUp : extendDown);
 }
 
 void OBSCollapsibleActionRow::addProperty(OBSActionBaseClass *ar)

@@ -71,8 +71,10 @@ class OBSCollapsibleActionRow : public OBSActionBaseClass {
 	Q_OBJECT
 
 public:
+	// ToDo: Figure out a better way to handle those options
 	OBSCollapsibleActionRow(const QString &name,
 				const QString &desc = nullptr,
+				bool toggleable = false,
 				QWidget *parent = nullptr);
 
 	OBSToggleSwitch *getSwitch() const { return sw; }
@@ -81,12 +83,17 @@ public:
 
 private:
 	void collapse(bool collapsed);
+	void toggleVisibility();
+
+	QPixmap extendDown;
+	QPixmap extendUp;
 
 	QVBoxLayout *layout;
 	QPropertyAnimation *anim;
+	QLabel *extendIcon;
 
 	OBSActionRow *ar;
 	OBSScrollArea *sa;
-	OBSToggleSwitch *sw;
+	OBSToggleSwitch *sw = nullptr;
 	OBSPropertiesList *plist;
 };
