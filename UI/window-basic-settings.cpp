@@ -1023,7 +1023,7 @@ OBSBasicSettings::OBSBasicSettings(QWidget *parent)
 	test->properties()->addProperty(tmp);
 
 	OBSCollapsibleActionRow *tmp2 = new OBSCollapsibleActionRow(
-		QTStr("Basic.Settings.General.Snapping"), nullptr, this);
+		QTStr("Basic.Settings.General.Snapping"), nullptr, true, this);
 	test->addProperty(tmp2);
 
 	tmp = new OBSActionRow(QTStr("Basic.Settings.General.SnapDistance"));
