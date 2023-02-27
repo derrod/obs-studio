@@ -1592,6 +1592,6 @@ OBSCollapsibleActionRow {
     border: none;
 }
 
-OBSScrollArea OBSPropertiesList {
+OBSCollapsibleActionRow OBSPropertiesList {
     background: rgb(33,36,46);
 }
