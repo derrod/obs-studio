@@ -32,15 +32,40 @@ env:
   YOUTUBE_SECRET_HASH: ${{ secrets.YOUTUBE_SECRET_HASH }}
 
 jobs:
+  config:
+    name: '01 - Configure Build Jobs'
+    runs-on: [ubuntu-22.04]
+    env:
+      HAVE_SPARKLE_KEY: ${{ secrets.SPARKLE_PRIVATE_KEY != '' }}
+    outputs:
+      create_artifacts: ${{ steps.config.outputs.create_artifacts }}
+      cache_date: ${{ steps.config.outputs.cache_date }}
+      run_sparkle: ${{ steps.config.outputs.run_sparkle }}
+    steps:
+      - name: 'Configure Build Jobs'
+        id: config
+        run: |
+          if [[ "${{ github.event_name == 'pull_request' }}" == "true" ]]; then
+            echo "create_artifacts=${{ contains(github.event.pull_request.labels.*.name, 'Seeking Testers') }}" >> $GITHUB_OUTPUT
+          else
+            echo 'create_artifacts=true' >> $GITHUB_OUTPUT
+          fi
+          if [[ ${{ env.HAVE_SPARKLE_KEY == 'true' }}" == "true" ]]; then
+            echo 'run_sparkle=true' >> $GITHUB_OUTPUT
+          else
+            echo 'run_sparkle=false' >> $GITHUB_OUTPUT
+          fi
+          echo "cache_date=$(date +"%Y-%m-%d")" >> $GITHUB_OUTPUT
+
   macos_sparkle:
     name: '04 - macOS Sparkle Updates'
     runs-on: [macos-12]
-    if: ${{ startsWith(github.ref, 'refs/tags/') && github.event_name != 'pull_request' }}
+    needs: [config]
+    if: needs.config.outputs.run_sparkle == 'true'
     strategy:
       matrix:
         arch: ['x86_64', 'arm64']
     env:
-      HAVE_SPARKLE_KEY: ${{ secrets.SPARKLE_PRIVATE_KEY != '' }}
       SPARKLE_VERSION: '2.3.2'
       SPARKLE_HASH: '2b3fe6918ca20a83729aad34f8f693a678b714a17d33b5f13ca2d25edfa7eed3'
     defaults:
@@ -48,48 +73,27 @@ jobs:
         shell: bash
     steps:
       - name: 'Checkout'
-        if: env.HAVE_SPARKLE_KEY == 'true'
         uses: actions/checkout@v3
         with:
           path: 'repo'
           ref: ${{ github.ref }}
 
-      - name: 'Setup folder structure'
-        if: env.HAVE_SPARKLE_KEY == 'true'
+      - name: 'Download artifact'
         run: |
-          mkdir builds
-          mkdir -p output/appcasts
-          mkdir -p output/deltas/${{ matrix.arch }}
+          mkdir artifacts
+          cd artifacts
+          wget "https://r2.rodney.io/sparkle/obs-studio-29.0.0-beta1-f6ed7c43b-macos-${{ matrix.arch }}.dmg"
+          wget "https://r2.rodney.io/sparkle/obs-studio-29.0.0-beta1-4df2b83f2-macos-${{ matrix.arch }}.dmg"
 
-      - name: 'Install requirements'
-        if: env.HAVE_SPARKLE_KEY == 'true'
-        run: |
-          pip3 install requests xmltodict
-          brew install coreutils pandoc
+      - name: 'Install Python requirements'
+        run: pip3 install requests xmltodict
 
-      - name: 'Determine branch and tag'
-        if: env.HAVE_SPARKLE_KEY == 'true'
-        id: branch
-        run: |
-          cd repo/
-          
-          GIT_TAG="$(git describe --tags --abbrev=0)"
-          if [[ ${GIT_TAG} == *'beta'* || ${GIT_TAG} == *'rc'* ]]; then
-            echo "branch=beta" >> $GITHUB_OUTPUT
-            echo "deltas=0" >> $GITHUB_OUTPUT
-          else
-            echo "branch=stable" >> $GITHUB_OUTPUT
-            echo "deltas=1" >> $GITHUB_OUTPUT
-          fi
-          
-          # Write tag description to file
-          git tag -l --format='%(contents)' ${GIT_TAG}
-          git tag -l --format='%(contents)' ${GIT_TAG} >> ../notes.rst
+      - name: 'Install Brew requirements'
+        run: brew install coreutils pandoc
 
-      - name: 'Download Sparkle'
-        if: env.HAVE_SPARKLE_KEY == 'true'
+      - name: 'Setup Sparkle'
         run: |
-          wget "https://github.com/sparkle-project/Sparkle/releases/download/${{ env.SPARKLE_VERSION }}/Sparkle-${{ env.SPARKLE_VERSION }}.tar.xz" -O Sparkle.tar.xz
+          curl -L "https://github.com/sparkle-project/Sparkle/releases/download/${{ env.SPARKLE_VERSION }}/Sparkle-${{ env.SPARKLE_VERSION }}.tar.xz" -o Sparkle.tar.xz
 
           if [[ '${{ env.SPARKLE_HASH }}' != "$(sha256sum Sparkle.tar.xz | cut -d " " -f 1)" ]]; then
               echo "Sparkle download hash does not match!"
@@ -99,20 +103,29 @@ jobs:
           mkdir sparkle && cd sparkle
           tar -xf ../Sparkle.tar.xz
 
-      - name: 'Write private key'
-        if: env.HAVE_SPARKLE_KEY == 'true'
-        run: echo -n "${{ secrets.SPARKLE_PRIVATE_KEY }}" >> eddsa_private.key
-
-      - name: 'Download artifact'
-        if: env.HAVE_SPARKLE_KEY == 'true'
+      - name: 'Setup folder structure'
         run: |
-          mkdir artifacts
-          cd artifacts
-          wget "https://r2.rodney.io/sparkle/obs-studio-29.0.0-beta1-f6ed7c43b-macos-${{ matrix.arch }}.dmg"
-          wget "https://r2.rodney.io/sparkle/obs-studio-29.0.0-beta1-4df2b83f2-macos-${{ matrix.arch }}.dmg"
+          mkdir builds
+          mkdir -p output/appcasts
+          mkdir -p output/deltas/${{ matrix.arch }}
 
-      - name: 'Download existing appcast and builds'
-        if: ${{ env.HAVE_SPARKLE_KEY == 'true' && false }}
+      - name: 'Determine branch and tag'
+        id: branch
+        run: |
+          pushd repo
+          
+          GIT_TAG="$(git describe --tags --abbrev=0)"
+          if [[ ${GIT_TAG} == *'beta'* || ${GIT_TAG} == *'rc'* ]]; then
+            echo "branch=beta" >> $GITHUB_OUTPUT
+            echo "deltas=0" >> $GITHUB_OUTPUT
+          else
+            echo "branch=stable" >> $GITHUB_OUTPUT
+            echo "deltas=1" >> $GITHUB_OUTPUT
+          fi
+          # Write tag description to file
+          git tag -l --format='%(contents)' ${GIT_TAG} >> ../notes.rst
+
+      - name: 'Download existing Appcast and builds'
         env:
           BRANCH: ${{ steps.branch.outputs.branch }}
           DELTAS: ${{ steps.branch.outputs.deltas }}
@@ -120,14 +133,15 @@ jobs:
         run: python3 repo/CI/macos/appcast_download.py
 
       - name: 'Prepare release notes'
-        if: env.HAVE_SPARKLE_KEY == 'true'
         run: |
-          # insert massive underline at line 2 to turn first line into HTML header
+          # Insert underline at line 2 to turn first line into heading
           sed -i '' '2i\'$'\n''###################################################' notes.rst
           pandoc -f rst -t html notes.rst -o output/appcasts/notes_${{ steps.branch.outputs.branch }}.html
 
-      - name: 'Update Appcast'
-        if: env.HAVE_SPARKLE_KEY == 'true'
+      - name: 'Setup Sparkle key'
+        run: echo -n "${{ secrets.SPARKLE_PRIVATE_KEY }}" >> eddsa_private.key
+
+      - name: 'Generate Appcast'
         run: |
           mv artifacts/*.dmg builds/
           ./sparkle/bin/generate_appcast \
@@ -145,12 +159,10 @@ jobs:
           # Move appcasts
           mv builds/*.xml output/appcasts/
 
-      - name: 'Create legacy appcast'
-        if: env.HAVE_SPARKLE_KEY == 'true'
+      - name: 'Create 1.x Appcast'
         run: python3 repo/CI/macos/appcast_convert.py
 
-      - name: 'Upload appcast and deltas'
-        if: env.HAVE_SPARKLE_KEY == 'true'
+      - name: 'Upload Appcast and Deltas'
         uses: actions/upload-artifact@v3
         with:
           name: 'macos-sparkle-updates'
