@@ -1,4 +1,5 @@
 import os
+from copy import deepcopy
 
 import xmltodict
 
@@ -16,12 +17,14 @@ def convert_appcast(filename):
         return
 
     appcast = xmltodict.parse(xml_data, force_list=('item',))
+    out_appcast = deepcopy(appcast)
 
-    new_list = []
     # Remove anything but the first stable channel item.
     # Mostly due to some issues with older Sparkle versions
     # we still have out there.
-    for item in appcast['rss']['channel']['item']:
+    new_list = []
+    for _item in appcast['rss']['channel']['item']:
+        item = deepcopy(_item)
         branch = item.pop('sparkle:channel', 'stable')
         if branch != 'stable':
             continue
@@ -30,10 +33,10 @@ def convert_appcast(filename):
         new_list.append(item)
         break
 
-    appcast['rss']['channel']['item'] = new_list
+    out_appcast['rss']['channel']['item'] = new_list
 
     with open(out_path, 'wb') as f:
-        xmltodict.unparse(appcast, output=f, pretty=True)
+        xmltodict.unparse(out_appcast, output=f, pretty=True)
 
 
 def adjust_appcast(filename):
@@ -46,32 +49,34 @@ def adjust_appcast(filename):
 
     arch = 'arm64' if 'arm64' in filename else 'x86_64'
     appcast = xmltodict.parse(xml_data, force_list=('item', 'enclosure'))
-    appcast['rss']['channel']['title'] = 'OBS Studio'
-    appcast['rss']['channel']['link'] = 'https://obsproject.com/'
+
+    out_appcast = deepcopy(appcast)
+    out_appcast['rss']['channel']['title'] = 'OBS Studio'
+    out_appcast['rss']['channel']['link'] = 'https://obsproject.com/'
 
     new_list = []
-    for item in appcast['rss']['channel']['item']:
+    for _item in appcast['rss']['channel']['item']:
+        item = deepcopy(_item)
         # Fix changelog URL
-        # Sparkle 2.x *really* wants us to embed the release notes instead of specifying
-        # a URL, and will not display the full notes, so use the legacy attribute instead.
+        # Sparkle doesn't allow us to specify the URL for a specific update,
+        # so we set the full release notes link instead and then rewrite the
+        # appcast. Yay.
         if release_notes_link := item.pop('sparkle:fullReleaseNotesLink', None):
             item['sparkle:releaseNotesLink'] = release_notes_link
 
         # If deltas exist, update their URLs to match server layout
         # (generate_appcast doesn't allow this).
-        if deltas := item.pop('sparkle:deltas', None):
+        if deltas := item.get('sparkle:deltas', None):
             for delta_item in deltas['enclosure']:
                 delta_filename = delta_item['@url'].rpartition('/')[2]
                 delta_item['@url'] = f'{DELTA_BASE_URL}/{arch}/{delta_filename}'
 
-            item['sparkle:deltas'] = deltas
-
         new_list.append(item)
 
-    appcast['rss']['channel']['item'] = new_list
+    out_appcast['rss']['channel']['item'] = new_list
 
     with open(file_path, 'wb') as f:
-        xmltodict.unparse(appcast, output=f, pretty=True)
+        xmltodict.unparse(out_appcast, output=f, pretty=True)
 
 
 if __name__ == '__main__':

@@ -1,24 +1,31 @@
 import os
+import sys
 
 import requests
 import xmltodict
 
 
 def download_build(url):
-    print('Downloading', url)
+    print(f'Downloading build "{url}"...')
     filename = url.rpartition('/')[2]
     r = requests.get(url)
     if r.status_code == 200:
         with open(f'artifacts/{filename}', 'wb') as f:
             f.write(r.content)
+    else:
+        print(f'Build download failed, status code: {r.status_code}')
+        sys.exit(1)
 
 
 def read_appcast(url, fallback):
     r = requests.get(url)
     if r.status_code == 404:
+        print('Using fallback Appcast URL...')
+
         r = requests.get(fallback)
-        if r.status_code == 404:
-            return
+        if r.status_code != 200:
+            print(f'Appcast download failed, status code: {r.status_code}')
+            sys.exit(1)
 
     filename = url.rpartition('/')[2]
     with open(f'builds/{filename}', 'wb') as f:
