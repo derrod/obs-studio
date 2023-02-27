@@ -942,9 +942,8 @@ OBSBasicSettings::OBSBasicSettings(QWidget *parent)
 	auto tswitch = new OBSToggleSwitch;
 	tswitch->setManualStatusChange(true);
 	connect(tswitch, &OBSToggleSwitch::toggled, this, [=](bool toggled) {
-		QTimer::singleShot(1000, [=]() {
-			tswitch->setStatus(toggled);
-		});
+		QTimer::singleShot(1000,
+				   [=]() { tswitch->setStatus(toggled); });
 	});
 
 	tmp->setSuffix(tswitch);
@@ -976,6 +975,8 @@ OBSBasicSettings::OBSBasicSettings(QWidget *parent)
 
 	// Output Settings
 	test = new OBSGroupBox(QTStr("Basic.Settings.Output"), this);
+
+	//QTimer::singleShot(1000, this, [=]() { test->properties()->clear(); });
 
 	tmp = new OBSActionRow(
 		QTStr("Basic.Settings.General.WarnBeforeStartingStream"));

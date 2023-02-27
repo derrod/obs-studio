@@ -13,8 +13,8 @@ public:
 	OBSPropertiesList(QWidget *parent = nullptr);
 
 	void addProperty(OBSActionBaseClass *ar);
+	void clear();
 
-	// This has too many fucking *'s
 	QList<OBSActionBaseClass *> *rows() const { return rowsList; }
 
 private:
