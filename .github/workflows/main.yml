@@ -50,7 +50,7 @@ jobs:
           else
             echo 'create_artifacts=true' >> $GITHUB_OUTPUT
           fi
-          if [[ ${{ env.HAVE_SPARKLE_KEY == 'true' }}" == "true" ]]; then
+          if [[ "${{ env.HAVE_SPARKLE_KEY == 'true' }}" == "true" ]]; then
             echo 'run_sparkle=true' >> $GITHUB_OUTPUT
           else
             echo 'run_sparkle=false' >> $GITHUB_OUTPUT
