@@ -10,6 +10,5 @@
 #include "obs-propertieslist.hpp"
 #include "obs-toggleswitch.hpp"
 
-// Note: This file contains temporary work before it is moved to its own file.
-//       It can currently be included to get all custom widgets, but this may change
-//       in the future!
+/// Note: This file serves as an all-in-one include for custom OBS widgets.
+/// It is not intended to define any widgets by itself.
