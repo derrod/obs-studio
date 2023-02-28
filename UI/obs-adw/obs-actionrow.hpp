@@ -44,6 +44,9 @@ public:
 	void setPrefix(QWidget *w, bool auto_connect = true);
 	void setSuffix(QWidget *w, bool auto_connect = true);
 
+	QWidget *prefix() const { return _prefix; }
+	QWidget *suffix() const { return _suffix; }
+
 	void setPrefixEnabled(bool enabled);
 	void setSuffixEnabled(bool enabled);
 
@@ -60,8 +63,8 @@ private:
 	QLabel *nameLbl = nullptr;
 	QLabel *descLbl = nullptr;
 
-	QWidget *prefix = nullptr;
-	QWidget *suffix = nullptr;
+	QWidget *_prefix = nullptr;
+	QWidget *_suffix = nullptr;
 };
 
 /**

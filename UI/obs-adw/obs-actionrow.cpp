@@ -39,7 +39,7 @@ void OBSActionRow::setPrefix(QWidget *w, bool auto_connect)
 	setSuffixEnabled(false);
 
 	int rowspan = !!descLbl ? 2 : 1;
-	prefix = w;
+	_prefix = w;
 
 	// HACK: Remove text from checkbox
 	QCheckBox *cbox = dynamic_cast<QCheckBox *>(w);
@@ -52,8 +52,8 @@ void OBSActionRow::setPrefix(QWidget *w, bool auto_connect)
 		connect(this, &OBSActionRow::clicked, abtn,
 			&QAbstractButton::click);
 
-	prefix->setParent(this);
-	layout->addWidget(prefix, 0, 0, rowspan, 1, Qt::AlignLeft);
+	_prefix->setParent(this);
+	layout->addWidget(_prefix, 0, 0, rowspan, 1, Qt::AlignLeft);
 	layout->setColumnStretch(0, 5);
 }
 
@@ -62,7 +62,7 @@ void OBSActionRow::setSuffix(QWidget *w, bool auto_connect)
 	setPrefixEnabled(false);
 
 	int rowspan = !!descLbl ? 2 : 1;
-	suffix = w;
+	_suffix = w;
 
 	// HACK: Remove text from checkbox
 	QCheckBox *cbox = dynamic_cast<QCheckBox *>(w);
@@ -75,35 +75,35 @@ void OBSActionRow::setSuffix(QWidget *w, bool auto_connect)
 		connect(this, &OBSActionRow::clicked, abtn,
 			&QAbstractButton::click);
 
-	suffix->setParent(this);
-	layout->addWidget(suffix, 0, 2, rowspan, 1,
+	_suffix->setParent(this);
+	layout->addWidget(_suffix, 0, 2, rowspan, 1,
 			  Qt::AlignRight | Qt::AlignVCenter);
 }
 
 void OBSActionRow::setPrefixEnabled(bool enabled)
 {
-	if (!prefix)
+	if (!_prefix)
 		return;
 	if (enabled)
 		setSuffixEnabled(false);
-	if (enabled == prefix->isEnabled() && enabled == prefix->isVisible())
+	if (enabled == _prefix->isEnabled() && enabled == _prefix->isVisible())
 		return;
 
-	prefix->setEnabled(enabled);
-	prefix->setVisible(enabled);
+	_prefix->setEnabled(enabled);
+	_prefix->setVisible(enabled);
 }
 
 void OBSActionRow::setSuffixEnabled(bool enabled)
 {
-	if (!suffix)
+	if (!_suffix)
 		return;
 	if (enabled)
 		setPrefixEnabled(false);
-	if (enabled == suffix->isEnabled() && enabled == suffix->isVisible())
+	if (enabled == _suffix->isEnabled() && enabled == _suffix->isVisible())
 		return;
 
-	suffix->setEnabled(enabled);
-	suffix->setVisible(enabled);
+	_suffix->setEnabled(enabled);
+	_suffix->setVisible(enabled);
 }
 
 void OBSActionRow::mouseReleaseEvent(QMouseEvent *e)
