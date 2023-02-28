@@ -7,7 +7,7 @@ OBSPropertiesList::OBSPropertiesList(QWidget *parent) : QFrame(parent)
 	layout->setSpacing(0);
 	layout->setContentsMargins(0, 0, 0, 0);
 
-	rowsList = new QList<OBSActionBaseClass *>;
+	rowsList = QList<OBSActionBaseClass *>();
 
 	setLayout(layout);
 }
@@ -15,21 +15,21 @@ OBSPropertiesList::OBSPropertiesList(QWidget *parent) : QFrame(parent)
 /* Note: This function takes ownership of the added widget
  * and it may be deleted when the properties list is destoryed
  * or the clear() method is called! */
-void OBSPropertiesList::addProperty(OBSActionBaseClass *ar)
+void OBSPropertiesList::addRow(OBSActionBaseClass *ar)
 {
 	// Add custom spacer once more than one element exists
 	if (layout->count() > 0)
 		layout->addWidget(new OBSPropertiesListSpacer(this));
 
 	ar->setParent(this);
-	rowsList->append(ar);
+	rowsList.append(ar);
 	layout->addWidget(ar);
 	adjustSize();
 }
 
 void OBSPropertiesList::clear()
 {
-	rowsList->clear();
+	rowsList.clear();
 	QLayoutItem *item = layout->takeAt(0);
 
 	while (item) {

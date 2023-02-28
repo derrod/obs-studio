@@ -82,7 +82,7 @@ public:
 
 	OBSToggleSwitch *getSwitch() const { return sw; }
 
-	void addProperty(OBSActionBaseClass *ar);
+	void addRow(OBSActionBaseClass *ar);
 
 private:
 	void collapse(bool collapsed);

@@ -28,7 +28,7 @@ public:
 	// ToDo allow setting enabled state
 	// (Maybe) ToDo add option for hiding properties list when disabled
 
-	void addProperty(OBSActionBaseClass *ar);
+	void addRow(OBSActionBaseClass *ar);
 
 private:
 	QGridLayout *layout = nullptr;

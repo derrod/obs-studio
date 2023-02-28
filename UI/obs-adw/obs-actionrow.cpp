@@ -209,7 +209,7 @@ void OBSCollapsibleActionRow::toggleVisibility()
 	extendIcon->setPixmap(visible ? extendUp : extendDown);
 }
 
-void OBSCollapsibleActionRow::addProperty(OBSActionBaseClass *ar)
+void OBSCollapsibleActionRow::addRow(OBSActionBaseClass *ar)
 {
-	plist->addProperty(ar);
+	plist->addRow(ar);
 }

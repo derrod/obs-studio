@@ -931,11 +931,11 @@ OBSBasicSettings::OBSBasicSettings(QWidget *parent)
 	test = new OBSGroupBox(this);
 	tmp = new OBSActionRow(QTStr("Basic.Settings.General.Language"));
 	tmp->setSuffix(ui->language);
-	test->properties()->addProperty(tmp);
+	test->properties()->addRow(tmp);
 
 	tmp = new OBSActionRow(QTStr("Basic.Settings.General.Theme"));
 	tmp->setSuffix(ui->theme);
-	test->properties()->addProperty(tmp);
+	test->properties()->addRow(tmp);
 
 	tmp = new OBSActionRow(
 		QTStr("Basic.Settings.General.OpenStatsOnStartup"));
@@ -947,12 +947,12 @@ OBSBasicSettings::OBSBasicSettings(QWidget *parent)
 	});
 
 	tmp->setSuffix(tswitch);
-	test->properties()->addProperty(tmp);
+	test->properties()->addRow(tmp);
 
 	tmp = new OBSActionRow(
 		QTStr("Basic.Settings.General.HideOBSWindowsFromCapture"));
 	tmp->setSuffix(new OBSToggleSwitch());
-	test->properties()->addProperty(tmp);
+	test->properties()->addRow(tmp);
 	ui->scrollAreaWidgetContents_2->layout()->addWidget(test);
 
 	// Updater Settings
@@ -963,12 +963,12 @@ OBSBasicSettings::OBSBasicSettings(QWidget *parent)
 		tmp = new OBSActionRow(
 			QTStr("Basic.Settings.General.UpdateChannel"));
 		tmp->setSuffix(ui->updateChannelBox);
-		test->properties()->addProperty(tmp);
+		test->properties()->addRow(tmp);
 
 		tmp = new OBSActionRow(
 			QTStr("Basic.Settings.General.EnableAutoUpdates"));
 		tmp->setSuffix(new OBSToggleSwitch(true));
-		test->properties()->addProperty(tmp);
+		test->properties()->addRow(tmp);
 
 		ui->scrollAreaWidgetContents_2->layout()->addWidget(test);
 	}
@@ -976,42 +976,42 @@ OBSBasicSettings::OBSBasicSettings(QWidget *parent)
 	// Output Settings
 	test = new OBSGroupBox(QTStr("Basic.Settings.Output"), this);
 
-	//QTimer::singleShot(1000, this, [=]() { test->properties()->clear(); });
+	QTimer::singleShot(10000, this, [=]() { test->properties()->clear(); });
 
 	tmp = new OBSActionRow(
 		QTStr("Basic.Settings.General.WarnBeforeStartingStream"));
 	tmp->setPrefix(ui->warnBeforeStreamStart);
-	test->properties()->addProperty(tmp);
+	test->properties()->addRow(tmp);
 
 	tmp = new OBSActionRow(
 		QTStr("Basic.Settings.General.WarnBeforeStoppingStream"));
 	tmp->setPrefix(ui->warnBeforeStreamStop);
-	test->properties()->addProperty(tmp);
+	test->properties()->addRow(tmp);
 
 	tmp = new OBSActionRow(
 		QTStr("Basic.Settings.General.WarnBeforeStoppingRecord"));
 	tmp->setPrefix(ui->warnBeforeRecordStop);
-	test->properties()->addProperty(tmp);
+	test->properties()->addRow(tmp);
 
 	tmp = new OBSActionRow(
 		QTStr("Basic.Settings.General.RecordWhenStreaming"));
 	tmp->setPrefix(ui->recordWhenStreaming);
-	test->properties()->addProperty(tmp);
+	test->properties()->addRow(tmp);
 
 	tmp = new OBSActionRow(
 		QTStr("Basic.Settings.General.KeepRecordingWhenStreamStops"));
 	tmp->setPrefix(ui->keepRecordStreamStops);
-	test->properties()->addProperty(tmp);
+	test->properties()->addRow(tmp);
 
 	tmp = new OBSActionRow(
 		QTStr("Basic.Settings.General.ReplayBufferWhileStreaming"));
 	tmp->setPrefix(ui->replayWhileStreaming);
-	test->properties()->addProperty(tmp);
+	test->properties()->addRow(tmp);
 
 	tmp = new OBSActionRow(
 		QTStr("Basic.Settings.General.KeepReplayBufferStreamStops"));
 	tmp->setPrefix(ui->keepReplayStreamStops);
-	test->properties()->addProperty(tmp);
+	test->properties()->addRow(tmp);
 
 	ui->scrollAreaWidgetContents_2->layout()->addWidget(test);
 
@@ -1020,31 +1020,31 @@ OBSBasicSettings::OBSBasicSettings(QWidget *parent)
 
 	tmp = new OBSActionRow("Placeholder");
 	tmp->setSuffix(new OBSToggleSwitch);
-	test->properties()->addProperty(tmp);
+	test->properties()->addRow(tmp);
 
 	OBSCollapsibleActionRow *tmp2 = new OBSCollapsibleActionRow(
 		QTStr("Basic.Settings.General.Snapping"), nullptr, true, this);
-	test->addProperty(tmp2);
+	test->addRow(tmp2);
 
 	tmp = new OBSActionRow(QTStr("Basic.Settings.General.SnapDistance"));
 	tmp->setSuffix(new OBSDoubleSpinBox());
-	tmp2->addProperty(tmp);
+	tmp2->addRow(tmp);
 
 	tmp = new OBSActionRow(QTStr("Basic.Settings.General.ScreenSnapping"));
 	tmp->setSuffix(ui->screenSnapping);
-	tmp2->addProperty(tmp);
+	tmp2->addRow(tmp);
 
 	tmp = new OBSActionRow(QTStr("Basic.Settings.General.SourceSnapping"));
 	tmp->setSuffix(new OBSToggleSwitch(true));
-	tmp2->addProperty(tmp);
+	tmp2->addRow(tmp);
 
 	tmp = new OBSActionRow(QTStr("Basic.Settings.General.CenterSnapping"));
 	tmp->setPrefix(ui->centerSnapping);
-	tmp2->addProperty(tmp);
+	tmp2->addRow(tmp);
 
 	tmp = new OBSActionRow("Placeholder 2");
 	tmp->setSuffix(new OBSToggleSwitch);
-	test->properties()->addProperty(tmp);
+	test->properties()->addRow(tmp);
 
 	ui->scrollAreaWidgetContents_2->layout()->addWidget(test);
 

@@ -57,7 +57,7 @@ OBSGroupBox::OBSGroupBox(const QString &name, const QString &desc,
 	}
 }
 
-void OBSGroupBox::addProperty(OBSActionBaseClass *ar)
+void OBSGroupBox::addRow(OBSActionBaseClass *ar)
 {
-	plist->addProperty(ar);
+	plist->addRow(ar);
 }

@@ -12,14 +12,14 @@ class OBSPropertiesList : public QFrame {
 public:
 	OBSPropertiesList(QWidget *parent = nullptr);
 
-	void addProperty(OBSActionBaseClass *ar);
+	void addRow(OBSActionBaseClass *ar);
 	void clear();
 
-	QList<OBSActionBaseClass *> *rows() const { return rowsList; }
+	QList<OBSActionBaseClass *> rows() const { return rowsList; }
 
 private:
 	QVBoxLayout *layout;
-	QList<OBSActionBaseClass *> *rowsList;
+	QList<OBSActionBaseClass *> rowsList;
 };
 
 /**
