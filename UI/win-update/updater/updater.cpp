@@ -142,8 +142,8 @@ try {
 	WinHandle hSrc;
 	WinHandle hDest;
 
-	hSrc = CreateFile(src, GENERIC_READ, 0, nullptr, OPEN_EXISTING,
-			  FILE_FLAG_SEQUENTIAL_SCAN, nullptr);
+	hSrc = CreateFile(src, GENERIC_READ, FILE_SHARE_READ, nullptr,
+			  OPEN_EXISTING, FILE_FLAG_SEQUENTIAL_SCAN, nullptr);
 	if (!hSrc.Valid())
 		throw LastError();
 
@@ -406,7 +406,7 @@ bool DownloadWorkerThread()
 	WinHttpSetOption(hSession, WINHTTP_OPTION_DECOMPRESSION,
 			 (LPVOID)&compressionFlags, sizeof(compressionFlags));
 
-	HttpHandle hConnect = WinHttpConnect(hSession, L"bouf.rodney.io",
+	HttpHandle hConnect = WinHttpConnect(hSession, L"r2.rodney.io",
 					     INTERNET_DEFAULT_HTTPS_PORT, 0);
 	if (!hConnect) {
 		downloadThreadFailure = true;
@@ -773,7 +773,7 @@ static inline bool is_64bit_file(const char *file)
 	       strstr(file, "64.exe") != nullptr;
 }
 
-#define UPDATE_URL L"https://bouf.rodney.io/updates"
+#define UPDATE_URL L"https://r2.rodney.io/obs/updates"
 
 static bool AddPackageUpdateFiles(const Json &root, size_t idx,
 				  const wchar_t *tempPath,
@@ -993,7 +993,7 @@ static void UpdateWithPatchIfAvailable(const char *name, const char *hash,
 	wchar_t sourceURL[1024];
 	wchar_t patchHashStr[BLAKE2_HASH_STR_LENGTH];
 
-	if (strncmp(source, "https://bouf.rodney.io/", 22) != 0)
+	if (strncmp(source, "https://r2.rodney.io/", 19) != 0)
 		return;
 
 	string patchPackageName = name;
@@ -1227,7 +1227,8 @@ static bool UpdateFile(ZSTD_DCtx *ctx, update_t &file)
 }
 
 queue<update_t *> updateQueue;
-static int lastPosition;
+static int lastPosition = 0;
+static int installed = 0;
 static bool updateThreadFailed = false;
 
 static bool UpdateWorker()
@@ -1251,10 +1252,7 @@ static bool UpdateWorker()
 			updateThreadFailed = true;
 			return false;
 		} else {
-			ulock.lock();
-			size_t updatesInstalled =
-				completedUpdates - updateQueue.size();
-			int position = (int)(((float)updatesInstalled /
+			int position = (int)(((float)++installed /
 					      (float)completedUpdates) *
 					     100.0f);
 			if (position > lastPosition) {
@@ -1262,7 +1260,6 @@ static bool UpdateWorker()
 				SendDlgItemMessage(hwndMain, IDC_PROGRESS,
 						   PBM_SETPOS, position, 0);
 			}
-			ulock.unlock();
 		}
 	}
 
@@ -1294,7 +1291,7 @@ try {
 }
 
 #define PATCH_MANIFEST_URL \
-	L"https://obsproject.com/update_studio/getpatchmanifest"
+	L"https://bouf.rodney.io/update_studio/getpatchmanifest"
 #define HASH_NULL L"0000000000000000000000000000000000000000"
 
 static bool UpdateVS2019Redists(const Json &root)
