@@ -23,10 +23,11 @@ jobs:
 
       - name: 'Wait 30 seconds, kill OBS'
         run: |
-          Start-Sleep -Seconds 30.0
+          Start-Sleep -Seconds 10.0
           Get-Process obs64 | Foreach-Object { $_.CloseMainWindow() | Out-Null } | stop-process -force
 
       - name: 'Upload build artifact'
+        if: always()
         uses: actions/upload-artifact@v3
         with:
           name: 'obs-config-dir'
