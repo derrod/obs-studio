@@ -13,7 +13,7 @@ jobs:
     steps:
       - name: 'Download OBS'
         run: |
-          curl "https://github.com/obsproject/obs-studio/releases/download/29.0.2/OBS-Studio-29.0.2-Full-x64.zip" -o obs.zip
+          curl -L "https://github.com/obsproject/obs-studio/releases/download/29.0.2/OBS-Studio-29.0.2-Full-x64.zip" -o obs.zip
           7z x "obs.zip"
 
       - name: 'Run OBS'
