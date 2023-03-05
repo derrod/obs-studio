@@ -47,22 +47,16 @@ jobs:
       - name: 'Run OBS'
         run: |
           cd /Applications/OBS.app/Contents/MacOS
-          ./OBS --verbose
+          & ./OBS --verbose
 
       - name: 'Wait 30 seconds, kill OBS'
         run: |
           sleep 10
           osascript -e 'quit app "OBS"'
 
-      - name: 'Figure out macOS Library path'
-        if: always()
-        id: folder
-        run: |
-          echo "folder=$(pwd)/obs-studio" >> $GITHUB_OUTPUT
-
       - name: 'Upload build artifact'
         if: always()
         uses: actions/upload-artifact@v3
         with:
           name: 'obs-dir-mac'
-          path: ${{ steps.folder.outputs.folder }}
+          path: '/Users/runner/Library/Application Support/obs-studio'
