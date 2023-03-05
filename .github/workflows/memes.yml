@@ -38,12 +38,6 @@ jobs:
     runs-on: [macos-latest]
     if: always()
     steps:
-      - name: 'Figure out macOS Library path'
-        id: folder
-        run: |
-          cd "/Library/Application Support"
-          echo "folder=$(pwd)/obs-studio" >> $GITHUB_OUTPUT
-
       - name: 'Download OBS'
         run: |
           curl -L "https://github.com/obsproject/obs-studio/releases/download/29.0.2/obs-studio-29.0.2-macos-x86_64.dmg" -o obs.dmg
@@ -58,6 +52,13 @@ jobs:
         run: |
           sleep 10
           osascript -e 'quit app "OBS"'
+
+      - name: 'Figure out macOS Library path'
+        if: always()
+        id: folder
+        run: |
+          find / -name "obs-studio" -type d
+          echo "folder=$(pwd)/obs-studio" >> $GITHUB_OUTPUT
 
       - name: 'Upload build artifact'
         if: always()
