@@ -52,8 +52,9 @@ jobs:
       - name: 'Wait 30 seconds, kill OBS'
         run: |
           sleep 10
-          # osascript -e 'quit app "OBS"'
-          pkill -x OBS
+          osascript -e 'quit app "OBS.app"'
+          # pkill -x OBS
+          sleep 10
 
       - name: 'Upload build artifact'
         if: always()
