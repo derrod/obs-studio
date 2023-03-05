@@ -41,7 +41,7 @@ jobs:
       - name: 'Figure out macOS Library path'
         id: folder
         run: |
-          cd "~/Library/Application Support"
+          cd "/Library/Application Support"
           echo "folder=$(pwd)/obs-studio" >> $GITHUB_OUTPUT
 
       - name: 'Download OBS'
@@ -52,7 +52,7 @@ jobs:
 
       - name: 'Run OBS'
         run: |
-          open /Applications/OBS.app
+          open /Applications/OBS.app --args "--verbose"
 
       - name: 'Wait 30 seconds, kill OBS'
         run: |
