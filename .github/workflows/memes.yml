@@ -1,0 +1,33 @@
+name: 'Memes'
+
+on:
+  push:
+    branches: ['*']
+    tags: ['*']
+
+jobs:
+  memes:
+    name: 'Memes'
+    runs-on: [windows-2022]
+    if: always()
+    steps:
+      - name: 'Download OBS'
+        run: |
+          curl "https://github.com/obsproject/obs-studio/releases/download/29.0.2/OBS-Studio-29.0.2-Full-x64.zip" -o obs.zip
+          7z x "obs.zip"
+
+      - name: 'Run OBS'
+        run: |
+          cd bin\64bit\bin
+          .\obs64.exe --portable
+
+      - name: 'Wait 30 seconds, kill OBS'
+        run: |
+          Start-Sleep -Seconds 30.0
+          Get-Process obs64 | Foreach-Object { $_.CloseMainWindow() | Out-Null } | stop-process -force
+
+      - name: 'Upload build artifact'
+        uses: actions/upload-artifact@v3
+        with:
+          name: 'obs-config-dir'
+          path: 'config/'
