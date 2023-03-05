@@ -40,7 +40,7 @@ jobs:
     steps:
       - name: 'Download OBS'
         run: |
-          curl -L "https://github.com/obsproject/obs-studio/releases/download/29.0.2/obs-studio-29.0.2-macos-arm64.dmg" -o obs.dmg
+          curl -L "https://github.com/obsproject/obs-studio/releases/download/29.0.2/obs-studio-29.0.2-macos-x86_64.dmg" -o obs.dmg
           hdiutil attach obs.dmg
           cp -rf /Volumes/**/OBS.app /Applications/
 
