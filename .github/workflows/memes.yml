@@ -47,7 +47,7 @@ jobs:
       - name: 'Run OBS'
         run: |
           cd /Applications/OBS.app/Contents/MacOS
-          & ./OBS --verbose
+          ./OBS --verbose &
 
       - name: 'Wait 30 seconds, kill OBS'
         run: |
