@@ -46,7 +46,8 @@ jobs:
 
       - name: 'Run OBS'
         run: |
-          open /Applications/OBS.app --args "--verbose"
+          cd /Applications/OBS.app/Contents/MacOS
+          ./OBS --verbose
 
       - name: 'Wait 30 seconds, kill OBS'
         run: |
@@ -57,7 +58,6 @@ jobs:
         if: always()
         id: folder
         run: |
-          find / -name "obs-studio" -type d
           echo "folder=$(pwd)/obs-studio" >> $GITHUB_OUTPUT
 
       - name: 'Upload build artifact'
