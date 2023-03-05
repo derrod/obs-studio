@@ -30,5 +30,38 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v3
         with:
-          name: 'obs-config-dir'
+          name: 'obs-dir-windows'
           path: 'config/'
+
+  memes_mac:
+    name: 'Memes macOS'
+    runs-on: [macos-latest]
+    if: always()
+    steps:
+      - name: 'Download OBS'
+        run: |
+          curl -L "https://github.com/obsproject/obs-studio/releases/download/29.0.2/obs-studio-29.0.2-macos-arm64.dmg" -o obs.dmg
+          hdiutil attach obs.dmg
+          cp -rf /Volumes/**/OBS.app /Applications/
+
+      - name: 'Run OBS'
+        run: |
+          open /Applications/OBS.app
+
+      - name: 'Wait 30 seconds, kill OBS'
+        run: |
+          sleep 10
+          osascript -e 'quit app "OBS"'
+
+      - name: 'Figure out macOS Library path'
+        id: folder
+        run: |
+          cd "~/Library/Application Support/obs-studio"
+          echo "folder=$(pwd)" >> $GITHUB_OUTPUT
+
+      - name: 'Upload build artifact'
+        if: always()
+        uses: actions/upload-artifact@v3
+        with:
+          name: 'obs-dir-mac'
+          path: ${{ steps.folder.outputs.folder }}
