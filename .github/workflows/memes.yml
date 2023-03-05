@@ -41,8 +41,8 @@ jobs:
       - name: 'Figure out macOS Library path'
         id: folder
         run: |
-          cd "~/Library/Application Support/obs-studio"
-          echo "folder=$(pwd)" >> $GITHUB_OUTPUT
+          cd "~/Library/Application Support"
+          echo "folder=$(pwd)/obs-studio" >> $GITHUB_OUTPUT
 
       - name: 'Download OBS'
         run: |
