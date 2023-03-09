@@ -798,6 +798,9 @@ typedef bool (*obs_save_source_filter_cb)(void *data, obs_source_t *source);
 EXPORT obs_data_array_t *obs_save_sources_filtered(obs_save_source_filter_cb cb,
 						   void *data);
 
+/** Reset source UUIDs */
+EXPORT void obs_reset_source_uuids(void);
+
 enum obs_obj_type {
 	OBS_OBJ_TYPE_INVALID,
 	OBS_OBJ_TYPE_SOURCE,
