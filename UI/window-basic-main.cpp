@@ -90,6 +90,10 @@
 #include "update/mac-update.hpp"
 #endif
 
+#ifdef ENABLE_WIDGET_ZOO
+#include "idian/widget-zoo.hpp"
+#endif
+
 #include "ui_OBSBasic.h"
 #include "ui_ColorSelect.h"
 
@@ -422,6 +426,10 @@ OBSBasic::OBSBasic(QWidget *parent)
 
 #ifdef __linux__
 	ui->actionE_xit->setShortcut(Qt::CTRL | Qt::Key_Q);
+#endif
+
+#ifndef ENABLE_WIDGET_ZOO
+	ui->widgetZoo->setVisible(false);
 #endif
 
 	auto addNudge = [this](const QKeySequence &seq, MoveDir direction,
@@ -10084,6 +10092,16 @@ void OBSBasic::on_actionShowAbout_triggered()
 	about->show();
 
 	about->setAttribute(Qt::WA_DeleteOnClose, true);
+}
+
+void OBSBasic::on_widgetZoo_triggered()
+{
+#ifdef ENABLE_WIDGET_ZOO
+	IdianZoo zoo(this);
+	zoo.setModal(true);
+	zoo.show();
+	zoo.exec();
+#endif
 }
 
 void OBSBasic::ResizeOutputSizeOfSource()

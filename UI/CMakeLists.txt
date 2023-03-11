@@ -56,6 +56,7 @@ include(cmake/feature-restream.cmake)
 include(cmake/feature-youtube.cmake)
 include(cmake/feature-sparkle.cmake)
 include(cmake/feature-whatsnew.cmake)
+include(cmake/feature-zoo.cmake)
 
 add_subdirectory(frontend-plugins)
 

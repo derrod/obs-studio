@@ -157,6 +157,26 @@ target_sources(
 
 target_sources(
   obs
+  PRIVATE idian/obs-actionrow.hpp
+          idian/obs-controls.hpp
+          idian/obs-groupbox.hpp
+          idian/obs-propertieslist.hpp
+          idian/obs-toggleswitch.hpp
+          idian/obs-widgets.hpp
+          idian/obs-actionrow.cpp
+          idian/obs-controls.cpp
+          idian/obs-groupbox.cpp
+          idian/obs-propertieslist.cpp
+          idian/obs-toggleswitch.cpp)
+
+option(ENABLE_WIDGET_ZOO "Enable building custom widget demo window" OFF)
+if(ENABLE_WIDGET_ZOO)
+  target_compile_definitions(obs PRIVATE ENABLE_WIDGET_ZOO)
+  target_sources(obs PRIVATE forms/IdianZoo.ui idian/widget-zoo.hpp idian/widget-zoo.cpp)
+endif()
+
+target_sources(
+  obs
   PRIVATE adv-audio-control.cpp
           adv-audio-control.hpp
           audio-encoders.cpp
