@@ -3204,7 +3204,7 @@ static void upgrade_settings(void)
 	os_closedir(dir);
 }
 
-#define FAILURES_BEFORE_SAFE_MODE 2
+static const char *sentinelContents = "This file intentionally left blank.";
 
 static void check_safe_mode_sentinel(void)
 {
@@ -3214,36 +3214,19 @@ static void check_safe_mode_sentinel(void)
 	if (pathlen <= 0)
 		return;
 
-	// Create sentinel file and write "1" to it as the start value
 	if (!os_file_exists(path)) {
-		os_quick_write_utf8_file(path, "1", sizeof(char), false);
+		os_quick_write_utf8_file(path, sentinelContents,
+					 strlen(sentinelContents), false);
 		return;
 	}
 
-	const char *sentinel = os_quick_read_utf8_file(path);
-	if (!sentinel)
-		return;
-
-	int num = atoi(sentinel);
-	if (num <= 0)
-		return;
-
-	// Write incremented counter back to file
-	string new_count = to_string(++num);
-	os_quick_write_utf8_file(path, new_count.c_str(), new_count.size(),
-				 false);
-
-	if (num <= FAILURES_BEFORE_SAFE_MODE)
-		return;
-
 	auto_safe_mode = true;
-	safe_mode = true;
 }
 
 static void delete_safe_mode_sentinel(void)
 {
 	char path[512];
-	int pathlen = GetConfigPath(path, 512, "obs-studio/safe_mode_sentinel");
+	int pathlen = GetConfigPath(path, 512, "obs-studio/safe_mode");
 
 	if (pathlen <= 0)
 		return;
