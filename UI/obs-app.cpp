@@ -2431,10 +2431,11 @@ static int run_program(fstream &logFile, int argc, char *argv[])
 		if (!created_log)
 			create_log_file(logFile);
 
-		if (auto_safe_mode && !safe_mode) {
+		if (auto_safe_mode)
 			blog(LOG_WARNING,
 			     "[Safe Mode] Unclean shutdown detected!");
 
+		if (auto_safe_mode && !safe_mode) {
 			QMessageBox mb(QMessageBox::Warning,
 				       QTStr("AutoSafeMode.Title"),
 				       QTStr("AutoSafeMode.Text"));
