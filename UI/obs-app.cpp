@@ -2446,11 +2446,11 @@ static int run_program(fstream &logFile, int argc, char *argv[])
 			QPushButton *launchNormalButton =
 				mb.addButton(QTStr("AutoSafeMode.LaunchNormal"),
 					     QMessageBox::RejectRole);
-			mb.setDefaultButton(launchSafeButton);
-			mb.setEscapeButton(launchSafeButton);
+			mb.setDefaultButton(launchNormalButton);
+			mb.setEscapeButton(launchNormalButton);
 			mb.exec();
 
-			safe_mode = mb.clickedButton() != launchNormalButton;
+			safe_mode = mb.clickedButton() == launchSafeButton;
 			if (safe_mode)
 				blog(LOG_INFO,
 				     "[Safe Mode] User has launched in safe mode.");
