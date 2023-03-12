@@ -2407,6 +2407,7 @@ static int run_program(fstream &logFile, int argc, char *argv[])
 			blog(LOG_WARNING, "================================");
 			blog(LOG_WARNING, "User is now running multiple "
 					  "instances of OBS!");
+			multi = true;
 		}
 
 		/* --------------------------------------- */
@@ -2435,7 +2436,7 @@ static int run_program(fstream &logFile, int argc, char *argv[])
 			blog(LOG_WARNING,
 			     "[Safe Mode] Unclean shutdown detected!");
 
-		if (auto_safe_mode && !safe_mode) {
+		if (auto_safe_mode && !safe_mode && !multi) {
 			QMessageBox mb(QMessageBox::Warning,
 				       QTStr("AutoSafeMode.Title"),
 				       QTStr("AutoSafeMode.Text"));
