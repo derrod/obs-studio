@@ -85,6 +85,7 @@ static string lastCrashLogFile;
 bool portable_mode = false;
 bool safe_mode = false;
 bool auto_safe_mode = false;
+bool disable_auto_safe_mode = false;
 bool steam = false;
 static bool multi = false;
 static bool log_verbose = false;
@@ -3208,6 +3209,9 @@ static const char *sentinelContents = "This file intentionally left blank.";
 
 static void check_safe_mode_sentinel(void)
 {
+	if (disable_auto_safe_mode)
+		return;
+
 	char path[512];
 	int pathlen = GetConfigPath(path, 512, "obs-studio/safe_mode");
 
@@ -3311,6 +3315,10 @@ int main(int argc, char *argv[])
 		} else if (arg_is(argv[i], "--safe", "-s")) {
 			safe_mode = true;
 
+		} else if (arg_is(argv[i], "--unsafe", nullptr)) {
+			/* This exists mostly to bypass the dialog during development. */
+			disable_auto_safe_mode = true;
+
 		} else if (arg_is(argv[i], "--always-on-top", nullptr)) {
 			opt_always_on_top = true;
 
@@ -3383,6 +3391,7 @@ int main(int argc, char *argv[])
 #endif
 				"--multi, -m: Don't warn when launching multiple instances.\n\n"
 				"--safe, -s: Run in safe mode (only load core plugins).\n"
+				"--unsafe: Disable unclean shutdown detection.\n"
 				"--verbose: Make log more verbose.\n"
 				"--always-on-top: Start in 'always on top' mode.\n\n"
 				"--unfiltered_log: Make log unfiltered.\n\n"
