@@ -2430,14 +2430,30 @@ static int run_program(fstream &logFile, int argc, char *argv[])
 		if (!created_log)
 			create_log_file(logFile);
 
-		if (auto_safe_mode) {
+		if (auto_safe_mode && !safe_mode) {
 			blog(LOG_WARNING,
-			     "Safe mode has been engaged due to repeated unclean shutdowns!");
+			     "[Safe Mode] Unclean shutdown detected!");
 
-			QMessageBox mb(QMessageBox::Information,
+			QMessageBox mb(QMessageBox::Warning,
 				       QTStr("AutoSafeMode.Title"),
 				       QTStr("AutoSafeMode.Text"));
+			QPushButton *launchSafeButton =
+				mb.addButton(QTStr("AutoSafeMode.LaunchSafe"),
+					     QMessageBox::AcceptRole);
+			QPushButton *launchNormalButton =
+				mb.addButton(QTStr("AutoSafeMode.LaunchNormal"),
+					     QMessageBox::RejectRole);
+			mb.setDefaultButton(launchSafeButton);
+			mb.setEscapeButton(launchSafeButton);
 			mb.exec();
+
+			safe_mode = mb.clickedButton() != launchNormalButton;
+			if (safe_mode)
+				blog(LOG_INFO,
+				     "[Safe Mode] User has launched in safe mode.");
+			else
+				blog(LOG_WARNING,
+				     "[Safe Mode] User elected to launch normally.");
 		}
 #ifdef __APPLE__
 		MacPermissionStatus audio_permission =
