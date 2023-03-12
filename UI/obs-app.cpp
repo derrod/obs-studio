@@ -83,6 +83,7 @@ static string lastLogFile;
 static string lastCrashLogFile;
 
 bool portable_mode = false;
+bool safe_mode = false;
 bool steam = false;
 static bool multi = false;
 static bool log_verbose = false;
@@ -1700,6 +1701,7 @@ bool OBSApp::OBSInit()
 	blog(LOG_INFO, "Qt Version: %s (runtime), %s (compiled)", qVersion(),
 	     QT_VERSION_STR);
 	blog(LOG_INFO, "Portable mode: %s", portable_mode ? "true" : "false");
+	blog(LOG_INFO, "Safe mode: %s", safe_mode ? "true" : "false");
 
 	setQuitOnLastWindowClosed(false);
 
@@ -3247,6 +3249,9 @@ int main(int argc, char *argv[])
 		} else if (arg_is(argv[i], "--verbose", nullptr)) {
 			log_verbose = true;
 
+		} else if (arg_is(argv[i], "--safe", "-s")) {
+			safe_mode = true;
+
 		} else if (arg_is(argv[i], "--always-on-top", nullptr)) {
 			opt_always_on_top = true;
 
@@ -3318,6 +3323,7 @@ int main(int argc, char *argv[])
 				"--portable, -p: Use portable mode.\n"
 #endif
 				"--multi, -m: Don't warn when launching multiple instances.\n\n"
+				"--safe, -s: Run in safe mode (only load core plugins).\n"
 				"--verbose: Make log more verbose.\n"
 				"--always-on-top: Start in 'always on top' mode.\n\n"
 				"--unfiltered_log: Make log unfiltered.\n\n"

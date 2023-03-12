@@ -17,6 +17,7 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
 ******************************************************************************/
 #include "ui-config.h"
+#include "safe_modules.h"
 
 #include <cstddef>
 #include <ctime>
@@ -229,6 +230,16 @@ static void AddExtraModulePaths()
 			    (path + "/data").c_str());
 #endif
 #endif
+}
+
+static void SetSafeModuleNames()
+{
+	const char **safe_module = safe_modules;
+
+	while (*safe_module) {
+		obs_add_safe_module(*safe_module);
+		safe_module++;
+	}
 }
 
 extern obs_frontend_callbacks *InitializeAPIInterface(OBSBasic *main);
@@ -1849,7 +1860,11 @@ void OBSBasic::OBSInit()
 #endif
 	struct obs_module_failure_info mfi;
 
-	AddExtraModulePaths();
+	if (safe_mode)
+		SetSafeModuleNames();
+	else
+		AddExtraModulePaths();
+
 	blog(LOG_INFO, "---------------------------------");
 	obs_load_all_modules2(&mfi);
 	blog(LOG_INFO, "---------------------------------");

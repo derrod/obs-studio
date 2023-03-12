@@ -517,6 +517,13 @@ source_group(
 unset(_SOURCES)
 unset(_UI)
 
+get_property(OBS_MODULE_LIST GLOBAL PROPERTY OBS_MODULE_LIST)
+foreach(module ${OBS_MODULE_LIST})
+  set(SAFE_MODULES "\t\"${module}\",\n${SAFE_MODULES}")
+endforeach()
+configure_file(${CMAKE_CURRENT_SOURCE_DIR}/safe_modules.h.in
+               ${CMAKE_CURRENT_BINARY_DIR}/safe_modules.h)
+
 define_graphic_modules(obs)
 setup_obs_app(obs)
 setup_target_resources(obs obs-studio)
