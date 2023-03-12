@@ -2448,6 +2448,7 @@ static int run_program(fstream &logFile, int argc, char *argv[])
 					     QMessageBox::RejectRole);
 			mb.setDefaultButton(launchNormalButton);
 			mb.setEscapeButton(launchNormalButton);
+			mb.setModal(true);
 			mb.exec();
 
 			safe_mode = mb.clickedButton() == launchSafeButton;

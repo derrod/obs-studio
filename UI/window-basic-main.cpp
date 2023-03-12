@@ -9027,6 +9027,8 @@ void OBSBasic::UpdateTitleBar()
 		name << "Studio ";
 
 	name << App()->GetVersionString();
+	if (safe_mode)
+		name << " (SAFE MODE)";
 	if (App()->IsPortableMode())
 		name << " - Portable Mode";
 
