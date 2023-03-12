@@ -436,6 +436,7 @@ struct obs_core_hotkeys {
 struct obs_core {
 	struct obs_module *first_module;
 	DARRAY(struct obs_module_path) module_paths;
+	DARRAY(char *) safe_modules;
 
 	DARRAY(struct obs_source_info) source_types;
 	DARRAY(struct obs_source_info) input_types;
