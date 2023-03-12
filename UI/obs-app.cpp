@@ -84,6 +84,7 @@ static string lastCrashLogFile;
 
 bool portable_mode = false;
 bool safe_mode = false;
+bool auto_safe_mode = false;
 bool steam = false;
 static bool multi = false;
 static bool log_verbose = false;
@@ -2429,6 +2430,15 @@ static int run_program(fstream &logFile, int argc, char *argv[])
 		if (!created_log)
 			create_log_file(logFile);
 
+		if (auto_safe_mode) {
+			blog(LOG_WARNING,
+			     "Safe mode has been engaged due to repeated unclean shutdowns!");
+
+			QMessageBox mb(QMessageBox::Information,
+				       QTStr("AutoSafeMode.Title"),
+				       QTStr("AutoSafeMode.Text"));
+			mb.exec();
+		}
 #ifdef __APPLE__
 		MacPermissionStatus audio_permission =
 			CheckPermission(kAudioDeviceAccess);
@@ -3178,6 +3188,56 @@ static void upgrade_settings(void)
 	os_closedir(dir);
 }
 
+#define FAILURES_BEFORE_SAFE_MODE 2
+
+static void check_safe_mode_sentinel(void)
+{
+	char path[512];
+	int pathlen = GetConfigPath(path, 512, "obs-studio/safe_mode");
+
+	if (pathlen <= 0)
+		return;
+
+	// Create sentinel file and write "1" to it as the start value
+	if (!os_file_exists(path)) {
+		os_quick_write_utf8_file(path, "1", sizeof(char), false);
+		return;
+	}
+
+	const char *sentinel = os_quick_read_utf8_file(path);
+	if (!sentinel)
+		return;
+
+	int num = atoi(sentinel);
+	if (num <= 0)
+		return;
+
+	// Write incremented counter back to file
+	string new_count = to_string(++num);
+	os_quick_write_utf8_file(path, new_count.c_str(), new_count.size(),
+				 false);
+
+	if (num <= FAILURES_BEFORE_SAFE_MODE)
+		return;
+
+	auto_safe_mode = true;
+	safe_mode = true;
+}
+
+static void delete_safe_mode_sentinel(void)
+{
+	char path[512];
+	int pathlen = GetConfigPath(path, 512, "obs-studio/safe_mode_sentinel");
+
+	if (pathlen <= 0)
+		return;
+
+	if (!os_file_exists(path))
+		return;
+
+	os_unlink(path);
+}
+
 void ctrlc_handler(int s)
 {
 	UNUSED_PARAMETER(s);
@@ -3374,6 +3434,7 @@ int main(int argc, char *argv[])
 	}
 #endif
 
+	check_safe_mode_sentinel();
 	upgrade_settings();
 
 	fstream logFile;
@@ -3393,6 +3454,7 @@ int main(int argc, char *argv[])
 	log_blocked_dlls();
 #endif
 
+	delete_safe_mode_sentinel();
 	blog(LOG_INFO, "Number of memory leaks: %ld", bnum_allocs());
 	base_set_log_handler(nullptr, nullptr);
 	return ret;
