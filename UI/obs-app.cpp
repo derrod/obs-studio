@@ -3209,6 +3209,10 @@ static const char *sentinelContents = "This file intentionally left blank.";
 
 static void check_safe_mode_sentinel(void)
 {
+#ifndef NDEBUG
+	// No auto safe mode in debug builds
+	return;
+#else
 	if (disable_auto_safe_mode)
 		return;
 
@@ -3225,6 +3229,7 @@ static void check_safe_mode_sentinel(void)
 	}
 
 	auto_safe_mode = true;
+#endif
 }
 
 static void delete_safe_mode_sentinel(void)
