@@ -20,6 +20,7 @@
 #include "util/dstr.h"
 #include "util/darray.h"
 #include "util/platform.h"
+#include "util/uthash.h"
 #include "graphics/vec2.h"
 #include "graphics/vec3.h"
 #include "graphics/vec4.h"
@@ -27,7 +28,6 @@
 #include "obs-data.h"
 
 #include <jansson.h>
-#include <uthash/uthash.h>
 
 struct obs_data_item {
 	volatile long ref;
@@ -319,7 +319,18 @@ static inline void obs_data_item_reattach(struct obs_data *parent,
 					  struct obs_data_item *item)
 {
 	if (parent) {
-		HASH_ADD_STR(parent->items, name, item);
+		do {
+			unsigned _uthash_hastr_keylen =
+				(unsigned)uthash_strlen((item)->name);
+			do {
+				unsigned _ha_hashv;
+				HASH_VALUE(&((item)->name[0]),
+					   _uthash_hastr_keylen, _ha_hashv);
+				HASH_ADD_KEYPTR_BYHASHVALUE(
+					hh, parent->items, &((item)->name[0]),
+					_uthash_hastr_keylen, _ha_hashv, item);
+			} while (0);
+		} while (0);
 		item->parent = parent;
 	}
 }

@@ -201,6 +201,7 @@ target_sources(
           util/threading.h
           util/utf8.c
           util/utf8.h
+          util/uthash.h
           util/util_uint64.h
           util/util_uint128.h
           util/curl/curl-helper.h

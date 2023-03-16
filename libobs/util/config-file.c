@@ -25,8 +25,7 @@
 #include "bmem.h"
 #include "lexer.h"
 #include "dstr.h"
-
-#include <uthash/uthash.h>
+#include "uthash.h"
 
 struct config_item {
 	char *name;

@@ -25,6 +25,7 @@
 #include "util/platform.h"
 #include "util/profiler.h"
 #include "util/task.h"
+#include "util/uthash.h"
 #include "callback/signal.h"
 #include "callback/proc.h"
 
@@ -38,7 +39,6 @@
 #include "obs.h"
 
 #include <caption/caption.h>
-#include <uthash/uthash.h>
 
 /* Custom helpers for the UUID hash table */
 #define HASH_FIND_UUID(head, uuid, out) \

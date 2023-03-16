@@ -20,8 +20,7 @@
 #include "text-lookup.h"
 #include "lexer.h"
 #include "platform.h"
-
-#include <uthash/uthash.h>
+#include "uthash.h"
 
 /* ------------------------------------------------------------------------- */
 
