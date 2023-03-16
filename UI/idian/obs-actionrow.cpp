@@ -23,6 +23,7 @@ OBSActionRow::OBSActionRow(const QString &name, QWidget *parent)
 	: OBSActionBaseClass(parent)
 {
 	layout = new QGridLayout(this);
+	layout->setVerticalSpacing(2);
 
 	QSizePolicy policy(QSizePolicy::MinimumExpanding, QSizePolicy::Fixed);
 	setSizePolicy(policy);
@@ -35,7 +36,7 @@ OBSActionRow::OBSActionRow(const QString &name, QWidget *parent)
 
 	nameLbl = new QLabel();
 	nameLbl->setText(name);
-	nameLbl->setObjectName("actionRowName");
+	nameLbl->setProperty("class", "title");
 
 	layout->addWidget(nameLbl, 0, 1, Qt::AlignLeft);
 }
@@ -46,7 +47,7 @@ OBSActionRow::OBSActionRow(const QString &name, const QString &desc,
 {
 	descLbl = new QLabel();
 	descLbl->setText(desc);
-	descLbl->setObjectName("actionRowSubtitle");
+	descLbl->setProperty("class", "subtitle");
 
 	layout->addWidget(descLbl, 1, 1, Qt::AlignLeft);
 }

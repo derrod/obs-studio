@@ -1558,7 +1558,7 @@ OBSActionRow {
     margin: 0;
     padding: 0;
     border-left: 3px solid transparent;
-    /* min-height: 50px; */
+    min-height: 48px;
     background: transparent;
 }
 
@@ -1570,8 +1570,13 @@ OBSActionRow[rowSelected="true"]:hover {
     border-color: rgb(54,92,192);
 }
 
-OBSActionRow QLabel {
+OBSActionRow > QLabel {
     font-weight: 500;
+}
+
+OBSActionRow > QLabel.subtitle {
+    font-size: 9pt;
+    color: rgba(255,255,255,0.5);
 }
 
 OBSActionRow QComboBox,
@@ -1596,6 +1601,7 @@ OBSCollapsibleActionRow {
 }
 
 OBSCollapsibleActionRow OBSPropertiesList {
+    border-radius: 0;
     background: rgb(33,36,46);
 }
 

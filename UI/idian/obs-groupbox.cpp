@@ -20,12 +20,15 @@
 OBSGroupBox::OBSGroupBox(QWidget *parent) : QFrame(parent)
 {
 	layout = new QGridLayout(this);
+	layout->setVerticalSpacing(6);
+
 	plist = new OBSPropertiesList(this);
 
 	QSizePolicy policy(QSizePolicy::Expanding, QSizePolicy::Fixed);
 	setSizePolicy(policy);
 	setLayout(layout);
-	setFixedWidth(600);
+	setMinimumWidth(300);
+	setMaximumWidth(600);
 
 	layout->addWidget(plist, 2, 0, -1, -1);
 }
@@ -36,7 +39,7 @@ OBSGroupBox::OBSGroupBox(const QString &name, QWidget *parent)
 
 	nameLbl = new QLabel();
 	nameLbl->setText(name);
-	nameLbl->setObjectName("groupName");
+	nameLbl->setProperty("class", "title");
 
 	layout->addWidget(nameLbl, 0, 0, Qt::AlignLeft);
 }
@@ -58,7 +61,7 @@ OBSGroupBox::OBSGroupBox(const QString &name, const QString &desc,
 {
 	descLbl = new QLabel();
 	descLbl->setText(desc);
-	descLbl->setObjectName("groupSubtitle");
+	descLbl->setProperty("class", "subtitle");
 	layout->addWidget(descLbl, 1, 0, Qt::AlignLeft);
 }
 
