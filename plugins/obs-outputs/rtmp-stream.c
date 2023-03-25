@@ -21,7 +21,6 @@
 
 #include <obs-avc.h>
 #include <obs-hevc.h>
-#include <libavutil/pixfmt.h>
 
 #ifdef _WIN32
 #include <util/windows/win-version.h>
@@ -904,48 +903,57 @@ static bool send_video_metadata(struct rtmp_stream *stream)
 			video_output_get_info(video);
 		enum video_format format = info->format;
 		enum video_colorspace colorspace = info->colorspace;
-		enum video_range_type range = info->range;
 
-		int bits_per_raw_sample = format == VIDEO_FORMAT_I010   ? 10
-					  : format == VIDEO_FORMAT_P010 ? 10
-					  : format == VIDEO_FORMAT_I210 ? 10
-					  : format == VIDEO_FORMAT_I412 ? 12
-					  : format == VIDEO_FORMAT_YA2L ? 12
-									: 8;
+		int bits_per_raw_sample;
+		switch (format) {
+		case VIDEO_FORMAT_I010:
+		case VIDEO_FORMAT_P010:
+		case VIDEO_FORMAT_I210:
+			bits_per_raw_sample = 10;
+			break;
+		case VIDEO_FORMAT_I412:
+		case VIDEO_FORMAT_YA2L:
+			bits_per_raw_sample = 12;
+			break;
+		default:
+			bits_per_raw_sample = 8;
+		}
 
 		int pri = 0, trc = 0, spc = 0;
 		switch (colorspace) {
 		case VIDEO_CS_601:
-			pri = AVCOL_PRI_SMPTE170M;
-			trc = AVCOL_TRC_SMPTE170M;
-			spc = AVCOL_SPC_SMPTE170M;
+			pri = OBSCOL_PRI_SMPTE170M;
+			trc = OBSCOL_PRI_SMPTE170M;
+			spc = OBSCOL_PRI_SMPTE170M;
 			break;
 		case VIDEO_CS_DEFAULT:
 		case VIDEO_CS_709:
-			pri = AVCOL_PRI_BT709;
-			trc = AVCOL_TRC_BT709;
-			spc = AVCOL_SPC_BT709;
+			pri = OBSCOL_PRI_BT709;
+			trc = OBSCOL_PRI_BT709;
+			spc = OBSCOL_PRI_BT709;
 			break;
 		case VIDEO_CS_SRGB:
-			pri = AVCOL_PRI_BT709;
-			trc = AVCOL_TRC_IEC61966_2_1;
-			spc = AVCOL_SPC_BT709;
+			pri = OBSCOL_PRI_BT709;
+			trc = OBSCOL_TRC_IEC61966_2_1;
+			spc = OBSCOL_PRI_BT709;
 			break;
 		case VIDEO_CS_2100_PQ:
-			pri = AVCOL_PRI_BT2020;
-			trc = AVCOL_TRC_SMPTE2084;
-			spc = AVCOL_SPC_BT2020_NCL;
+			pri = OBSCOL_PRI_BT2020;
+			trc = OBSCOL_TRC_SMPTE2084;
+			spc = OBSCOL_SPC_BT2020_NCL;
 			break;
 		case VIDEO_CS_2100_HLG:
-			pri = AVCOL_PRI_BT2020;
-			trc = AVCOL_TRC_ARIB_STD_B67;
-			spc = AVCOL_SPC_BT2020_NCL;
+			pri = OBSCOL_PRI_BT2020;
+			trc = OBSCOL_TRC_ARIB_STD_B67;
+			spc = OBSCOL_SPC_BT2020_NCL;
 		}
 
-		const int max_luminance =
-			(trc == AVCOL_TRC_SMPTE2084)
-				? (int)obs_get_video_hdr_nominal_peak_level()
-				: ((trc == AVCOL_TRC_ARIB_STD_B67) ? 1000 : 0);
+		int max_luminance = 0;
+		if (trc == OBSCOL_TRC_ARIB_STD_B67)
+			max_luminance = 1000;
+		else if (trc == OBSCOL_TRC_SMPTE2084)
+			max_luminance =
+				(int)obs_get_video_hdr_nominal_peak_level();
 
 		flv_packet_metadata(vencoder, &data, &size, bits_per_raw_sample,
 				    pri, trc, spc, 0, max_luminance);
