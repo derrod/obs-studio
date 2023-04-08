@@ -137,7 +137,7 @@ else()
   string(TOLOWER ${CMAKE_SYSTEM_PROCESSOR} LOWERCASE_CMAKE_SYSTEM_PROCESSOR)
 endif()
 
-if(LOWERCASE_CMAKE_SYSTEM_PROCESSOR MATCHES "(i[3-6]86|x86|x64|x86_64|amd64|e2k)")
+if(LOWERCASE_CMAKE_SYSTEM_PROCESSOR MATCHES "(i[3-6]86|x86|x64|x86_64|amd64)")
   if(NOT MSVC AND NOT CMAKE_OSX_ARCHITECTURES STREQUAL "arm64")
     set(ARCH_SIMD_FLAGS -mmmx -msse -msse2)
   endif()
@@ -152,27 +152,4 @@ else()
         -DSIMDE_ENABLE_OPENMP "$<$<AND:$<COMPILE_LANGUAGE:C>,$<BOOL:C_COMPILER_SUPPORTS_OPENMP_SIMD>>:-fopenmp-simd>"
         "$<$<AND:$<COMPILE_LANGUAGE:CXX>,$<BOOL:CXX_COMPILER_SUPPORTS_OPENMP_SIMD>>:-fopenmp-simd>")
   endif()
-endif()
-
-if(LOWERCASE_CMAKE_SYSTEM_PROCESSOR MATCHES "e2k")
-  foreach(
-    TEST_C_FLAG
-    "-Wno-unused-parameter"
-    "-Wno-ignored-qualifiers"
-    "-Wno-pointer-sign"
-    "-Wno-unused-variable"
-    "-Wno-sign-compare"
-    "-Wno-bad-return-value-type"
-    "-Wno-maybe-uninitialized")
-    check_c_compiler_flag(${TEST_C_FLAG} C_COMPILER_SUPPORTS_FLAG_${TEST_C_FLAG})
-    if(C_COMPILER_SUPPORTS_FLAG_${TEST_C_FLAG})
-      set(CMAKE_C_FLAGS ${CMAKE_C_FLAGS} ${TEST_C_FLAG})
-    endif()
-  endforeach()
-  foreach(TEST_CXX_FLAG "-Wno-invalid-offsetof" "-Wno-maybe-uninitialized")
-    check_cxx_compiler_flag(${TEST_CXX_FLAG} CXX_COMPILER_SUPPORTS_FLAG_${TEST_CXX_FLAG})
-    if(CXX_COMPILER_SUPPORTS_FLAG_${TEST_CXX_FLAG})
-      set(CMAKE_CXX_FLAGS ${CMAKE_CXX_FLAGS} ${TEST_CXX_FLAG})
-    endif()
-  endforeach()
 endif()
