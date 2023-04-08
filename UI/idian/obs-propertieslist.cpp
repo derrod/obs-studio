@@ -40,6 +40,20 @@ void OBSPropertiesList::addRow(OBSActionBaseClass *ar)
 	if (layout->count() > 0)
 		layout->addWidget(new OBSPropertiesListSpacer(this));
 
+	// Custom properties to work around :first and :last not existing.
+	if (!first) {
+		ar->setProperty("first", true);
+		first = ar;
+	}
+
+	// Remove last property from exisitng last item
+	if (last)
+		last->setProperty("last", QVariant());
+
+	// Most recently added item is also always last
+	ar->setProperty("last", true);
+	last = ar;
+
 	ar->setParent(this);
 	rowsList.append(ar);
 	layout->addWidget(ar);
@@ -49,6 +63,8 @@ void OBSPropertiesList::addRow(OBSActionBaseClass *ar)
 void OBSPropertiesList::clear()
 {
 	rowsList.clear();
+	first = nullptr;
+	last = nullptr;
 	QLayoutItem *item = layout->takeAt(0);
 
 	while (item) {

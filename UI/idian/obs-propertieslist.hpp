@@ -35,6 +35,9 @@ public:
 	QList<OBSActionBaseClass *> rows() const { return rowsList; }
 
 private:
+	OBSActionBaseClass *first = nullptr;
+	OBSActionBaseClass *last = nullptr;
+
 	QVBoxLayout *layout;
 	QList<OBSActionBaseClass *> rowsList;
 };
