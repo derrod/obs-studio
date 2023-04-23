@@ -69,35 +69,9 @@ function Package-OBS {
     } elseif ($BuildArch -eq "x64") {
         Write-Step "Install 64-bit OBS..."
         Invoke-Expression "cmake --build `"${BuildDirectory}64`" --config ${BuildConfiguration} -t install"
-
-        $CompressVars = @{
-            Path = "${CheckoutDir}/build64/install/bin", "${CheckoutDir}/build64/install/data", "${CheckoutDir}/build64/install/obs-plugins"
-            CompressionLevel = "Optimal"
-            DestinationPath = "${FileName}-x64.zip"
-        }
-
-        Write-Step "Creating zip archive..."
-
-        $ProgressPreference = $(if ($Quiet.isPresent) { 'SilentlyContinue' } else { 'Continue' })
-        Compress-Archive -Force @CompressVars
-        $ProgressPreference = 'Continue'
-
     } elseif ($BuildArch -eq "x86") {
         Write-Step "Install 32-bit OBS..."
         Invoke-Expression "cmake --build `"${BuildDirectory}32`" --config ${BuildConfiguration} -t install"
-
-        $CompressVars = @{
-            Path = "${CheckoutDir}/build32/install/bin", "${CheckoutDir}/build32/install/data", "${CheckoutDir}/build32/install/obs-plugins"
-            CompressionLevel = "Optimal"
-            DestinationPath = "${FileName}-x86.zip"
-        }
-
-        Write-Step "Creating zip archive..."
-
-        $ProgressPreference = $(if ($Quiet.isPresent) { 'SilentlyContinue' } else { 'Continue' })
-        Compress-Archive -Force @CompressVars
-        $ProgressPreference = 'Continue'
-
     }
 }
 
