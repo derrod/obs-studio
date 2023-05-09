@@ -21,6 +21,7 @@
 #include <graphics/vec3.h>
 #include <graphics/matrix3.h>
 #include <graphics/matrix4.h>
+#include <util/platform.h>
 
 void gs_vertex_shader::GetBuffersExpected(
 	const vector<D3D11_INPUT_ELEMENT_DESC> &inputs)
@@ -200,25 +201,70 @@ void gs_shader::BuildConstantBuffer()
 		gs_shader_set_default(&params[i]);
 }
 
+static uint64_t fnv1a_hash(const char *str)
+{
+	const uint64_t FNV_OFFSET = 14695981039346656037ULL;
+	const uint64_t FNV_PRIME = 1099511628211ULL;
+	uint64_t hash = FNV_OFFSET;
+	while (*str) {
+		hash ^= (uint64_t)*str++;
+		hash *= FNV_PRIME;
+	}
+	return hash;
+}
+
 void gs_shader::Compile(const char *shaderString, const char *file,
 			const char *target, ID3D10Blob **shader)
 {
 	ComPtr<ID3D10Blob> errorsBlob;
 	HRESULT hr;
 
+	FILE *cache_file;
+	struct dstr cache_path = {0};
+	char hashstr[20];
+
 	if (!shaderString)
 		throw "No shader string specified";
 
-	hr = device->d3dCompile(shaderString, strlen(shaderString), file, NULL,
-				NULL, "main", target,
-				D3D10_SHADER_OPTIMIZATION_LEVEL1, 0, shader,
-				errorsBlob.Assign());
-	if (FAILED(hr)) {
-		if (errorsBlob != NULL && errorsBlob->GetBufferSize())
-			throw ShaderError(errorsBlob, hr);
-		else
-			throw HRError("Failed to compile shader", hr);
+	uint64_t hash = fnv1a_hash(shaderString);
+	snprintf(hashstr, sizeof(hashstr), "%02llx", hash);
+
+	dstr_init_move_array(&cache_path, os_get_program_data_path_ptr(
+						  "obs-studio/shader-cache"));
+	os_mkdirs(cache_path.array);
+	dstr_cat_ch(&cache_path, '/');
+	dstr_cat(&cache_path, hashstr);
+
+	cache_file = os_fopen(cache_path.array, "rb");
+	if (cache_file) {
+		os_fseeki64(cache_file, 0, SEEK_END);
+		size_t len = os_ftelli64(cache_file);
+		os_fseeki64(cache_file, 0, SEEK_SET);
+
+		device->d3dCreateBlob(len, shader);
+		fread((*shader)->GetBufferPointer(), len, 1, cache_file);
+		fclose(cache_file);
+	} else {
+		hr = device->d3dCompile(shaderString, strlen(shaderString),
+					file, NULL, NULL, "main", target,
+					D3D10_SHADER_OPTIMIZATION_LEVEL3, 0,
+					shader, errorsBlob.Assign());
+		if (FAILED(hr)) {
+			if (errorsBlob != NULL && errorsBlob->GetBufferSize())
+				throw ShaderError(errorsBlob, hr);
+			else
+				throw HRError("Failed to compile shader", hr);
+		}
+
+		cache_file = os_fopen(cache_path.array, "wb");
+		if (cache_file) {
+			fwrite((*shader)->GetBufferPointer(),
+			       (*shader)->GetBufferSize(), 1, cache_file);
+			fclose(cache_file);
+		}
 	}
+
+	dstr_free(&cache_path);
 
 #ifdef DISASSEMBLE_SHADERS
 	ComPtr<ID3D10Blob> asmBlob;
