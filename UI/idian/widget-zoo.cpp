@@ -18,9 +18,14 @@
 #include <QTimer>
 #include <QCheckBox>
 #include <QComboBox>
+#include <qtlottiewidget.h>
+
+#include <QMediaPlayer>
+#include <QVideoWidget>
 
 #include "obs-widgets.hpp"
 #include "widget-zoo.hpp"
+#include "platform.hpp"
 
 // This file is a temporary playground for building new widgets,
 // it may be removed in the future.
@@ -35,6 +40,61 @@ IdianZoo::IdianZoo(QWidget *parent) : QDialog(parent), ui(new Ui_IdianZoo)
 	QComboBox *cbox = new QComboBox;
 	cbox->addItem("Test 1");
 	cbox->addItem("Test 2");
+
+	/* Lottie! */
+
+	/* ui->scrollAreaWidgetContents->layout()->addWidget(
+		new QLabel("QMovie test:"));
+
+	auto wat = new QLabel(this);
+	auto movie = new QMovie(this);
+
+	std::string gif_path;
+	GetDataFilePath("themes/lottie/test.gif", gif_path);
+	movie->setFileName(QString::fromStdString(gif_path));
+
+	wat->setMovie(movie);
+	movie->start();
+
+	ui->scrollAreaWidgetContents->layout()->addWidget(wat);
+	*/
+
+	ui->scrollAreaWidgetContents->layout()->addWidget(
+		new QLabel("QVideoWidget test:"));
+
+	auto player = new QMediaPlayer(this);
+
+	std::string gif_path;
+	GetDataFilePath("themes/lottie/test.mp4", gif_path);
+	QUrl path(QString::fromStdString(gif_path));
+	player->setSource(path);
+	player->setLoops(QMediaPlayer::Infinite);
+
+	auto videowidget = new QVideoWidget(this);
+	videowidget->setFixedSize(350, 350);
+	player->setVideoOutput(videowidget);
+	player->play();
+	videowidget->show();
+
+	ui->scrollAreaWidgetContents->layout()->addWidget(videowidget);
+
+	ui->scrollAreaWidgetContents->layout()->addWidget(
+		new QLabel("Lottie Test:"));
+
+	std::string lottie_path;
+	GetDataFilePath("themes/lottie/test.json", lottie_path);
+
+	auto lottieWidget = new QtLottieWidget(this);
+	lottieWidget->setFixedSize(350, 350);
+	lottieWidget->setSource(
+		QUrl::fromLocalFile(QString::fromStdString(lottie_path)));
+	/* connect(lottieWidget, &QtLottieWidget::sourceSizeChanged, this,
+		[lottieWidget]() {
+		lottieWidget->resize(lottieWidget->sourceSize());
+		});
+	*/
+
+	ui->scrollAreaWidgetContents->layout()->addWidget(lottieWidget);
 
 	/* Group box 1 */
 	test = new OBSGroupBox(this);

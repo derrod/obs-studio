@@ -71,9 +71,11 @@ find_package(CURL REQUIRED)
 add_subdirectory(frontend-plugins)
 add_executable(obs)
 
-find_qt(COMPONENTS Widgets Network Svg Xml COMPONENTS_LINUX Gui)
+find_qt(COMPONENTS Widgets Network Svg Xml Multimedia MultimediaWidgets COMPONENTS_LINUX Gui)
 
-target_link_libraries(obs PRIVATE Qt::Widgets Qt::Svg Qt::Xml Qt::Network)
+find_package(QtLottie)
+
+target_link_libraries(obs PRIVATE Qt::Widgets Qt::Svg Qt::Xml Qt::Network Qt::Multimedia Qt::MultimediaWidgets QtLottie::QtLottie)
 
 set_target_properties(
   obs

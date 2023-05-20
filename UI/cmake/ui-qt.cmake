@@ -1,6 +1,10 @@
 find_qt(COMPONENTS Widgets Network Svg Xml COMPONENTS_LINUX Gui)
 
-target_link_libraries(obs-studio PRIVATE Qt::Widgets Qt::Svg Qt::Xml Qt::Network)
+find_package(QtLottie::QtLottie)
+
+message("FUCK")
+
+target_link_libraries(obs-studio PRIVATE Qt::Widgets Qt::Svg Qt::Xml Qt::Network QtLottie::QtLottie)
 
 set_target_properties(
   obs-studio
