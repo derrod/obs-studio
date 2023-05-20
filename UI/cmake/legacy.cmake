@@ -73,9 +73,7 @@ add_executable(obs)
 
 find_qt(COMPONENTS Widgets Network Svg Xml Multimedia MultimediaWidgets COMPONENTS_LINUX Gui)
 
-find_package(QtLottie)
-
-target_link_libraries(obs PRIVATE Qt::Widgets Qt::Svg Qt::Xml Qt::Network Qt::Multimedia Qt::MultimediaWidgets QtLottie::QtLottie)
+target_link_libraries(obs PRIVATE Qt::Widgets Qt::Svg Qt::Xml Qt::Network Qt::Multimedia Qt::MultimediaWidgets)
 
 set_target_properties(
   obs
@@ -175,6 +173,7 @@ option(ENABLE_WIDGET_ZOO "Enable building custom widget demo window" OFF)
 if(ENABLE_WIDGET_ZOO)
   target_compile_definitions(obs PRIVATE ENABLE_WIDGET_ZOO)
   target_sources(obs PRIVATE forms/IdianZoo.ui idian/widget-zoo.hpp idian/widget-zoo.cpp)
+  target_link_libraries(obs PRIVATE OBS::QtLottie)
 endif()
 
 target_sources(

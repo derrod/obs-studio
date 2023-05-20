@@ -18,10 +18,11 @@
 #include <QTimer>
 #include <QCheckBox>
 #include <QComboBox>
-#include <qtlottiewidget.h>
 
 #include <QMediaPlayer>
 #include <QVideoWidget>
+
+#include "qtlottiewidget.h"
 
 #include "obs-widgets.hpp"
 #include "widget-zoo.hpp"
