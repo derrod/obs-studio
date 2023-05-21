@@ -40,7 +40,7 @@ QtLottieDrawEngine::QtLottieDrawEngine(QObject *parent) : QObject(parent)
 	}
 }
 
-bool QtLottieDrawEngine::setSource(const QUrl &value)
+bool QtLottieDrawEngine::setSource(const QUrl &value, const QUrl &resources)
 {
 	Q_ASSERT(value.isValid());
 
@@ -66,6 +66,11 @@ bool QtLottieDrawEngine::setSource(const QUrl &value)
 						   : value.url();
 	}
 
+	QString resourcesPath = {};
+	if (!resources.isEmpty() && resources.isLocalFile()) {
+		resourcesPath = resources.toLocalFile();
+	}
+
 	Q_ASSERT(QFile::exists(jsonFilePath));
 	if (!QFile::exists(jsonFilePath)) {
 		qWarning() << jsonFilePath << "doesn't exist.";
@@ -86,11 +91,9 @@ bool QtLottieDrawEngine::setSource(const QUrl &value)
 		return false;
 	}
 
-	// TODO: Support setting this via parameter, since OBS has its own resource handling
-	const QString resDirPath = QCoreApplication::applicationDirPath();
-
-	m_player = rlottie::Animation::loadFromData(jsonBuffer.toStdString(),
-						    resDirPath.toStdString());
+	m_player = rlottie::Animation::loadFromData(
+		jsonBuffer.toStdString(), jsonFilePath.toStdString(),
+		resourcesPath.toStdString());
 
 	if (!m_player) {
 		qWarning() << "Failed to create lottie animation.";

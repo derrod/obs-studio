@@ -115,7 +115,7 @@ QUrl QtLottieWidget::source() const
 	return m_source;
 }
 
-void QtLottieWidget::setSource(const QUrl &value)
+void QtLottieWidget::setSource(const QUrl &value, const QUrl &resources)
 {
 	if (!value.isValid()) {
 		qWarning() << value << "is not a valid URL.";
@@ -123,7 +123,7 @@ void QtLottieWidget::setSource(const QUrl &value)
 	}
 	if (m_source != value) {
 		m_source = value;
-		if (!m_drawEngine->setSource(value)) {
+		if (!m_drawEngine->setSource(value, resources)) {
 			qWarning() << "Failed to start playing.";
 		}
 		Q_EMIT sourceChanged(m_source);

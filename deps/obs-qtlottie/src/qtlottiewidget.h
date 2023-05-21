@@ -52,7 +52,7 @@ public:
 	QSize minimumSizeHint() const override;
 
 	QUrl source() const;
-	void setSource(const QUrl &value);
+	void setSource(const QUrl &value, const QUrl &resources = QUrl());
 
 	qint64 frameRate() const;
 

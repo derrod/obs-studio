@@ -19,6 +19,8 @@
 #include <QCheckBox>
 #include <QComboBox>
 
+#include <QSvgRenderer>
+#include <QSvgWidget>
 #include <QMediaPlayer>
 #include <QVideoWidget>
 
@@ -27,6 +29,8 @@
 #include "obs-widgets.hpp"
 #include "widget-zoo.hpp"
 #include "platform.hpp"
+
+#include "util/base.h"
 
 // This file is a temporary playground for building new widgets,
 // it may be removed in the future.
@@ -60,7 +64,7 @@ IdianZoo::IdianZoo(QWidget *parent) : QDialog(parent), ui(new Ui_IdianZoo)
 	ui->scrollAreaWidgetContents->layout()->addWidget(wat);
 	*/
 
-	ui->scrollAreaWidgetContents->layout()->addWidget(
+	/*ui->scrollAreaWidgetContents->layout()->addWidget(
 		new QLabel("QVideoWidget test:"));
 
 	auto player = new QMediaPlayer(this);
@@ -77,23 +81,43 @@ IdianZoo::IdianZoo(QWidget *parent) : QDialog(parent), ui(new Ui_IdianZoo)
 	player->play();
 	videowidget->show();
 
-	ui->scrollAreaWidgetContents->layout()->addWidget(videowidget);
+	ui->scrollAreaWidgetContents->layout()->addWidget(videowidget);*/
+
+	/* ui->scrollAreaWidgetContents->layout()->addWidget(
+		new QLabel("QSvgWidget test:"));
+
+	auto svg = new QSvgWidget(this);
+
+	svg->setMinimumSize(550, 400);
+	std::string svg_path;
+	GetDataFilePath("themes/lottie/demo.svg", svg_path);
+	svg->load(QString::fromStdString(svg_path));
+
+	blog(LOG_INFO, "Animated: %d", svg->renderer()->animated());
+
+	//ui->scrollAreaWidgetContents->layout()->addWidget(svg); */
 
 	ui->scrollAreaWidgetContents->layout()->addWidget(
 		new QLabel("Lottie Test:"));
 
 	std::string lottie_path;
+	std::string lottie_resources_path;
 	GetDataFilePath("themes/lottie/test.json", lottie_path);
+	GetDataFilePath("themes/lottie/res/", lottie_resources_path);
 
 	auto lottieWidget = new QtLottieWidget(this);
-	lottieWidget->setFixedSize(350, 350);
+	lottieWidget->setFixedSize(550, 400);
 	lottieWidget->setSource(
-		QUrl::fromLocalFile(QString::fromStdString(lottie_path)));
-	/* connect(lottieWidget, &QtLottieWidget::sourceSizeChanged, this,
+		QUrl::fromLocalFile(QString::fromStdString(lottie_path)),
+		QUrl::fromLocalFile(
+			QString::fromStdString(lottie_resources_path)));
+	//lottieWidget->setLoops(1);
+
+	// ToDo figure out why this no worky
+	connect(lottieWidget, &QtLottieWidget::sourceSizeChanged, this,
 		[lottieWidget]() {
-		lottieWidget->resize(lottieWidget->sourceSize());
+			lottieWidget->resize(lottieWidget->sourceSize());
 		});
-	*/
 
 	ui->scrollAreaWidgetContents->layout()->addWidget(lottieWidget);
 

@@ -57,7 +57,7 @@ public:
 	void render(const QSize &s);
 
 	QUrl source() const;
-	bool setSource(const QUrl &value);
+	bool setSource(const QUrl &value, const QUrl &resources = QUrl());
 
 	qint64 frameRate() const;
 
