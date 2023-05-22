@@ -23,6 +23,7 @@
 #include <QSvgWidget>
 #include <QMediaPlayer>
 #include <QVideoWidget>
+#include <QMovie>
 
 #include "qtlottiewidget.h"
 
@@ -48,21 +49,22 @@ IdianZoo::IdianZoo(QWidget *parent) : QDialog(parent), ui(new Ui_IdianZoo)
 
 	/* Lottie! */
 
-	/* ui->scrollAreaWidgetContents->layout()->addWidget(
+	ui->scrollAreaWidgetContents->layout()->addWidget(
 		new QLabel("QMovie test:"));
 
 	auto wat = new QLabel(this);
 	auto movie = new QMovie(this);
 
 	std::string gif_path;
-	GetDataFilePath("themes/lottie/test.gif", gif_path);
+	GetDataFilePath("themes/lottie/pulsating-streaming.webp", gif_path);
 	movie->setFileName(QString::fromStdString(gif_path));
+	movie->setCacheMode(QMovie::CacheAll);
 
 	wat->setMovie(movie);
 	movie->start();
 
 	ui->scrollAreaWidgetContents->layout()->addWidget(wat);
-	*/
+	/**/
 
 	/*ui->scrollAreaWidgetContents->layout()->addWidget(
 		new QLabel("QVideoWidget test:"));
@@ -83,30 +85,30 @@ IdianZoo::IdianZoo(QWidget *parent) : QDialog(parent), ui(new Ui_IdianZoo)
 
 	ui->scrollAreaWidgetContents->layout()->addWidget(videowidget);*/
 
-	/* ui->scrollAreaWidgetContents->layout()->addWidget(
+	ui->scrollAreaWidgetContents->layout()->addWidget(
 		new QLabel("QSvgWidget test:"));
 
 	auto svg = new QSvgWidget(this);
 
-	svg->setMinimumSize(550, 400);
+	svg->setFixedSize(256, 256);
 	std::string svg_path;
-	GetDataFilePath("themes/lottie/demo.svg", svg_path);
+	GetDataFilePath("themes/lottie/pulsating-streaming3.svg", svg_path);
 	svg->load(QString::fromStdString(svg_path));
 
 	blog(LOG_INFO, "Animated: %d", svg->renderer()->animated());
 
-	//ui->scrollAreaWidgetContents->layout()->addWidget(svg); */
+	ui->scrollAreaWidgetContents->layout()->addWidget(svg); /**/
 
 	ui->scrollAreaWidgetContents->layout()->addWidget(
 		new QLabel("Lottie Test:"));
 
 	std::string lottie_path;
 	std::string lottie_resources_path;
-	GetDataFilePath("themes/lottie/test.json", lottie_path);
+	GetDataFilePath("themes/lottie/pulsating-streaming.json", lottie_path);
 	GetDataFilePath("themes/lottie/res/", lottie_resources_path);
 
 	auto lottieWidget = new QtLottieWidget(this);
-	lottieWidget->setFixedSize(550, 400);
+	lottieWidget->setFixedSize(256, 256);
 	lottieWidget->setSource(
 		QUrl::fromLocalFile(QString::fromStdString(lottie_path)),
 		QUrl::fromLocalFile(
