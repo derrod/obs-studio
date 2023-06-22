@@ -205,6 +205,10 @@ EXPORT uint64_t os_get_proc_virtual_size(void);
 
 EXPORT char *os_generate_uuid(void);
 
+EXPORT bool os_keychain_save(const char *key, const char *data);
+EXPORT bool os_keychain_load(const char *key, char **data);
+EXPORT bool os_keychain_delete(const char *key);
+
 /* clang-format off */
 #ifdef __APPLE__
 # define ARCH_BITS 64

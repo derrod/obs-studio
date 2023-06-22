@@ -503,3 +503,23 @@ Other Functions
 
    Creates a version 4 UUID and returns a NULL-terminated 36-character string.
    Must be freed with :c:func:`bfree()`.
+
+---------------------
+
+.. function:: bool os_keychain_save(const char *key, const char *data)
+
+   Saves the string `data` into the OS keychain as key `key`.
+
+---------------------
+
+.. function:: bool os_keychain_load(const char *key, char **data)
+
+   Attempt to read the string saved under `key` from the keychain.
+   
+   If successful, `data´ must be freed with :c:func:`bfree()`.
+
+---------------------
+
+.. function:: bool os_keychain_delete(const char *key)
+
+   Deletes an item from the keychain.
