@@ -71,12 +71,18 @@ protected:
 		      const std::string &secret,
 		      const std::string &redirect_uri, int scope_ver,
 		      const std::string &auth_code, bool retry);
+	bool InvalidateToken(const char *url);
+	bool InvalidateToken(const char *url, const std::string &client_id);
 
 private:
 	bool GetTokenInternal(const char *url, const std::string &client_id,
 			      const std::string &secret,
 			      const std::string &redirect_uri, int scope_ver,
 			      const std::string &auth_code, bool retry);
+
+	bool InvalidateTokenInternal(const char *base_url,
+				     const std::string &client_id,
+				     bool token_as_parameter = false);
 };
 
 class OAuthStreamKey : public OAuth {
