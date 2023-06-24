@@ -263,6 +263,18 @@ bool OAuth::LoadInternal()
 	return implicit ? !token.empty() : !refresh_token.empty();
 }
 
+void OAuth::DeleteInternal()
+{
+	OBSBasic *main = OBSBasic::Get();
+
+	/* Delete keychain item (if it exists) */
+	os_keychain_delete(
+		config_get_string(main->Config(), service(), "KeychainItem"));
+
+	/* Delete OAuth config section */
+	config_remove_section(main->Config(), service());
+}
+
 bool OAuth::TokenExpired()
 {
 	if (token.empty())
