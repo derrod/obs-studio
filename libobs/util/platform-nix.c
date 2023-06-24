@@ -1149,7 +1149,7 @@ char *os_generate_uuid(void)
 	return out;
 }
 
-#ifndef __APPLE__
+#if !defined(__APPLE__) && !defined(USE_LIBSECRET)
 bool os_keychain_save(const char *key, const char *data)
 {
 	/* Not implemented */

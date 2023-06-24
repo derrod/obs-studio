@@ -9,6 +9,7 @@ find_package(
   OPTIONAL_COMPONENTS xcb-xinput
   QUIET)
 find_package(gio)
+find_package(Libsecret)
 
 target_link_libraries(libobs PRIVATE X11::x11-xcb xcb::xcb LibUUID::LibUUID ${CMAKE_DL_LIBS})
 
@@ -51,6 +52,12 @@ if(TARGET gio::gio)
   target_link_libraries(libobs PRIVATE gio::gio)
 
   target_sources(libobs PRIVATE util/platform-nix-dbus.c util/platform-nix-portal.c)
+
+  if(TARGET Libsecret::Libsecret)
+    target_link_libraries(libobs PRIVATE Libsecret::Libsecret)
+    target_compile_definitions(libobs PRIVATE USE_LIBSECRET)
+    target_sources(libobs PRIVATE util/platform-nix-libsecret.c)
+  endif()
 endif()
 
 if(ENABLE_WAYLAND)
