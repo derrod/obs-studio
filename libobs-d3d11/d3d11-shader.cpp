@@ -22,6 +22,10 @@
 #include <graphics/matrix3.h>
 #include <graphics/matrix4.h>
 #include <util/platform.h>
+#include <util/util.hpp>
+
+#include <filesystem>
+#include <fstream>
 
 void gs_vertex_shader::GetBuffersExpected(
 	const vector<D3D11_INPUT_ELEMENT_DESC> &inputs)
@@ -219,8 +223,6 @@ void gs_shader::Compile(const char *shaderString, const char *file,
 	ComPtr<ID3D10Blob> errorsBlob;
 	HRESULT hr;
 
-	FILE *cache_file;
-	struct dstr cache_path = {0};
 	char hashstr[20];
 
 	if (!shaderString)
@@ -229,21 +231,20 @@ void gs_shader::Compile(const char *shaderString, const char *file,
 	uint64_t hash = fnv1a_hash(shaderString);
 	snprintf(hashstr, sizeof(hashstr), "%02llx", hash);
 
-	dstr_init_move_array(&cache_path, os_get_program_data_path_ptr(
-						  "obs-studio/shader-cache"));
-	os_mkdirs(cache_path.array);
-	dstr_cat_ch(&cache_path, '/');
-	dstr_cat(&cache_path, hashstr);
+	BPtr program_data =
+		os_get_program_data_path_ptr("obs-studio/shader-cache");
+	auto cachePath = filesystem::u8path(program_data.Get()) / hashstr;
 
-	cache_file = os_fopen(cache_path.array, "rb");
-	if (cache_file) {
-		os_fseeki64(cache_file, 0, SEEK_END);
-		size_t len = os_ftelli64(cache_file);
-		os_fseeki64(cache_file, 0, SEEK_SET);
+	std::fstream cacheFile;
+	if (filesystem::exists(cachePath) && !filesystem::is_empty(cachePath))
+		cacheFile.open(cachePath, ios::in | ios::binary | ios::ate);
+
+	if (cacheFile.is_open()) {
+		streampos len = cacheFile.tellg();
+		cacheFile.seekg(0, ios::beg);
 
 		device->d3dCreateBlob(len, shader);
-		fread((*shader)->GetBufferPointer(), len, 1, cache_file);
-		fclose(cache_file);
+		cacheFile.read((char *)(*shader)->GetBufferPointer(), len);
 	} else {
 		hr = device->d3dCompile(shaderString, strlen(shaderString),
 					file, NULL, NULL, "main", target,
@@ -256,15 +257,12 @@ void gs_shader::Compile(const char *shaderString, const char *file,
 				throw HRError("Failed to compile shader", hr);
 		}
 
-		cache_file = os_fopen(cache_path.array, "wb");
-		if (cache_file) {
-			fwrite((*shader)->GetBufferPointer(),
-			       (*shader)->GetBufferSize(), 1, cache_file);
-			fclose(cache_file);
+		cacheFile.open(cachePath, ios::out | ios::binary);
+		if (cacheFile.is_open()) {
+			cacheFile.write((char *)(*shader)->GetBufferPointer(),
+					(*shader)->GetBufferSize());
 		}
 	}
-
-	dstr_free(&cache_path);
 
 #ifdef DISASSEMBLE_SHADERS
 	ComPtr<ID3D10Blob> asmBlob;
