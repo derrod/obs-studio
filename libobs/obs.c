@@ -540,29 +540,11 @@ gs_effect_t *obs_load_effect(gs_effect_t **effect, const char *file)
 	return *effect;
 }
 
-static int obs_init_graphics(struct obs_video_info *ovi)
+static const char *obs_init_default_shaders_name = "obs_init_default_shaders";
+static void obs_init_default_shaders()
 {
 	struct obs_core_video *video = &obs->video;
-	uint8_t transparent_tex_data[2 * 2 * 4] = {0};
-	const uint8_t *transparent_tex = transparent_tex_data;
-	struct gs_sampler_info point_sampler = {0};
-	bool success = true;
-	int errorcode;
-
-	errorcode =
-		gs_create(&video->graphics, ovi->graphics_module, ovi->adapter);
-	if (errorcode != GS_SUCCESS) {
-		switch (errorcode) {
-		case GS_ERROR_MODULE_NOT_FOUND:
-			return OBS_VIDEO_MODULE_NOT_FOUND;
-		case GS_ERROR_NOT_SUPPORTED:
-			return OBS_VIDEO_NOT_SUPPORTED;
-		default:
-			return OBS_VIDEO_FAIL;
-		}
-	}
-
-	gs_enter_context(video->graphics);
+	profile_start(obs_init_default_shaders_name);
 
 	char *filename = obs_find_data_file("default.effect");
 	video->default_effect = gs_effect_create_from_file(filename, NULL);
@@ -613,6 +595,39 @@ static int obs_init_graphics(struct obs_video_info *ovi)
 		gs_effect_create_from_file(filename, NULL);
 	bfree(filename);
 
+	profile_end(obs_init_default_shaders_name);
+}
+
+static const char *obs_init_graphics_name = "obs_init_graphics";
+static int obs_init_graphics(struct obs_video_info *ovi)
+{
+	struct obs_core_video *video = &obs->video;
+	uint8_t transparent_tex_data[2 * 2 * 4] = {0};
+	const uint8_t *transparent_tex = transparent_tex_data;
+	struct gs_sampler_info point_sampler = {0};
+	bool success = true;
+	int errorcode;
+
+	profile_start(obs_init_graphics_name);
+
+	errorcode =
+		gs_create(&video->graphics, ovi->graphics_module, ovi->adapter);
+	if (errorcode != GS_SUCCESS) {
+		profile_end(obs_init_graphics_name);
+
+		switch (errorcode) {
+		case GS_ERROR_MODULE_NOT_FOUND:
+			return OBS_VIDEO_MODULE_NOT_FOUND;
+		case GS_ERROR_NOT_SUPPORTED:
+			return OBS_VIDEO_NOT_SUPPORTED;
+		default:
+			return OBS_VIDEO_FAIL;
+		}
+	}
+
+	gs_enter_context(video->graphics);
+	obs_init_default_shaders();
+
 	point_sampler.max_anisotropy = 1;
 	video->point_sampler = gs_samplerstate_create(&point_sampler);
 
@@ -639,6 +654,8 @@ static int obs_init_graphics(struct obs_video_info *ovi)
 		success = false;
 
 	gs_leave_context();
+	profile_end(obs_init_graphics_name);
+
 	return success ? OBS_VIDEO_SUCCESS : OBS_VIDEO_FAIL;
 }
 
