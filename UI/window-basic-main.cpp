@@ -2363,6 +2363,34 @@ void OBSBasic::OBSInit()
 		OBSMessageBox::warning(this, QTStr("PluginsFailedToLoad.Title"),
 				       failed_msg);
 	}
+
+#ifdef ENABLE_SOURCE_PERF_SAMPLING
+	fuck = CreateQThread([] {
+		while (true) {
+			auto cb_sources = [](void *data, obs_source_t *source) {
+				uint64_t tick_time =
+					obs_source_get_avg_tick_time(source);
+				uint64_t render_time =
+					obs_source_get_avg_render_time(source);
+				blog(LOG_DEBUG,
+				     "Source \"%s\" (%s) tick: %.06f ms, render: %.06f",
+				     obs_source_get_name(source),
+				     obs_source_get_id(source),
+				     (double)tick_time / 1000000,
+				     (double)render_time / 1000000);
+				return true;
+			};
+
+			blog(LOG_DEBUG,
+			     "================ PERF START ================");
+			obs_enum_all_sources(cb_sources, nullptr);
+			blog(LOG_DEBUG,
+			     "================ PERF END ================");
+			QThread::sleep(1);
+		}
+	});
+	fuck->start();
+#endif
 }
 
 void OBSBasic::OnFirstLoad()
@@ -5139,6 +5167,9 @@ void OBSBasic::closeEvent(QCloseEvent *event)
 		devicePropertiesThread->wait();
 		devicePropertiesThread.reset();
 	}
+
+	if (fuck)
+		fuck->terminate();
 
 	QApplication::sendPostedEvents(nullptr);
 
