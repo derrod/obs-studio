@@ -1248,6 +1248,10 @@ void obs_source_video_tick(obs_source_t *source, float seconds)
 	if (!obs_source_valid(source, "obs_source_video_tick"))
 		return;
 
+#ifdef ENABLE_SOURCE_PERF_SAMPLING
+	uint64_t start = os_gettime_ns();
+#endif
+
 	if (source->info.type == OBS_SOURCE_TYPE_TRANSITION)
 		obs_transition_tick(source, seconds);
 
@@ -1314,6 +1318,11 @@ void obs_source_video_tick(obs_source_t *source, float seconds)
 
 	source->async_rendered = false;
 	source->deinterlace_rendered = false;
+
+#ifdef ENABLE_SOURCE_PERF_SAMPLING
+	uint64_t duration = os_gettime_ns() - start;
+	source->last_tick_time[source->last_tick_idx++] = duration;
+#endif
 }
 
 /* unless the value is 3+ hours worth of frames, this won't overflow */
@@ -2981,7 +2990,15 @@ void obs_source_video_render(obs_source_t *source)
 
 	source = obs_source_get_ref(source);
 	if (source) {
+
+#ifdef ENABLE_SOURCE_PERF_SAMPLING
+		uint64_t start = os_gettime_ns();
+#endif
 		render_video(source);
+#ifdef ENABLE_SOURCE_PERF_SAMPLING
+		source->last_render_time[source->last_render_idx++] =
+			os_gettime_ns() - start;
+#endif
 		obs_source_release(source);
 	}
 }
@@ -6211,3 +6228,25 @@ void obs_source_restore_filters(obs_source_t *source, obs_data_array_t *array)
 
 	da_free(cur_filters);
 }
+
+#ifdef ENABLE_SOURCE_PERF_SAMPLING
+uint64_t obs_source_get_avg_tick_time(obs_source_t *source)
+{
+	uint64_t sum = 0;
+	for (uint16_t idx = 0; idx < 256; idx++) {
+		sum += source->last_tick_time[idx];
+	}
+
+	return sum / 256;
+}
+
+uint64_t obs_source_get_avg_render_time(obs_source_t *source)
+{
+	uint64_t sum = 0;
+	for (uint16_t idx = 0; idx < 256; idx++) {
+		sum += source->last_render_time[idx];
+	}
+
+	return sum / 256;
+}
+#endif

@@ -875,6 +875,14 @@ struct obs_source {
 	struct audio_monitor *monitor;
 	enum obs_monitoring_type monitoring_type;
 
+#ifdef ENABLE_SOURCE_PERF_SAMPLING
+	/* Profiling */
+	uint8_t last_tick_idx;
+	uint64_t last_tick_time[256];
+	uint8_t last_render_idx;
+	uint64_t last_render_time[256];
+#endif
+
 	obs_data_t *private_settings;
 };
 

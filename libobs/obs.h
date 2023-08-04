@@ -1609,6 +1609,12 @@ EXPORT enum obs_media_state obs_source_media_get_state(obs_source_t *source);
 EXPORT void obs_source_media_started(obs_source_t *source);
 EXPORT void obs_source_media_ended(obs_source_t *source);
 
+#ifdef ENABLE_SOURCE_PERF_SAMPLING
+/* Source performance stats, returns average time to tick in ns */
+EXPORT uint64_t obs_source_get_avg_tick_time(obs_source_t *source);
+EXPORT uint64_t obs_source_get_avg_render_time(obs_source_t *source);
+#endif
+
 /* ------------------------------------------------------------------------- */
 /* Transition-specific functions */
 enum obs_transition_target {
