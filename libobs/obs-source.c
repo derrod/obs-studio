@@ -3676,6 +3676,10 @@ obs_source_output_video_internal(obs_source_t *source,
 			output = NULL;
 		} else {
 			da_push_back(source->async_frames, &output);
+#ifdef ENABLE_SOURCE_PERF_SAMPLING
+			source->last_async_time[source->last_async_idx++] =
+				os_gettime_ns();
+#endif
 			source->async_active = true;
 		}
 	}
@@ -6248,5 +6252,19 @@ uint64_t obs_source_get_avg_render_time(obs_source_t *source)
 	}
 
 	return sum / 256;
+}
+
+uint64_t obs_source_get_last_fps(obs_source_t *source)
+{
+	uint64_t now = os_gettime_ns();
+	uint64_t frames_last_second = 0;
+
+	for (uint16_t idx = 0; idx < 256; idx++) {
+		uint64_t ts = source->last_async_time[idx];
+		if (ts >= (now - 1000000000))
+			frames_last_second++;
+	}
+
+	return frames_last_second;
 }
 #endif

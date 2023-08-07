@@ -881,6 +881,8 @@ struct obs_source {
 	uint64_t last_tick_time[256];
 	uint8_t last_render_idx;
 	uint64_t last_render_time[256];
+	uint8_t last_async_idx;
+	uint64_t last_async_time[256];
 #endif
 
 	obs_data_t *private_settings;

@@ -1613,6 +1613,7 @@ EXPORT void obs_source_media_ended(obs_source_t *source);
 /* Source performance stats, returns average time to tick in ns */
 EXPORT uint64_t obs_source_get_avg_tick_time(obs_source_t *source);
 EXPORT uint64_t obs_source_get_avg_render_time(obs_source_t *source);
+EXPORT uint64_t obs_source_get_last_fps(obs_source_t *source);
 #endif
 
 /* ------------------------------------------------------------------------- */
