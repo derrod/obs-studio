@@ -2372,12 +2372,13 @@ void OBSBasic::OBSInit()
 					obs_source_get_avg_tick_time(source);
 				uint64_t render_time =
 					obs_source_get_avg_render_time(source);
+				uint64_t fps = obs_source_get_last_fps(source);
 				blog(LOG_DEBUG,
-				     "Source \"%s\" (%s) tick: %.06f ms, render: %.06f",
-				     obs_source_get_name(source),
-				     obs_source_get_id(source),
+				     "tick: %.06f ms, render: %.06f ms, fps: %d - type: %s, name: \"%s\"",
 				     (double)tick_time / 1000000,
-				     (double)render_time / 1000000);
+				     (double)render_time / 1000000, fps,
+				     obs_source_get_id(source),
+				     obs_source_get_name(source));
 				return true;
 			};
 
