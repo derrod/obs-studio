@@ -2363,35 +2363,6 @@ void OBSBasic::OBSInit()
 		OBSMessageBox::warning(this, QTStr("PluginsFailedToLoad.Title"),
 				       failed_msg);
 	}
-
-#ifdef ENABLE_SOURCE_PERF_SAMPLING
-	fuck = CreateQThread([] {
-		while (true) {
-			auto cb_sources = [](void *data, obs_source_t *source) {
-				uint64_t tick_time =
-					obs_source_get_avg_tick_time(source);
-				uint64_t render_time =
-					obs_source_get_avg_render_time(source);
-				uint64_t fps = obs_source_get_last_fps(source);
-				blog(LOG_DEBUG,
-				     "tick: %.06f ms, render: %.06f ms, fps: %d - type: %s, name: \"%s\"",
-				     (double)tick_time / 1000000,
-				     (double)render_time / 1000000, fps,
-				     obs_source_get_id(source),
-				     obs_source_get_name(source));
-				return true;
-			};
-
-			blog(LOG_DEBUG,
-			     "================ PERF START ================");
-			obs_enum_all_sources(cb_sources, nullptr);
-			blog(LOG_DEBUG,
-			     "================ PERF END ================");
-			QThread::sleep(1);
-		}
-	});
-	fuck->start();
-#endif
 }
 
 void OBSBasic::OnFirstLoad()
@@ -5169,9 +5140,6 @@ void OBSBasic::closeEvent(QCloseEvent *event)
 		devicePropertiesThread.reset();
 	}
 
-	if (fuck)
-		fuck->terminate();
-
 	QApplication::sendPostedEvents(nullptr);
 
 	signalHandlers.clear();
@@ -6624,7 +6592,7 @@ void OBSBasic::on_actionUploadLastLog_triggered()
 
 void OBSBasic::on_actionViewCurrentLog_triggered()
 {
-	if (!logView)
+	/*if (!logView)
 		logView = new OBSLogViewer();
 
 	logView->show();
@@ -6632,7 +6600,17 @@ void OBSBasic::on_actionViewCurrentLog_triggered()
 		(logView->windowState() & ~Qt::WindowMinimized) |
 		Qt::WindowActive);
 	logView->activateWindow();
-	logView->raise();
+	logView->raise();*/
+
+	if (!perfView)
+		perfView = new OBSPerfViewer();
+
+	perfView->show();
+	perfView->setWindowState(
+		(perfView->windowState() & ~Qt::WindowMinimized) |
+		Qt::WindowActive);
+	perfView->activateWindow();
+	perfView->raise();
 }
 
 void OBSBasic::on_actionShowCrashLogs_triggered()

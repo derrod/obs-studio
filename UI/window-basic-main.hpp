@@ -41,6 +41,7 @@
 #endif
 #include "auth-base.hpp"
 #include "log-viewer.hpp"
+#include "perf-viewer.hpp"
 #include "undo-stack-obs.hpp"
 
 #include <obs-frontend-internal.hpp>
@@ -271,6 +272,7 @@ private:
 	QPointer<OBSAbout> about;
 	QPointer<OBSMissingFiles> missDialog;
 	QPointer<OBSLogViewer> logView;
+	QPointer<OBSPerfViewer> perfView;
 
 	QPointer<QTimer> cpuUsageTimer;
 	QPointer<QTimer> diskFullTimer;
@@ -634,7 +636,6 @@ private:
 	bool broadcastActive = false;
 	bool broadcastReady = false;
 	QPointer<QThread> youtubeStreamCheckThread;
-	QPointer<QThread> fuck;
 #ifdef YOUTUBE_ENABLED
 	void YoutubeStreamCheck(const std::string &key);
 	void ShowYouTubeAutoStartWarning();
