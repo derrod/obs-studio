@@ -6261,10 +6261,33 @@ uint64_t obs_source_get_last_fps(obs_source_t *source)
 
 	for (uint16_t idx = 0; idx < 256; idx++) {
 		uint64_t ts = source->last_async_time[idx];
+		if (!ts)
+			continue;
 		if (ts >= (now - 1000000000))
 			frames_last_second++;
 	}
 
 	return frames_last_second;
+}
+
+double obs_source_get_avg_fps(obs_source_t *source)
+{
+	uint64_t deltas = 0;
+	uint64_t delta_sum = 0;
+
+	for (uint16_t idx = 1; idx < 256; idx++) {
+		uint64_t prev_ts = source->last_async_time[idx - 1];
+		uint64_t ts = source->last_async_time[idx];
+		if (!ts || !prev_ts || prev_ts > ts)
+			continue;
+
+		delta_sum += (ts - prev_ts);
+		deltas++;
+	}
+
+	if (!deltas || !delta_sum)
+		return 0.0;
+
+	return 1.0E9 / ((double)delta_sum / (double)deltas);
 }
 #endif

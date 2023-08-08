@@ -878,11 +878,11 @@ struct obs_source {
 #ifdef ENABLE_SOURCE_PERF_SAMPLING
 	/* Profiling */
 	uint8_t last_tick_idx;
-	uint64_t last_tick_time[256];
+	uint64_t last_tick_time[UINT8_MAX + 1];
 	uint8_t last_render_idx;
-	uint64_t last_render_time[256];
+	uint64_t last_render_time[UINT8_MAX + 1];
 	uint8_t last_async_idx;
-	uint64_t last_async_time[256];
+	uint64_t last_async_time[UINT8_MAX + 1];
 #endif
 
 	obs_data_t *private_settings;
