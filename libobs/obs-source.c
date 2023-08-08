@@ -3666,6 +3666,9 @@ obs_source_output_video_internal(obs_source_t *source,
 		return;
 	}
 
+#ifdef ENABLE_SOURCE_PERF_SAMPLING
+	source->last_async_time[source->last_async_idx++] = os_gettime_ns();
+#endif
 	struct obs_source_frame *output = cache_video(source, frame);
 
 	/* ------------------------------------------- */
@@ -3676,10 +3679,6 @@ obs_source_output_video_internal(obs_source_t *source,
 			output = NULL;
 		} else {
 			da_push_back(source->async_frames, &output);
-#ifdef ENABLE_SOURCE_PERF_SAMPLING
-			source->last_async_time[source->last_async_idx++] =
-				os_gettime_ns();
-#endif
 			source->async_active = true;
 		}
 	}
@@ -6244,6 +6243,18 @@ uint64_t obs_source_get_avg_tick_time(obs_source_t *source)
 	return sum / 256;
 }
 
+uint64_t obs_source_get_max_tick_time(obs_source_t *source)
+{
+	uint64_t max = 0;
+	for (uint16_t idx = 0; idx < 256; idx++) {
+		uint64_t t = source->last_tick_time[idx];
+		if (t > max)
+			max = t;
+	}
+
+	return max;
+}
+
 uint64_t obs_source_get_avg_render_time(obs_source_t *source)
 {
 	uint64_t sum = 0;
@@ -6252,6 +6263,18 @@ uint64_t obs_source_get_avg_render_time(obs_source_t *source)
 	}
 
 	return sum / 256;
+}
+
+uint64_t obs_source_get_max_render_time(obs_source_t *source)
+{
+	uint64_t max = 0;
+	for (uint16_t idx = 0; idx < 256; idx++) {
+		uint64_t t = source->last_render_time[idx];
+		if (t > max)
+			max = t;
+	}
+
+	return max;
 }
 
 uint64_t obs_source_get_last_fps(obs_source_t *source)
@@ -6290,4 +6313,76 @@ double obs_source_get_avg_fps(obs_source_t *source)
 
 	return 1.0E9 / ((double)delta_sum / (double)deltas);
 }
+
+obs_source_perf_t *obs_source_get_perf_info(obs_source_t *source)
+{
+	obs_source_perf_t *perf = bzalloc(sizeof(struct obs_source_perf));
+
+	uint64_t sum = 0;
+	uint64_t max = 0;
+	uint64_t min = 0;
+
+	/* Tick performance */
+	for (uint16_t idx = 0; idx < 256; idx++) {
+		uint64_t val = source->last_tick_time[idx];
+		if (!val)
+			continue;
+
+		sum += val;
+		if (val > max)
+			max = val;
+		if (!min || val < min)
+			min = val;
+	}
+
+	perf->avg_tick = sum / 256;
+	perf->max_tick = max;
+	perf->min_tick = min;
+
+	/* Render performance */
+	sum = max = min = 0;
+	for (uint16_t idx = 0; idx < 256; idx++) {
+		uint64_t val = source->last_render_time[idx];
+		if (!val)
+			continue;
+
+		sum += val;
+		if (val > max)
+			max = val;
+		if (!min || val < min)
+			min = val;
+	}
+	perf->avg_render = sum / 256;
+	perf->max_render = max;
+	perf->min_render = min;
+
+	/* Async performance */
+	if (is_async_video_source(source)) {
+		uint64_t now = os_gettime_ns();
+
+		uint64_t deltas = 0;
+		uint64_t delta_sum = 0;
+
+		for (uint16_t idx = 1; idx < 256; idx++) {
+			uint64_t prev_ts = source->last_async_time[idx - 1];
+			uint64_t ts = source->last_async_time[idx];
+			if (!ts)
+				continue;
+			if (ts >= (now - 1000000000))
+				perf->frames++;
+			if (!prev_ts || prev_ts > ts)
+				continue;
+
+			delta_sum += (ts - prev_ts);
+			deltas++;
+		}
+
+		if (deltas && delta_sum)
+			perf->avg_fps =
+				1.0E9 / ((double)delta_sum / (double)deltas);
+	}
+
+	return perf;
+}
+
 #endif
