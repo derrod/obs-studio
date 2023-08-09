@@ -2984,6 +2984,8 @@ static inline void render_video(obs_source_t *source)
 	GS_DEBUG_MARKER_END();
 }
 
+static const char *test_name = "test";
+
 void obs_source_video_render(obs_source_t *source)
 {
 	if (!obs_source_valid(source, "obs_source_video_render"))
@@ -2993,12 +2995,21 @@ void obs_source_video_render(obs_source_t *source)
 	if (source) {
 
 #ifdef ENABLE_SOURCE_PERF_SAMPLING
-		uint64_t start = os_gettime_ns();
+		// uint64_t start = os_gettime_ns();
+		struct gs_timer *timer = gs_timer_create();
+		gs_timer_begin(timer);
 #endif
 		render_video(source);
+
 #ifdef ENABLE_SOURCE_PERF_SAMPLING
-		source->last_render_time[source->last_render_idx] =
-			os_gettime_ns() - start;
+		// TODO the results should be collected elsewhere
+		// this all really needs to be moved elsewhere
+		// see https://therealmjp.github.io/posts/profiling-in-dx11-with-queries/
+		gs_timer_end(timer);
+		gs_timer_get_data(
+			timer,
+			&source->last_render_time[source->last_render_idx]);
+		gs_timer_destroy(timer);
 		source->last_render_idx = (source->last_render_idx + 1) %
 					  SOURCE_PERF_SAMPLE_COUNT;
 #endif
@@ -6278,7 +6289,15 @@ void obs_source_fill_perf_info(obs_source_t *source, obs_source_perf_t *perf)
 		if (!perf->min_render || val < perf->min_render)
 			perf->min_render = val;
 	}
-	perf->avg_render = sum / SOURCE_PERF_SAMPLE_COUNT;
+
+	struct obs_core_video_mix *mix = obs->video.mixes.array[0];
+
+	if (mix->timer_accurate) {
+		uint64_t avg_ticks = sum / SOURCE_PERF_SAMPLE_COUNT;
+		perf->avg_render = (uint64_t)(((double)avg_ticks /
+					       (double)mix->timer_frequency) *
+					      1000000000ULL);
+	}
 
 	/* Async performance */
 	if (!is_async_video_source(source))

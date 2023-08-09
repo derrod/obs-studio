@@ -313,6 +313,10 @@ struct obs_core_video_mix {
 
 	bool encoder_only_mix;
 	long encoder_refs;
+
+	bool timer_enabled;
+	bool timer_accurate;
+	uint64_t timer_frequency;
 };
 
 extern struct obs_core_video_mix *

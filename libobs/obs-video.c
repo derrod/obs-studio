@@ -158,7 +158,21 @@ static inline void render_main_texture(struct obs_core_video_mix *video)
 
 	pthread_mutex_unlock(&obs->data.draw_callbacks_mutex);
 
+	struct gs_timer_range *range = gs_timer_range_create();
+	gs_timer_range_begin(range);
+	video->timer_enabled = true;
+
 	obs_view_render(video->view);
+
+	video->timer_enabled = false;
+	gs_timer_range_end(range);
+	bool disjoint;
+	uint64_t freq;
+	gs_timer_range_get_data(range, &disjoint, &freq);
+	video->timer_accurate = !disjoint;
+	video->timer_frequency = freq;
+
+	gs_timer_range_destroy(range);
 
 	video->texture_rendered = true;
 
