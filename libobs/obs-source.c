@@ -1248,6 +1248,10 @@ void obs_source_video_tick(obs_source_t *source, float seconds)
 	if (!obs_source_valid(source, "obs_source_video_tick"))
 		return;
 
+#ifdef ENABLE_SOURCE_PERF_SAMPLING
+	uint64_t start = os_gettime_ns();
+#endif
+
 	if (source->info.type == OBS_SOURCE_TYPE_TRANSITION)
 		obs_transition_tick(source, seconds);
 
@@ -1314,6 +1318,12 @@ void obs_source_video_tick(obs_source_t *source, float seconds)
 
 	source->async_rendered = false;
 	source->deinterlace_rendered = false;
+
+#ifdef ENABLE_SOURCE_PERF_SAMPLING
+	source->last_tick_time[source->last_tick_idx] = os_gettime_ns() - start;
+	source->last_tick_idx =
+		(source->last_tick_idx + 1) % SOURCE_PERF_SAMPLE_COUNT;
+#endif
 }
 
 /* unless the value is 3+ hours worth of frames, this won't overflow */
@@ -2981,7 +2991,17 @@ void obs_source_video_render(obs_source_t *source)
 
 	source = obs_source_get_ref(source);
 	if (source) {
+
+#ifdef ENABLE_SOURCE_PERF_SAMPLING
+		uint64_t start = os_gettime_ns();
+#endif
 		render_video(source);
+#ifdef ENABLE_SOURCE_PERF_SAMPLING
+		source->last_render_time[source->last_render_idx] =
+			os_gettime_ns() - start;
+		source->last_render_idx = (source->last_render_idx + 1) %
+					  SOURCE_PERF_SAMPLE_COUNT;
+#endif
 		obs_source_release(source);
 	}
 }
@@ -3649,6 +3669,11 @@ obs_source_output_video_internal(obs_source_t *source,
 		return;
 	}
 
+#ifdef ENABLE_SOURCE_PERF_SAMPLING
+	source->last_async_time[source->last_async_idx] = os_gettime_ns();
+	source->last_async_idx =
+		(source->last_async_idx + 1) % SOURCE_PERF_SAMPLE_COUNT;
+#endif
 	struct obs_source_frame *output = cache_video(source, frame);
 
 	/* ------------------------------------------- */
@@ -6211,3 +6236,72 @@ void obs_source_restore_filters(obs_source_t *source, obs_data_array_t *array)
 
 	da_free(cur_filters);
 }
+
+#ifdef ENABLE_SOURCE_PERF_SAMPLING
+obs_source_perf_t *obs_source_get_perf_info(obs_source_t *source)
+{
+	obs_source_perf_t *perf = bmalloc(sizeof(struct obs_source_perf));
+	obs_source_fill_perf_info(source, perf);
+	return perf;
+}
+
+void obs_source_fill_perf_info(obs_source_t *source, obs_source_perf_t *perf)
+{
+	/* Reset to zero */
+	memset(perf, 0, sizeof(struct obs_source_perf));
+
+	/* Tick performance */
+	uint64_t sum = 0;
+	for (uint16_t idx = 0; idx < SOURCE_PERF_SAMPLE_COUNT; idx++) {
+		uint64_t val = source->last_tick_time[idx];
+		if (!val)
+			continue;
+
+		sum += val;
+		if (val > perf->max_tick)
+			perf->max_tick = val;
+		if (!perf->min_tick || val < perf->min_tick)
+			perf->min_tick = val;
+	}
+	perf->avg_tick = sum / SOURCE_PERF_SAMPLE_COUNT;
+
+	/* Render performance */
+	sum = 0;
+	for (uint16_t idx = 0; idx < SOURCE_PERF_SAMPLE_COUNT; idx++) {
+		uint64_t val = source->last_render_time[idx];
+		if (!val)
+			continue;
+
+		sum += val;
+		if (val > perf->max_render)
+			perf->max_render = val;
+		if (!perf->min_render || val < perf->min_render)
+			perf->min_render = val;
+	}
+	perf->avg_render = sum / SOURCE_PERF_SAMPLE_COUNT;
+
+	/* Async performance */
+	if (!is_async_video_source(source))
+		return;
+
+	uint64_t one_second_ago = os_gettime_ns() - 1000000000ULL;
+	uint64_t deltas = 0, delta_sum = 0;
+
+	for (uint16_t idx = 0; idx < SOURCE_PERF_SAMPLE_COUNT; idx++) {
+		uint64_t ts = source->last_async_time[idx];
+		if (!ts)
+			continue;
+		if (ts >= one_second_ago)
+			perf->frames++;
+		uint64_t prev_ts = source->last_async_time[(uint8_t)(idx - 1)];
+		if (!prev_ts || prev_ts > ts)
+			continue;
+
+		delta_sum += (ts - prev_ts);
+		deltas++;
+	}
+
+	if (deltas && delta_sum)
+		perf->avg_fps = 1.0E9 / ((double)delta_sum / (double)deltas);
+}
+#endif

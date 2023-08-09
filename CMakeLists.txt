@@ -17,6 +17,7 @@ if(CMAKE_HOST_SYSTEM_NAME MATCHES "(Darwin)" OR OBS_CMAKE_VERSION VERSION_GREATE
   option(ENABLE_UI "Enable building with UI (requires Qt)" ON)
   option(ENABLE_SCRIPTING "Enable scripting support" ON)
   option(ENABLE_HEVC "Enable HEVC encoders" ON)
+  option(ENABLE_SOURCE_PERF_SAMPLING "Enable source performance sampling" OFF)
 
   add_subdirectory(libobs)
   if(OS_WINDOWS)

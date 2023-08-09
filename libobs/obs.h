@@ -1609,6 +1609,32 @@ EXPORT enum obs_media_state obs_source_media_get_state(obs_source_t *source);
 EXPORT void obs_source_media_started(obs_source_t *source);
 EXPORT void obs_source_media_ended(obs_source_t *source);
 
+#ifdef ENABLE_SOURCE_PERF_SAMPLING
+struct obs_source_perf {
+	/* (Async only) Average frame-rate based on time delta between submitted frames */
+	double avg_fps;
+	/* (Async only) Frames submitted in the last second (max 256) */
+	uint64_t frames;
+	/* Average source tick time in ns */
+	uint64_t avg_tick;
+	/* Maximum source tick time in ns */
+	uint64_t max_tick;
+	/* Minimum source tick time in ns */
+	uint64_t min_tick;
+	/* Average source render time in ns */
+	uint64_t avg_render;
+	/* Maximum source render time in ns */
+	uint64_t max_render;
+	/* Minimum source render time in ns */
+	uint64_t min_render;
+} typedef obs_source_perf_t;
+
+/* Gets source perf info for one source */
+EXPORT obs_source_perf_t *obs_source_get_perf_info(obs_source_t *source);
+EXPORT void obs_source_fill_perf_info(obs_source_t *source,
+				      obs_source_perf_t *perf_info);
+#endif
+
 /* ------------------------------------------------------------------------- */
 /* Transition-specific functions */
 enum obs_transition_target {

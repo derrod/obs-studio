@@ -690,6 +690,10 @@ struct caption_cb_info {
 	void *param;
 };
 
+#if defined(ENABLE_SOURCE_PERF_SAMPLING) && !defined(SOURCE_PERF_SAMPLE_COUNT)
+#define SOURCE_PERF_SAMPLE_COUNT (UINT8_MAX + 1)
+#endif
+
 struct obs_source {
 	struct obs_context_data context;
 	struct obs_source_info info;
@@ -874,6 +878,16 @@ struct obs_source {
 
 	struct audio_monitor *monitor;
 	enum obs_monitoring_type monitoring_type;
+
+#ifdef ENABLE_SOURCE_PERF_SAMPLING
+	/* Profiling */
+	uint32_t last_tick_idx;
+	uint64_t last_tick_time[SOURCE_PERF_SAMPLE_COUNT];
+	uint32_t last_render_idx;
+	uint64_t last_render_time[SOURCE_PERF_SAMPLE_COUNT];
+	uint32_t last_async_idx;
+	uint64_t last_async_time[SOURCE_PERF_SAMPLE_COUNT];
+#endif
 
 	obs_data_t *private_settings;
 };
