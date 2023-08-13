@@ -77,7 +77,9 @@ static uint64_t tick_sources(uint64_t cur_time, uint64_t last_time)
 
 	for (size_t i = 0; i < data->sources_to_tick.num; i++) {
 		obs_source_t *s = data->sources_to_tick.array[i];
+		const uint64_t start = source_profiler_source_tick_start();
 		obs_source_video_tick(s, seconds);
+		source_profiler_source_tick_end(s, start);
 		obs_source_release(s);
 	}
 
@@ -939,6 +941,7 @@ static inline void output_frame(struct obs_core_video_mix *video)
 
 static inline void output_frames(void)
 {
+	source_profiler_render_begin();
 	pthread_mutex_lock(&obs->video.mixes_mutex);
 	for (size_t i = 0, num = obs->video.mixes.num; i < num; i++) {
 		struct obs_core_video_mix *mix = obs->video.mixes.array[i];
@@ -953,6 +956,7 @@ static inline void output_frames(void)
 		}
 	}
 	pthread_mutex_unlock(&obs->video.mixes_mutex);
+	source_profiler_render_end();
 }
 
 #define NBSP "\xC2\xA0"
@@ -1141,6 +1145,7 @@ bool obs_graphics_thread_loop(struct obs_graphics_context *context)
 	update_active_states();
 
 	profile_start(context->video_thread_name);
+	source_profiler_frame_begin();
 
 	gs_enter_context(obs->video.graphics);
 	gs_begin_frame();
@@ -1171,6 +1176,7 @@ bool obs_graphics_thread_loop(struct obs_graphics_context *context)
 
 	frame_time_ns = os_gettime_ns() - frame_start;
 
+	source_profiler_frame_collect();
 	profile_end(context->video_thread_name);
 
 	profile_reenable_thread();

@@ -671,6 +671,8 @@ void obs_source_destroy(struct obs_source *source)
 		obs_context_data_remove_name(&source->context,
 					     &obs->data.public_sources);
 
+	source_profiler_remove_source(source);
+
 	/* defer source destroy */
 	os_task_queue_queue_task(obs->destruction_task_thread,
 				 (os_task_t)obs_source_destroy_defer, source);
@@ -2955,6 +2957,9 @@ static inline void render_video(obs_source_t *source)
 				     get_type_format(source->info.type),
 				     obs_source_get_name(source));
 
+	gs_timer_t *timer = NULL;
+	const uint64_t start = source_profiler_source_render_begin(&timer);
+
 	if (source->filters.num && !source->rendering_filter)
 		obs_source_render_filters(source);
 
@@ -2969,6 +2974,8 @@ static inline void render_video(obs_source_t *source)
 
 	else
 		obs_source_render_async_video(source);
+
+	source_profiler_source_render_end(source, start, timer);
 
 	GS_DEBUG_MARKER_END();
 }
@@ -3647,6 +3654,8 @@ obs_source_output_video_internal(obs_source_t *source,
 		pthread_mutex_unlock(&source->async_mutex);
 		return;
 	}
+
+	source_profiler_async_frame_received(source);
 
 	struct obs_source_frame *output = cache_video(source, frame);
 

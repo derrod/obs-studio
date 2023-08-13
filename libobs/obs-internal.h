@@ -1336,3 +1336,36 @@ void obs_service_destroy(obs_service_t *service);
 
 void obs_output_remove_encoder_internal(struct obs_output *output,
 					struct obs_encoder *encoder);
+
+/** Internal Source Profiler functions **/
+
+/* Start of frame in graphics loop */
+extern void source_profiler_frame_begin(void);
+/* Process data collected during frame */
+extern void source_profiler_frame_collect(void);
+
+/* Start/end of outputs being rendered (GPU timer begin/end) */
+extern void source_profiler_render_begin(void);
+extern void source_profiler_render_end(void);
+
+/* Reset settings, buffers, and GPU timers when video settings change */
+extern void source_profiler_reset_video(struct obs_video_info *ovi);
+
+/* Signal that source received an async frame */
+extern void source_profiler_async_frame_received(obs_source_t *source);
+
+/* Get timestamp for start of tick */
+extern uint64_t source_profiler_source_tick_start(void);
+/* Submit start timestamp for source */
+extern void source_profiler_source_tick_end(obs_source_t *source,
+					    uint64_t start);
+
+/* Obtain GPU timer and start timestamp for render start of a source. */
+extern uint64_t source_profiler_source_render_begin(gs_timer_t **timer);
+/* Submit start timestamp and GPU timer after rendering source */
+extern void source_profiler_source_render_end(obs_source_t *source,
+					      uint64_t start,
+					      gs_timer_t *timer);
+
+/* Remove source from profiler hashmaps */
+extern void source_profiler_remove_source(obs_source_t *source);
