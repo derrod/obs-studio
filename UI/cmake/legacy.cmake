@@ -112,6 +112,7 @@ target_sources(
           forms/OBSImporter.ui
           forms/OBSLogReply.ui
           forms/OBSLogViewer.ui
+          forms/OBSPerfViewer.ui
           forms/OBSMissingFiles.ui
           forms/OBSRemux.ui
           forms/OBSUpdate.ui
@@ -189,6 +190,8 @@ target_sources(
           mute-checkbox.hpp
           plain-text-edit.cpp
           plain-text-edit.hpp
+          perf-viewer.cpp
+          perf-viewer.hpp
           properties-view.cpp
           properties-view.hpp
           properties-view.moc.hpp
