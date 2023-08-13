@@ -52,6 +52,8 @@ target_sources(
           menu-button.hpp
           mute-checkbox.hpp
           noncheckable-button.hpp
+          perf-viewer.cpp
+          perf-viewer.hpp
           remote-text.cpp
           remote-text.hpp
           scene-tree.cpp

@@ -716,6 +716,7 @@
      <string>Basic.MainMenu.Tools</string>
     </property>
     <addaction name="autoConfigure"/>
+    <addaction name="sourceProfiler"/>
     <addaction name="separator"/>
    </widget>
    <widget class="QMenu" name="menuDocks">
@@ -1928,9 +1929,9 @@
     <string>PasteDuplicate</string>
    </property>
   </action>
-  <action name="autoConfigure2">
+  <action name="sourceProfiler">
    <property name="text">
-    <string>Basic.AutoConfig</string>
+    <string>Basic.SourceProfiler</string>
    </property>
   </action>
   <action name="autoConfigure">

@@ -135,6 +135,7 @@ target_sources(
           forms/OBSImporter.ui
           forms/OBSLogReply.ui
           forms/OBSLogViewer.ui
+          forms/OBSPerfViewer.ui
           forms/OBSMissingFiles.ui
           forms/OBSRemux.ui
           forms/OBSUpdate.ui
@@ -211,6 +212,8 @@ target_sources(
           menu-button.hpp
           mute-checkbox.hpp
           noncheckable-button.hpp
+          perf-viewer.cpp
+          perf-viewer.hpp
           remote-text.cpp
           remote-text.hpp
           scene-tree.cpp
