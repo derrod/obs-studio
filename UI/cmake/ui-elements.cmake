@@ -32,6 +32,8 @@ target_sources(
           menu-button.cpp
           menu-button.hpp
           mute-checkbox.hpp
+          perf-viewer.cpp
+          perf-viewer.hpp
           plain-text-edit.cpp
           plain-text-edit.hpp
           properties-view.cpp

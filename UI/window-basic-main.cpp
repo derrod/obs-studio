@@ -4941,6 +4941,9 @@ void OBSBasic::ClearSceneData()
 		outputHandler->UpdateVirtualCamOutputSource();
 	}
 
+	if (perfView)
+		perfView->close();
+
 	safeModeModuleData = nullptr;
 	lastScene = nullptr;
 	swapScene = nullptr;
@@ -10337,6 +10340,20 @@ void OBSBasic::on_autoConfigure_triggered()
 	test.setModal(true);
 	test.show();
 	test.exec();
+}
+
+void OBSBasic::on_sourceProfiler_triggered()
+{
+
+	if (!perfView)
+		perfView = new OBSPerfViewer();
+
+	perfView->show();
+	perfView->setWindowState(
+		(perfView->windowState() & ~Qt::WindowMinimized) |
+		Qt::WindowActive);
+	perfView->activateWindow();
+	perfView->raise();
 }
 
 void OBSBasic::on_stats_triggered()
