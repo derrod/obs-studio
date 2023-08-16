@@ -2564,6 +2564,10 @@ static void rotate_async_video(obs_source_t *source, long rotation)
 static inline void obs_source_render_async_video(obs_source_t *source)
 {
 	if (source->async_textures[0] && source->async_active) {
+		gs_timer_t *timer = NULL;
+		const uint64_t start =
+			source_profiler_source_render_begin(&timer);
+
 		const enum gs_color_space source_space = convert_video_space(
 			source->async_format, source->async_trc);
 
@@ -2673,6 +2677,8 @@ static inline void obs_source_render_async_video(obs_source_t *source)
 		gs_technique_end(tech);
 
 		gs_set_linear_srgb(previous);
+
+		source_profiler_source_render_end(source, start, timer);
 	}
 }
 
@@ -2741,6 +2747,9 @@ static uint32_t get_base_height(const obs_source_t *source)
 
 static void source_render(obs_source_t *source, gs_effect_t *effect)
 {
+	gs_timer_t *timer = NULL;
+	const uint64_t start = source_profiler_source_render_begin(&timer);
+
 	void *const data = source->context.data;
 	const enum gs_color_space current_space = gs_get_color_space();
 	const enum gs_color_space source_space =
@@ -2867,6 +2876,7 @@ static void source_render(obs_source_t *source, gs_effect_t *effect)
 	} else {
 		source->info.video_render(data, effect);
 	}
+	source_profiler_source_render_end(source, start, timer);
 }
 
 void obs_source_default_render(obs_source_t *source)
@@ -2957,9 +2967,6 @@ static inline void render_video(obs_source_t *source)
 				     get_type_format(source->info.type),
 				     obs_source_get_name(source));
 
-	gs_timer_t *timer = NULL;
-	const uint64_t start = source_profiler_source_render_begin(&timer);
-
 	if (source->filters.num && !source->rendering_filter)
 		obs_source_render_filters(source);
 
@@ -2974,8 +2981,6 @@ static inline void render_video(obs_source_t *source)
 
 	else
 		obs_source_render_async_video(source);
-
-	source_profiler_source_render_end(source, start, timer);
 
 	GS_DEBUG_MARKER_END();
 }
