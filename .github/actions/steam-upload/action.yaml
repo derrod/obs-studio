@@ -261,7 +261,7 @@ runs:
       if: fromJSON(steps.asset-info.outputs.is_prerelease)
       shell: zsh --no-rcs --errexit --pipefail {0}
       run: |
-        : Upload to Steam Playtest 📤
+        : Upload to Steam (Playtest) 📤
         if (( ${+RUNNER_DEBUG} )) setopt XTRACE
 
         local build_file='build_playtest.vdf'
