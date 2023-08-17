@@ -264,6 +264,7 @@ runs:
         : Upload to Steam (Playtest) 📤
         if (( ${+RUNNER_DEBUG} )) setopt XTRACE
 
+        local root_dir="${PWD}"
         local build_file='build_playtest.vdf'
         local branch_name='${{ inputs.playtestBranch }}'
 
