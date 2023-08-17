@@ -106,7 +106,8 @@ runs:
                 --pattern '*macOS*.dmg' \
                 --pattern '*Windows*' \
                 --pattern '*.zip' \
-                --clobber
+                --clobber \
+                --repo obsproject/obs-studio
 
               description='${{ inputs.tagName }}'
               read -r is_prerelease <<< \
@@ -241,11 +242,10 @@ runs:
         print '::endgroup::'
 
         print '::group::Upload to Steam'
-        local preview='${{ inputs.preview }}'
 
         steamcmd \
           +login '${{ inputs.steamUser }}' '${{ inputs.steamPassword }}' '${{ steps.steam-totp.outputs.code }}' \
-          +run_app_build ${preview:+-preview} ${build_file:a} \
+          +run_app_build -preview ${build_file:a} \
           +quit
         print '::endgroup'
         popd
@@ -254,7 +254,7 @@ runs:
       if: fromJSON(steps.asset-info.outputs.is_prerelease)
       shell: zsh --no-rcs --errexit --pipefail {0}
       run: |
-        : Upload to Steam (Playtest) 📤
+        : Upload to Steam Playtest 📤
         if (( ${+RUNNER_DEBUG} )) setopt XTRACE
 
         local build_file='build_playtest.vdf'
