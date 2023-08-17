@@ -26,7 +26,13 @@ OBSPerfViewer::OBSPerfViewer(QWidget *parent)
 	}
 
 	m_model = new PerfTreeModel(this);
-	ui->treeView->setModel(m_model);
+
+	m_proxy = new PerfViewerProxyModel(this);
+	m_proxy->setSourceModel(m_model);
+
+	ui->treeView->setModel(m_proxy);
+	ui->treeView->setSortingEnabled(true);
+	ui->treeView->setAlternatingRowColors(true);
 
 	connect(ui->resetButton, &QAbstractButton::clicked, m_model,
 		&PerfTreeModel::refreshSources);
@@ -34,6 +40,8 @@ OBSPerfViewer::OBSPerfViewer(QWidget *parent)
 		&OBSPerfViewer::sourceListUpdated);
 	connect(ui->showPrivate, &QAbstractButton::toggled, m_model,
 		&PerfTreeModel::setPrivateVisible);
+	connect(ui->searchBox, &QLineEdit::textChanged, m_proxy,
+		&PerfViewerProxyModel::setFilterText);
 
 	source_profiler_enable(true);
 #ifndef __APPLE__
@@ -128,6 +136,10 @@ QVariant PerfTreeModel::data(const QModelIndex &index, int role) const
 		auto item =
 			static_cast<PerfTreeItem *>(index.internalPointer());
 		return item->getTextColour(index.column());
+	} else if (role == Qt::UserRole) {
+		auto item =
+			static_cast<PerfTreeItem *>(index.internalPointer());
+		return item->rawData(index.column());
 	}
 
 	return {};
@@ -196,6 +208,9 @@ int PerfTreeModel::rowCount(const QModelIndex &parent) const
 	else
 		parentItem =
 			static_cast<PerfTreeItem *>(parent.internalPointer());
+
+	if (!parentItem)
+		return 0;
 
 	return parentItem->childCount();
 }
@@ -431,6 +446,26 @@ QVariant PerfTreeItem::data(int column) const
 	}
 }
 
+QVariant PerfTreeItem::rawData(int column) const
+{
+	switch (column) {
+	case PerfTreeModel::NAME:
+		return m_source ? QString(obs_source_get_name(m_source)) : name;
+	case PerfTreeModel::TICK:
+		return (qulonglong)m_perf->tick_max;
+	case PerfTreeModel::RENDER:
+		return (qulonglong)m_perf->render_max;
+#ifndef __APPLE__
+	case PerfTreeModel::RENDER_GPU:
+		return (qulonglong)m_perf->render_gpu_max;
+#endif
+	case PerfTreeModel::FPS:
+		return m_perf->async_fps;
+	default:
+		return {};
+	}
+}
+
 PerfTreeItem *PerfTreeItem::parentItem()
 {
 	return m_parentItem;
@@ -519,4 +554,66 @@ QVariant PerfTreeItem::getTextColour(int column) const
 		return QBrush(Qt::darkYellow);
 
 	return {};
+}
+
+void PerfViewerProxyModel::setFilterText(const QString &filter)
+{
+	QRegularExpression regex(filter,
+				 QRegularExpression::CaseInsensitiveOption);
+	setFilterRegularExpression(regex);
+}
+
+static bool ChildContainsName(PerfTreeItem *item,
+			      const QRegularExpression &regex)
+{
+	int children = item->childCount();
+
+	for (int i = 0; i < children; i++) {
+		auto child = item->child(i);
+		if (child->rawData(PerfTreeModel::Columns::NAME)
+			    .toString()
+			    .contains(regex))
+			return true;
+		if (child->childCount() && ChildContainsName(child, regex))
+			return true;
+	}
+
+	return false;
+}
+
+bool PerfViewerProxyModel::filterAcceptsRow(
+	int sourceRow, const QModelIndex &sourceParent) const
+{
+	// Always include roots
+	if (!sourceParent.isValid())
+		return true;
+
+	QModelIndex itemIndex =
+		sourceModel()->index(sourceRow, 0, sourceParent);
+
+	auto item = static_cast<PerfTreeItem *>(itemIndex.internalPointer());
+	auto name = item->rawData(PerfTreeModel::Columns::NAME).toString();
+
+	if (name.contains(filterRegularExpression()))
+		return true;
+
+	// If any of the children match this item also needs to be visible
+	return ChildContainsName(item, filterRegularExpression());
+}
+
+bool PerfViewerProxyModel::lessThan(const QModelIndex &left,
+				    const QModelIndex &right) const
+{
+	QVariant leftData = sourceModel()->data(left, Qt::UserRole);
+	QVariant rightData = sourceModel()->data(right, Qt::UserRole);
+
+	if (leftData.userType() == QMetaType::Double)
+		return leftData.toDouble() < rightData.toDouble();
+	if (leftData.userType() == QMetaType::ULongLong)
+		return leftData.toULongLong() < rightData.toULongLong();
+	if (leftData.userType() == QMetaType::QString)
+		return QString::localeAwareCompare(leftData.toString(),
+						   rightData.toString()) < 0;
+
+	return false;
 }

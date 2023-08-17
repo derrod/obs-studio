@@ -3,18 +3,21 @@
 #include <QDialog>
 #include <QAbstractItemModel>
 #include <QVariant>
+#include <QSortFilterProxyModel>
 
 #include "util/source-profiler.h"
 
 #include "ui_OBSPerfViewer.h"
 
 class PerfTreeModel;
+class PerfViewerProxyModel;
 
 class OBSPerfViewer : public QDialog {
 	Q_OBJECT
 
 	std::unique_ptr<Ui::OBSPerfViewer> ui;
 	PerfTreeModel *m_model = nullptr;
+	PerfViewerProxyModel *m_proxy = nullptr;
 
 public:
 	OBSPerfViewer(QWidget *parent = 0);
@@ -97,6 +100,7 @@ public:
 	int childCount() const;
 	int columnCount() const;
 	QVariant data(int column) const;
+	QVariant rawData(int column) const;
 	int row() const;
 	PerfTreeItem *parentItem();
 
@@ -117,4 +121,23 @@ private:
 	OBSSource m_source;
 	QString name;
 	bool rendered;
+};
+
+class PerfViewerProxyModel : public QSortFilterProxyModel {
+	Q_OBJECT
+
+public:
+	PerfViewerProxyModel(QObject *parent = nullptr)
+		: QSortFilterProxyModel(parent)
+	{
+	}
+
+public slots:
+	void setFilterText(const QString &filter);
+
+protected:
+	bool filterAcceptsRow(int sourceRow,
+			      const QModelIndex &sourceParent) const override;
+	bool lessThan(const QModelIndex &left,
+		      const QModelIndex &right) const override;
 };
