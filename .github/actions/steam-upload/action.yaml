@@ -270,7 +270,7 @@ runs:
         pushd steam
         print '::group::Prepare Steam Build Script'
 
-        set "s/@@DESC@@/${branch_name}-${{ steps.asset-info.outputs.description }}/;s/@@BRANCH@@/${branch_name}" \
+        sed "s/@@DESC@@/${branch_name}-${{ steps.asset-info.outputs.description }}/;s/@@BRANCH@@/${branch_name}/" \
           ${root_dir}/build-aux/steam/obs_playtest_build.vdf > ${build_file}
 
         print "Generated ${build_file}:\n$(<${build_file})"
