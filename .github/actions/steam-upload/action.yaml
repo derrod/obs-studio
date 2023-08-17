@@ -111,7 +111,7 @@ runs:
 
               description='${{ inputs.tagName }}'
               read -r is_prerelease <<< \
-                "$(gh release view ${{ inputs.tagName }} --json isPrerelease --jq '.isPrerelease')"
+                "$(gh release view ${{ inputs.tagName }} --repo obsproject/obs-studio --json isPrerelease --jq '.isPrerelease')"
               asset_names=(gh release view ${{ inputs.tagName }} --json assets \
                 --jq '.assets[] | select(.name|test(".*(macos|Full-x64|windows).*")) | .name')
 
