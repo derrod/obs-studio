@@ -250,6 +250,13 @@ runs:
         print '::endgroup'
         popd
 
+    - name: Generate Steam auth code 🔐
+      id: steam-totp-playtest
+      uses: CyberAndrii/steam-totp@c7f636bc64e77f1b901e0420b7890813141508ee
+      if: ${{ ! fromJSON(inputs.preview) && fromJSON(steps.asset-info.outputs.is_prerelease) }}
+      with:
+        shared_secret: ${{ inputs.steamSecret }}
+
     - name: Upload to Steam (Playtest) 📤
       if: fromJSON(steps.asset-info.outputs.is_prerelease)
       shell: zsh --no-rcs --errexit --pipefail {0}
@@ -274,7 +281,7 @@ runs:
         if [[ '${{ inputs.preview }}' == 'true' ]] preview='-preview'
 
         steamcmd \
-          +login '${{ inputs.steamUser }}' '${{ inputs.steamPassword }}' '${{ steps.steam-totp.outputs.code }}' \
+          +login '${{ inputs.steamUser }}' '${{ inputs.steamPassword }}' '${{ steps.steam-totp-playtest.outputs.code }}' \
           +run_app_build ${preview} ${build_file:a} \
           +quit
         print '::endgroup'
