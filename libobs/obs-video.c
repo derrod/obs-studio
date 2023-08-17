@@ -941,7 +941,6 @@ static inline void output_frame(struct obs_core_video_mix *video)
 
 static inline void output_frames(void)
 {
-	source_profiler_render_begin();
 	pthread_mutex_lock(&obs->video.mixes_mutex);
 	for (size_t i = 0, num = obs->video.mixes.num; i < num; i++) {
 		struct obs_core_video_mix *mix = obs->video.mixes.array[i];
@@ -956,7 +955,6 @@ static inline void output_frames(void)
 		}
 	}
 	pthread_mutex_unlock(&obs->video.mixes_mutex);
-	source_profiler_render_end();
 }
 
 #define NBSP "\xC2\xA0"
@@ -1164,6 +1162,7 @@ bool obs_graphics_thread_loop(struct obs_graphics_context *context)
 	}
 #endif
 
+	source_profiler_render_begin();
 	profile_start(output_frame_name);
 	output_frames();
 	profile_end(output_frame_name);
@@ -1171,6 +1170,7 @@ bool obs_graphics_thread_loop(struct obs_graphics_context *context)
 	profile_start(render_displays_name);
 	render_displays();
 	profile_end(render_displays_name);
+	source_profiler_render_end();
 
 	execute_graphics_tasks();
 
