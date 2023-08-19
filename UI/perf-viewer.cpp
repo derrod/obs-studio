@@ -589,16 +589,12 @@ void PerfViewerProxyModel::setFilterText(const QString &filter)
 bool PerfViewerProxyModel::filterAcceptsRow(
 	int sourceRow, const QModelIndex &sourceParent) const
 {
-	// Always include roots
-	if (!sourceParent.isValid())
-		return true;
-
 	QModelIndex itemIndex =
 		sourceModel()->index(sourceRow, 0, sourceParent);
 
-	auto item = static_cast<PerfTreeItem *>(itemIndex.internalPointer());
-	auto name = item->rawData(PerfTreeModel::Columns::NAME).toString();
-
+	auto name = sourceModel()
+			    ->data(itemIndex, PerfTreeModel::RawDataRole)
+			    .toString();
 	return name.contains(filterRegularExpression());
 }
 
