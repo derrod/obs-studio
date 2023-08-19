@@ -41,8 +41,11 @@ OBSPerfViewer::OBSPerfViewer(QWidget *parent)
 		&OBSPerfViewer::sourceListUpdated);
 	connect(ui->showPrivate, &QAbstractButton::toggled, m_model,
 		&PerfTreeModel::setPrivateVisible);
-	connect(ui->searchBox, &QLineEdit::textChanged, m_proxy,
-		&PerfViewerProxyModel::setFilterText);
+	connect(ui->searchBox, &QLineEdit::textChanged, this,
+		[&](const QString &text) {
+			m_proxy->setFilterText(text);
+			ui->treeView->expandAll();
+		});
 
 	source_profiler_enable(true);
 #ifndef __APPLE__
