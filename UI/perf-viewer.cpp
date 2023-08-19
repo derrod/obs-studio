@@ -565,24 +565,6 @@ void PerfViewerProxyModel::setFilterText(const QString &filter)
 	setFilterRegularExpression(regex);
 }
 
-static bool ChildContainsName(PerfTreeItem *item,
-			      const QRegularExpression &regex)
-{
-	int children = item->childCount();
-
-	for (int i = 0; i < children; i++) {
-		auto child = item->child(i);
-		if (child->rawData(PerfTreeModel::Columns::NAME)
-			    .toString()
-			    .contains(regex))
-			return true;
-		if (child->childCount() && ChildContainsName(child, regex))
-			return true;
-	}
-
-	return false;
-}
-
 bool PerfViewerProxyModel::filterAcceptsRow(
 	int sourceRow, const QModelIndex &sourceParent) const
 {
@@ -596,11 +578,7 @@ bool PerfViewerProxyModel::filterAcceptsRow(
 	auto item = static_cast<PerfTreeItem *>(itemIndex.internalPointer());
 	auto name = item->rawData(PerfTreeModel::Columns::NAME).toString();
 
-	if (name.contains(filterRegularExpression()))
-		return true;
-
-	// If any of the children match this item also needs to be visible
-	return ChildContainsName(item, filterRegularExpression());
+	return name.contains(filterRegularExpression());
 }
 
 bool PerfViewerProxyModel::lessThan(const QModelIndex &left,

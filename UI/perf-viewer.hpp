@@ -130,6 +130,7 @@ public:
 	PerfViewerProxyModel(QObject *parent = nullptr)
 		: QSortFilterProxyModel(parent)
 	{
+		setRecursiveFilteringEnabled(true);
 	}
 
 public slots:
