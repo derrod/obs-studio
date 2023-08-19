@@ -46,6 +46,8 @@ OBSPerfViewer::OBSPerfViewer(QWidget *parent)
 			m_proxy->setFilterText(text);
 			ui->treeView->expandAll();
 		});
+	connect(ui->refreshInterval, &QSpinBox::valueChanged, m_model,
+		&PerfTreeModel::setRefreshInterval);
 
 	source_profiler_enable(true);
 #ifndef __APPLE__
@@ -93,7 +95,7 @@ PerfTreeModel::PerfTreeModel(QObject *parent) : QAbstractItemModel(parent)
 
 	updater.reset(CreateQThread([this] {
 		while (true) {
-			QThread::sleep(1);
+			QThread::msleep(refreshInterval);
 			updateData();
 		}
 	}));
@@ -108,6 +110,12 @@ PerfTreeModel::~PerfTreeModel()
 
 	delete rootItem;
 }
+
+void PerfTreeModel::setRefreshInterval(int interval)
+{
+	refreshInterval = interval;
+}
+
 int PerfTreeModel::columnCount(const QModelIndex &parent) const
 {
 	if (parent.isValid())
