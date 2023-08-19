@@ -146,8 +146,12 @@ static struct frame_sample *frame_sample_create(void)
 
 static void frame_sample_destroy(struct frame_sample *sample)
 {
-	for (size_t i = 0; i < sample->render_timers.num; i++)
-		gs_timer_destroy(sample->render_timers.array[i]);
+	if (sample->render_timers.num) {
+		gs_enter_context(obs->video.graphics);
+		for (size_t i = 0; i < sample->render_timers.num; i++)
+			gs_timer_destroy(sample->render_timers.array[i]);
+		gs_leave_context();
+	}
 
 	da_free(sample->render_cpu);
 	da_free(sample->render_timers);
@@ -199,6 +203,7 @@ static void entry_destroy(struct profiler_entry *entry)
 
 static void reset_gpu_timers(void)
 {
+	gs_enter_context(obs->video.graphics);
 	/* Reset timers */
 	for (int i = 0; i < FRAME_BUFFER_SIZE; i++) {
 		if (timer_ranges[i]) {
@@ -206,6 +211,7 @@ static void reset_gpu_timers(void)
 			timer_ranges[i] = NULL;
 		}
 	}
+	gs_leave_context();
 }
 
 static void profiler_shutdown(void)
