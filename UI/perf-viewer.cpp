@@ -228,7 +228,7 @@ static bool EnumSceneItem(obs_scene_t *, obs_sceneitem_t *item, void *data)
 	obs_source_t *source = obs_sceneitem_get_source(item);
 
 	auto treeItem = new PerfTreeItem(source, parent, parent->model());
-	parent->appendChild(treeItem);
+	parent->prependChild(treeItem);
 
 	if (obs_sceneitem_is_group(item)) {
 		obs_scene_t *scene = obs_sceneitem_group_get_scene(item);
@@ -348,6 +348,11 @@ PerfTreeItem::~PerfTreeItem()
 void PerfTreeItem::appendChild(PerfTreeItem *item)
 {
 	m_childItems.append(item);
+}
+
+void PerfTreeItem::prependChild(PerfTreeItem *item)
+{
+	m_childItems.prepend(item);
 }
 
 PerfTreeItem *PerfTreeItem::child(int row)

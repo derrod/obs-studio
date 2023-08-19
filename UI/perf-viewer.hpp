@@ -95,6 +95,7 @@ public:
 	~PerfTreeItem();
 
 	void appendChild(PerfTreeItem *child);
+	void prependChild(PerfTreeItem *child);
 
 	PerfTreeItem *child(int row);
 	int childCount() const;
