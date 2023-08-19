@@ -517,6 +517,8 @@ QIcon PerfTreeItem::getIcon() const
 		return main->GetSceneIcon();
 	else if (strcmp(id, "group") == 0)
 		return main->GetGroupIcon();
+	else if (obs_source_get_type(m_source) == OBS_SOURCE_TYPE_FILTER)
+		return main->GetFilterIcon();
 	else
 		return main->GetSourceIcon(id);
 }
