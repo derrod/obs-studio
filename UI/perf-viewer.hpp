@@ -57,6 +57,8 @@ public:
 		refreshSources();
 	}
 
+	void setRefreshInterval(int interval);
+
 	double targetFrameTime() const { return frameTime; }
 
 	enum Columns {
@@ -89,6 +91,7 @@ private:
 	bool showPrivateSources = false;
 	bool refreshing = false;
 	double frameTime = 0.0;
+	int refreshInterval = 1000;
 };
 
 class PerfTreeItem {
