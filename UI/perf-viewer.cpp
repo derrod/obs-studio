@@ -137,7 +137,11 @@ QVariant PerfTreeModel::data(const QModelIndex &index, int role) const
 		auto item =
 			static_cast<PerfTreeItem *>(index.internalPointer());
 		return item->getTextColour(index.column());
-	} else if (role == Qt::UserRole) {
+	} else if (role == SortRole) {
+		auto item =
+			static_cast<PerfTreeItem *>(index.internalPointer());
+		return item->sortData(index.column());
+	} else if (role == RawDataRole) {
 		auto item =
 			static_cast<PerfTreeItem *>(index.internalPointer());
 		return item->rawData(index.column());
@@ -456,7 +460,7 @@ QVariant PerfTreeItem::rawData(int column) const
 {
 	switch (column) {
 	case PerfTreeModel::NAME:
-		return row(); // Used for sorting only
+		return m_source ? QString(obs_source_get_name(m_source)) : name;
 	case PerfTreeModel::TICK:
 		return (qulonglong)m_perf->tick_max;
 	case PerfTreeModel::RENDER:
@@ -470,6 +474,14 @@ QVariant PerfTreeItem::rawData(int column) const
 	default:
 		return {};
 	}
+}
+
+QVariant PerfTreeItem::sortData(int column) const
+{
+	if (column == PerfTreeModel::NAME)
+		return row();
+
+	return rawData(column);
 }
 
 PerfTreeItem *PerfTreeItem::parentItem()
@@ -590,8 +602,9 @@ bool PerfViewerProxyModel::filterAcceptsRow(
 bool PerfViewerProxyModel::lessThan(const QModelIndex &left,
 				    const QModelIndex &right) const
 {
-	QVariant leftData = sourceModel()->data(left, Qt::UserRole);
-	QVariant rightData = sourceModel()->data(right, Qt::UserRole);
+	QVariant leftData = sourceModel()->data(left, PerfTreeModel::SortRole);
+	QVariant rightData =
+		sourceModel()->data(right, PerfTreeModel::SortRole);
 
 	if (leftData.userType() == QMetaType::Double)
 		return leftData.toDouble() < rightData.toDouble();

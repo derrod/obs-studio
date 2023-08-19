@@ -68,6 +68,11 @@ public:
 		NUM_COLUMNS
 	};
 
+	enum PerfRole {
+		SortRole = Qt::UserRole,
+		RawDataRole,
+	};
+
 public slots:
 	void refreshSources();
 
@@ -102,6 +107,7 @@ public:
 	int columnCount() const;
 	QVariant data(int column) const;
 	QVariant rawData(int column) const;
+	QVariant sortData(int column) const;
 	int row() const;
 	PerfTreeItem *parentItem();
 
