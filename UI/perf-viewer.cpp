@@ -275,6 +275,8 @@ static bool EnumPrivateSource(void *data, obs_source_t *source)
 {
 	if (!obs_obj_is_private(source))
 		return true;
+	if (obs_source_get_type(source) == OBS_SOURCE_TYPE_FILTER)
+		return true;
 
 	return EnumSource(data, source);
 }
