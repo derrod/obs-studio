@@ -65,6 +65,9 @@ OBSPerfViewer::~OBSPerfViewer()
 void OBSPerfViewer::sourceListUpdated()
 {
 	ui->treeView->expandAll();
+	if (loaded)
+		return;
+
 	ui->treeView->resizeColumnToContents(0);
 	ui->treeView->resizeColumnToContents(1);
 	ui->treeView->resizeColumnToContents(2);
@@ -72,6 +75,7 @@ void OBSPerfViewer::sourceListUpdated()
 #ifndef __APPLE__
 	ui->treeView->resizeColumnToContents(4);
 #endif
+	loaded = true;
 }
 
 /* Model */
@@ -386,9 +390,11 @@ static QString GetSourceName(obs_source_t *source, bool rendered)
 {
 	const char *name = obs_source_get_name(source);
 	QString qName = name ? name : QTStr("PerfViewer.NoName");
+#ifdef _DEBUG
 	qName += " (";
 	qName += obs_source_get_id(source);
 	qName += ")";
+#endif
 
 	if (!rendered)
 		qName += " " + QTStr("PerfViewer.Inactive");
