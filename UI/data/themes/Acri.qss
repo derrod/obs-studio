@@ -1333,6 +1333,7 @@ OBSBasic {
     qproperty-browserIcon: url(theme:Dark/sources/globe.svg);
     qproperty-groupIcon: url(theme:Dark/sources/group.svg);
     qproperty-sceneIcon: url(theme:Dark/sources/scene.svg);
+    qproperty-filterIcon: url(theme:Dark/filter.svg);
     qproperty-defaultIcon: url(theme:Dark/sources/default.svg);
     qproperty-audioProcessOutputIcon: url(theme:Dark/sources/windowaudio.svg);
 }

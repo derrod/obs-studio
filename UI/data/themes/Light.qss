@@ -1321,6 +1321,7 @@ OBSBasic {
     qproperty-browserIcon: url(theme:Light/sources/globe.svg);
     qproperty-groupIcon: url(theme:Light/sources/group.svg);
     qproperty-sceneIcon: url(theme:Light/sources/scene.svg);
+    qproperty-filterIcon: url(theme:Light/filter.svg);
     qproperty-defaultIcon: url(theme:Light/sources/default.svg);
     qproperty-audioProcessOutputIcon: url(theme:Light/sources/windowaudio.svg);
 }

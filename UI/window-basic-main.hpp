@@ -173,6 +173,8 @@ class OBSBasic : public OBSMainWindow {
 			   DESIGNABLE true)
 	Q_PROPERTY(QIcon sceneIcon READ GetSceneIcon WRITE SetSceneIcon
 			   DESIGNABLE true)
+	Q_PROPERTY(QIcon filterIcon READ GetFilterIcon WRITE SetFilterIcon
+			   DESIGNABLE true)
 	Q_PROPERTY(QIcon defaultIcon READ GetDefaultIcon WRITE SetDefaultIcon
 			   DESIGNABLE true)
 	Q_PROPERTY(QIcon audioProcessOutputIcon READ GetAudioProcessOutputIcon
@@ -602,6 +604,7 @@ private:
 	QIcon browserIcon;
 	QIcon groupIcon;
 	QIcon sceneIcon;
+	QIcon filterIcon;
 	QIcon defaultIcon;
 	QIcon audioProcessOutputIcon;
 
@@ -842,6 +845,7 @@ private slots:
 	void SetBrowserIcon(const QIcon &icon);
 	void SetGroupIcon(const QIcon &icon);
 	void SetSceneIcon(const QIcon &icon);
+	void SetFilterIcon(const QIcon &icon);
 	void SetDefaultIcon(const QIcon &icon);
 	void SetAudioProcessOutputIcon(const QIcon &icon);
 
@@ -1015,6 +1019,7 @@ public:
 	QIcon GetSourceIcon(const char *id) const;
 	QIcon GetGroupIcon() const;
 	QIcon GetSceneIcon() const;
+	QIcon GetFilterIcon() const;
 
 	OBSWeakSource copyFilter;
 
