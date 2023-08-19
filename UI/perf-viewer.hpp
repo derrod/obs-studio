@@ -19,6 +19,8 @@ class OBSPerfViewer : public QDialog {
 	PerfTreeModel *m_model = nullptr;
 	PerfViewerProxyModel *m_proxy = nullptr;
 
+	bool loaded = false;
+
 public:
 	OBSPerfViewer(QWidget *parent = 0);
 	~OBSPerfViewer() override;
