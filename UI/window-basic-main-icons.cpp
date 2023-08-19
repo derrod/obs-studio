@@ -109,6 +109,11 @@ void OBSBasic::SetSceneIcon(const QIcon &icon)
 	sceneIcon = icon;
 }
 
+void OBSBasic::SetFilterIcon(const QIcon &icon)
+{
+	filterIcon = icon;
+}
+
 void OBSBasic::SetDefaultIcon(const QIcon &icon)
 {
 	defaultIcon = icon;
@@ -187,6 +192,11 @@ QIcon OBSBasic::GetGroupIcon() const
 QIcon OBSBasic::GetSceneIcon() const
 {
 	return sceneIcon;
+}
+
+QIcon OBSBasic::GetFilterIcon() const
+{
+	return filterIcon;
 }
 
 QIcon OBSBasic::GetDefaultIcon() const
