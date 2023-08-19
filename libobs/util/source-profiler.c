@@ -62,28 +62,27 @@ struct source_samples {
 	UT_hash_handle hh;
 };
 
-typedef DARRAY(uint64_t) u64_array_t;
+struct ucirclebuf {
+	size_t idx;
+	size_t capacity;
+	size_t num;
+
+	uint64_t *array;
+};
 
 struct profiler_entry {
 	void *key;
 
 	/* Tick times for last N frames */
-	u64_array_t tick;
+	struct ucirclebuf tick;
 	/* Average of all render passes in a frame, for last N frames */
-	u64_array_t render_cpu;
-	u64_array_t render_gpu;
+	struct ucirclebuf render_cpu;
+	struct ucirclebuf render_gpu;
 	/* Sum of all render passes in a frame, for last N frames */
-	u64_array_t render_cpu_sum;
-	u64_array_t render_gpu_sum;
+	struct ucirclebuf render_cpu_sum;
+	struct ucirclebuf render_gpu_sum;
 	/* Timestamps of last N async frame submissions */
-	u64_array_t async_frame_ts;
-
-	uint16_t next_tick_idx;
-	uint16_t next_cpu_idx;
-	uint16_t next_cpu_sum_idx;
-	uint16_t next_gpu_idx;
-	uint16_t next_gpu_sum_idx;
-	uint16_t next_async_idx;
+	struct ucirclebuf async_frame_ts;
 
 	UT_hash_handle hh;
 };
@@ -108,6 +107,34 @@ static bool gpu_enabled = false;
 // These can get changed from other threads so mark them volatile
 static volatile bool enable_next = false;
 static volatile bool gpu_enable_next = false;
+
+void ucirclebuf_init(struct ucirclebuf *buf, size_t capacity)
+{
+	if (!capacity)
+		return;
+
+	memset(buf, 0, sizeof(struct ucirclebuf));
+	buf->capacity = capacity;
+	buf->array = bmalloc(sizeof(uint64_t) * capacity);
+}
+
+void ucirclebuf_free(struct ucirclebuf *buf)
+{
+	bfree(buf->array);
+	memset(buf, 0, sizeof(struct ucirclebuf));
+}
+
+void ucirclebuf_push(struct ucirclebuf *buf, uint64_t val)
+{
+	if (buf->num == buf->capacity) {
+		buf->idx = (buf->idx + 1) % buf->capacity;
+		buf->array[buf->idx] = val;
+		return;
+	}
+
+	buf->array[buf->idx++] = val;
+	buf->num++;
+}
 
 static struct frame_sample *frame_sample_create(void)
 {
@@ -150,23 +177,23 @@ static struct profiler_entry *entry_create(void *key)
 {
 	struct profiler_entry *ent = bzalloc(sizeof(struct profiler_entry));
 	ent->key = key;
-	da_reserve(ent->tick, profiler_samples);
-	da_reserve(ent->render_cpu, profiler_samples);
-	da_reserve(ent->render_gpu, profiler_samples);
-	da_reserve(ent->render_cpu_sum, profiler_samples);
-	da_reserve(ent->render_gpu_sum, profiler_samples);
-	da_reserve(ent->async_frame_ts, profiler_samples);
+	ucirclebuf_init(&ent->tick, profiler_samples);
+	ucirclebuf_init(&ent->render_cpu, profiler_samples);
+	ucirclebuf_init(&ent->render_gpu, profiler_samples);
+	ucirclebuf_init(&ent->render_cpu_sum, profiler_samples);
+	ucirclebuf_init(&ent->render_gpu_sum, profiler_samples);
+	ucirclebuf_init(&ent->async_frame_ts, profiler_samples);
 	return ent;
 }
 
 static void entry_destroy(struct profiler_entry *entry)
 {
-	da_free(entry->tick);
-	da_free(entry->render_cpu);
-	da_free(entry->render_gpu);
-	da_free(entry->render_cpu_sum);
-	da_free(entry->render_gpu_sum);
-	da_free(entry->async_frame_ts);
+	ucirclebuf_free(&entry->tick);
+	ucirclebuf_free(&entry->render_cpu);
+	ucirclebuf_free(&entry->render_gpu);
+	ucirclebuf_free(&entry->render_cpu_sum);
+	ucirclebuf_free(&entry->render_gpu_sum);
+	ucirclebuf_free(&entry->async_frame_ts);
 	bfree(entry);
 }
 
@@ -257,21 +284,6 @@ void source_profiler_frame_begin(void)
 	}
 }
 
-static inline void da_push_or_replace(u64_array_t *arr, const uint64_t *val,
-				      uint16_t *idx)
-{
-	if (arr->num < arr->capacity) {
-		da_push_back(*arr, val);
-		(*idx)++;
-		return;
-	}
-
-	// If the array is "full" start overwriting existing entries from 0
-	*idx %= arr->capacity;
-	arr->array[*idx] = *val;
-	(*idx)++;
-}
-
 static const char *source_profiler_frame_collect_name =
 	"source_profiler_frame_collect";
 void source_profiler_frame_collect(void)
@@ -325,7 +337,7 @@ void source_profiler_frame_collect(void)
 		}
 
 		/* Last tick time, only happens once per frame */
-		da_push_or_replace(&ent->tick, &smp->tick, &ent->next_tick_idx);
+		ucirclebuf_push(&ent->tick, smp->tick);
 
 		/* Calculate average single render + total time per frame */
 		if (smp->render_cpu.num) {
@@ -335,11 +347,9 @@ void source_profiler_frame_collect(void)
 				sum += smp->render_cpu.array[idx];
 			}
 
-			uint64_t avg = sum / smp->render_cpu.num;
-			da_push_or_replace(&ent->render_cpu, &avg,
-					   &ent->next_cpu_idx);
-			da_push_or_replace(&ent->render_cpu_sum, &sum,
-					   &ent->next_cpu_sum_idx);
+			ucirclebuf_push(&ent->render_cpu,
+					sum / smp->render_cpu.num);
+			ucirclebuf_push(&ent->render_cpu_sum, sum);
 		}
 
 		/* Same, but for GPU. Note that we still check this even if GPU
@@ -366,11 +376,8 @@ void source_profiler_frame_collect(void)
 			}
 
 			if (num) {
-				uint64_t avg = sum / num;
-				da_push_or_replace(&ent->render_gpu, &avg,
-						   &ent->next_gpu_idx);
-				da_push_or_replace(&ent->render_gpu_sum, &sum,
-						   &ent->next_gpu_sum_idx);
+				ucirclebuf_push(&ent->render_gpu, sum / num);
+				ucirclebuf_push(&ent->render_gpu_sum, sum);
 			}
 		}
 
@@ -413,7 +420,7 @@ void source_profiler_async_frame_received(obs_source_t *source)
 		HASH_ADD_PTR(hm_entries, key, ent);
 	}
 
-	da_push_or_replace(&ent->async_frame_ts, &ts, &ent->next_async_idx);
+	ucirclebuf_push(&ent->async_frame_ts, ts);
 
 	pthread_rwlock_unlock(&hm_rwlock);
 }
@@ -587,8 +594,7 @@ static inline void calculate_fps(struct profiler_entry *ent,
 		if (!ts)
 			break;
 
-		size_t prev_idx = idx ? idx - 1
-				      : ent->async_frame_ts.capacity - 1;
+		size_t prev_idx = idx ? idx - 1 : ent->async_frame_ts.num - 1;
 		const uint64_t prev_ts = ent->async_frame_ts.array[prev_idx];
 		if (!prev_ts || prev_ts > ts)
 			continue;
