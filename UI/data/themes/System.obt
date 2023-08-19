@@ -266,6 +266,7 @@ OBSBasic {
     qproperty-browserIcon: url(:res/images/sources/globe.svg);
     qproperty-groupIcon: url(:res/images/sources/group.svg);
     qproperty-sceneIcon: url(:res/images/sources/scene.svg);
+    qproperty-filterIcon: url(:/res/images/filter.svg);
     qproperty-defaultIcon: url(:res/images/sources/default.svg);
     qproperty-audioProcessOutputIcon: url(:res/images/sources/windowaudio.svg);
 }
