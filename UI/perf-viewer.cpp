@@ -32,6 +32,7 @@ OBSPerfViewer::OBSPerfViewer(QWidget *parent)
 
 	ui->treeView->setModel(m_proxy);
 	ui->treeView->setSortingEnabled(true);
+	ui->treeView->sortByColumn(PerfTreeModel::NAME, Qt::AscendingOrder);
 	ui->treeView->setAlternatingRowColors(true);
 
 	connect(ui->resetButton, &QAbstractButton::clicked, m_model,
@@ -455,7 +456,7 @@ QVariant PerfTreeItem::rawData(int column) const
 {
 	switch (column) {
 	case PerfTreeModel::NAME:
-		return m_source ? QString(obs_source_get_name(m_source)) : name;
+		return row(); // Used for sorting only
 	case PerfTreeModel::TICK:
 		return (qulonglong)m_perf->tick_max;
 	case PerfTreeModel::RENDER:
@@ -596,6 +597,8 @@ bool PerfViewerProxyModel::lessThan(const QModelIndex &left,
 		return leftData.toDouble() < rightData.toDouble();
 	if (leftData.userType() == QMetaType::ULongLong)
 		return leftData.toULongLong() < rightData.toULongLong();
+	if (leftData.userType() == QMetaType::Int)
+		return leftData.toInt() < rightData.toInt();
 	if (leftData.userType() == QMetaType::QString)
 		return QString::localeAwareCompare(leftData.toString(),
 						   rightData.toString()) < 0;
