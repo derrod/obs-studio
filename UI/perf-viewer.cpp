@@ -352,11 +352,11 @@ PerfTreeItem::PerfTreeItem(obs_source_t *source, PerfTreeItem *parent,
 }
 
 /* Fake item (e.g. to group private sources) */
-PerfTreeItem::PerfTreeItem(const QString &name, PerfTreeItem *parent,
-			   PerfTreeModel *model)
+PerfTreeItem::PerfTreeItem(QString name, PerfTreeItem *parent,
+                           PerfTreeModel *model)
 	: m_parentItem(parent),
 	  m_model(model),
-	  name(name)
+	  name(std::move(name))
 {
 	m_perf = nullptr;
 }
@@ -377,7 +377,7 @@ void PerfTreeItem::prependChild(PerfTreeItem *item)
 	m_childItems.prepend(item);
 }
 
-PerfTreeItem *PerfTreeItem::child(int row)
+PerfTreeItem *PerfTreeItem::child(int row) const
 {
 	if (row < 0 || row >= m_childItems.size())
 		return nullptr;
