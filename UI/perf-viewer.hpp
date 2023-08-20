@@ -99,15 +99,14 @@ public:
 	explicit PerfTreeItem(obs_source_t *source,
 			      PerfTreeItem *parentItem = nullptr,
 			      PerfTreeModel *model = nullptr);
-	explicit PerfTreeItem(const QString &name,
-			      PerfTreeItem *parentItem = nullptr,
+	explicit PerfTreeItem(QString name, PerfTreeItem *parentItem = nullptr,
 			      PerfTreeModel *model = nullptr);
 	~PerfTreeItem();
 
-	void appendChild(PerfTreeItem *child);
-	void prependChild(PerfTreeItem *child);
+	void appendChild(PerfTreeItem *item);
+	void prependChild(PerfTreeItem *item);
 
-	PerfTreeItem *child(int row);
+	PerfTreeItem *child(int row) const;
 	int childCount() const;
 	int columnCount() const;
 	QVariant data(int column) const;
@@ -132,7 +131,7 @@ private:
 	profiler_result_t *m_perf = nullptr;
 	OBSSource m_source;
 	QString name;
-	bool rendered;
+	bool rendered = false;
 };
 
 class PerfViewerProxyModel : public QSortFilterProxyModel {
