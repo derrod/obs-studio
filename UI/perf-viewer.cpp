@@ -34,6 +34,7 @@ OBSPerfViewer::OBSPerfViewer(QWidget *parent)
 	ui->treeView->setSortingEnabled(true);
 	ui->treeView->sortByColumn(PerfTreeModel::NAME, Qt::AscendingOrder);
 	ui->treeView->setAlternatingRowColors(true);
+	ui->treeView->setAnimated(true);
 
 	connect(ui->resetButton, &QAbstractButton::clicked, m_model,
 		&PerfTreeModel::refreshSources);
@@ -353,7 +354,7 @@ PerfTreeItem::PerfTreeItem(obs_source_t *source, PerfTreeItem *parent,
 
 /* Fake item (e.g. to group private sources) */
 PerfTreeItem::PerfTreeItem(QString name, PerfTreeItem *parent,
-                           PerfTreeModel *model)
+			   PerfTreeModel *model)
 	: m_parentItem(parent),
 	  m_model(model),
 	  name(std::move(name))
@@ -477,6 +478,16 @@ QVariant PerfTreeItem::data(int column) const
 
 QVariant PerfTreeItem::rawData(int column) const
 {
+	if (!name.isEmpty()) {
+		if (column == 0)
+			return name;
+		return {};
+	}
+
+	// Root item has no data or if perf is null we can't return anything
+	if (!m_source || !m_perf)
+		return {};
+
 	switch (column) {
 	case PerfTreeModel::NAME:
 		return m_source ? QString(obs_source_get_name(m_source)) : name;
