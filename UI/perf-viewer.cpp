@@ -477,6 +477,16 @@ QVariant PerfTreeItem::data(int column) const
 
 QVariant PerfTreeItem::rawData(int column) const
 {
+	if (!name.isEmpty()) {
+		if (column == 0)
+			return name;
+		return {};
+	}
+
+	// Root item has no data or if perf is null we can't return anything
+	if (!m_source || !m_perf)
+		return {};
+
 	switch (column) {
 	case PerfTreeModel::NAME:
 		return m_source ? QString(obs_source_get_name(m_source)) : name;
