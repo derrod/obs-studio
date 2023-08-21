@@ -59,9 +59,9 @@ static bool load_ingests(const char *json, bool write_file)
 	for (size_t i = 0; i < count; i++) {
 		json_t *item = json_array_get(ingests, i);
 		json_t *item_name = json_object_get(item, "name");
-		json_t *item_url = json_object_get(item, "url_template_secure");
-		if (!item_url || !rtmps_available)
-			item_url = json_object_get(item, "url_template");
+		json_t *item_url = json_object_get(item, "url_template");
+		json_t *item_url_secure =
+			json_object_get(item, "url_template_secure");
 
 		struct ingest ingest = {0};
 		struct dstr url = {0};
@@ -85,6 +85,25 @@ static bool load_ingests(const char *json, bool write_file)
 		ingest.url = url.array;
 
 		da_push_back(cur_ingests, &ingest);
+
+		if (rtmps_available && item_url_secure) {
+			struct ingest ingest_secure = {0};
+			struct dstr url_secure = {0};
+			struct dstr name_secure = {0};
+
+			const char *url_secure_str =
+				json_string_value(item_url_secure);
+			dstr_copy(&url_secure, url_secure_str);
+			dstr_replace(&url_secure, "/{stream_key}", "");
+
+			dstr_copy(&name_secure, name_str);
+			dstr_cat(&name_secure, " (RTMPS)");
+
+			ingest_secure.name = name_secure.array;
+			ingest_secure.url = url_secure.array;
+
+			da_push_back(cur_ingests, &ingest_secure);
+		}
 	}
 
 	if (!cur_ingests.num)
