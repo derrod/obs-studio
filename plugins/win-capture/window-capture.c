@@ -2,7 +2,9 @@
 #include <util/dstr.h>
 #include <util/threading.h>
 #include <util/windows/window-helpers.h>
+
 #include "dc-capture.h"
+#include "audio-helpers.h"
 #include "compat-helpers.h"
 #ifdef OBS_LEGACY
 #include "../../libobs/util/platform.h"
@@ -80,6 +82,7 @@ typedef DPI_AWARENESS_CONTEXT(WINAPI *PFN_GetWindowDpiAwarenessContext)(HWND);
 
 struct window_capture {
 	obs_source_t *source;
+	obs_source_t *audio_source;
 
 	pthread_mutex_t update_mutex;
 
@@ -93,6 +96,7 @@ struct window_capture {
 	bool client_area;
 	bool force_sdr;
 	bool hooked;
+	bool capture_audio;
 
 	struct dc_capture capture;
 
@@ -217,9 +221,13 @@ static void update_settings(struct window_capture *wc, obs_data_t *s)
 	wc->method = choose_method(method, wgc_supported, wc->class);
 	wc->priority = (enum window_priority)priority;
 	wc->cursor = obs_data_get_bool(s, "cursor");
+	wc->capture_audio = obs_data_get_bool(s, "capture_audio");
 	wc->force_sdr = obs_data_get_bool(s, "force_sdr");
 	wc->compatibility = obs_data_get_bool(s, "compatibility");
 	wc->client_area = obs_data_get_bool(s, "client_area");
+
+	setup_audio_source(wc->source, &wc->audio_source, s, window,
+			   wc->capture_audio, wc->priority);
 
 	pthread_mutex_unlock(&wc->update_mutex);
 }
@@ -351,6 +359,9 @@ static void *wc_create(obs_data_t *settings, obs_source_t *source)
 		"void get_hooked(out bool hooked, out string title, out string class, out string executable)",
 		wc_get_hooked, wc);
 
+	signal_handler_connect(sh, "rename", rename_audio_source,
+			       &wc->audio_source);
+
 	update_settings(wc, settings);
 	log_settings(wc, settings);
 	return wc;
@@ -382,7 +393,16 @@ static void wc_actual_destroy(void *data)
 
 static void wc_destroy(void *data)
 {
-	obs_queue_task(OBS_TASK_GRAPHICS, wc_actual_destroy, data, false);
+	struct window_capture *wc = data;
+	if (wc->audio_source) {
+		obs_source_remove_active_child(wc->source, wc->audio_source);
+		obs_source_release(wc->audio_source);
+	}
+	signal_handler_t *sh = obs_source_get_signal_handler(wc->source);
+	signal_handler_disconnect(sh, "rename", rename_audio_source,
+				  &wc->audio_source);
+
+	obs_queue_task(OBS_TASK_GRAPHICS, wc_actual_destroy, wc, false);
 }
 
 static void force_reset(struct window_capture *wc)
@@ -558,6 +578,12 @@ static obs_properties_t *wc_properties(void *data)
 	p = obs_properties_add_text(ppts, "compat_info", NULL, OBS_TEXT_INFO);
 	obs_property_set_enabled(p, false);
 
+	if (audio_capture_available()) {
+		p = obs_properties_add_bool(ppts, SETTING_CAPTURE_AUDIO,
+					    TEXT_CAPTURE_AUDIO);
+		obs_property_set_long_description(p, TEXT_CAPTURE_AUDIO_TT);
+	}
+
 	obs_properties_add_bool(ppts, "cursor", TEXT_CAPTURE_CURSOR);
 
 	obs_properties_add_bool(ppts, "compatibility", TEXT_COMPATIBILITY);
@@ -648,6 +674,9 @@ static void wc_tick(void *data, float seconds)
 				dc_capture_free(&wc->capture);
 			return;
 		}
+
+		if (wc->audio_source)
+			reconfigure_audio_source(wc->audio_source, wc->window);
 
 		wc->previously_failed = false;
 		reset_capture = true;
@@ -866,22 +895,57 @@ wc_get_color_space(void *data, size_t count,
 	return space;
 }
 
+static void wc_save(void *data, obs_data_t *settings)
+{
+	struct window_capture *wc = data;
+	if (!wc->audio_source)
+		return;
+
+	obs_data_t *audio_data = obs_save_source(wc->audio_source);
+	obs_data_set_obj(settings, "audio_data", audio_data);
+	obs_data_release(audio_data);
+}
+
+static void wc_child_enum(void *data, obs_source_enum_proc_t cb, void *param)
+{
+	struct window_capture *wc = data;
+	if (wc->audio_source)
+		cb(wc->source, wc->audio_source, param);
+}
+
+static bool wc_audio_render(void *data, uint64_t *ts_out,
+			    struct obs_source_audio_mix *output,
+			    uint32_t mixers, size_t channels,
+			    size_t sample_rate)
+{
+	struct window_capture *wc = data;
+	if (!wc->audio_source)
+		return false;
+
+	UNUSED_PARAMETER(sample_rate);
+	return render_child_audio(wc->audio_source, ts_out, output, mixers,
+				  channels);
+}
+
 struct obs_source_info window_capture_info = {
 	.id = "window_capture",
 	.type = OBS_SOURCE_TYPE_INPUT,
 	.output_flags = OBS_SOURCE_VIDEO | OBS_SOURCE_CUSTOM_DRAW |
-			OBS_SOURCE_SRGB,
+			OBS_SOURCE_SRGB | OBS_SOURCE_COMPOSITE,
 	.get_name = wc_getname,
 	.create = wc_create,
 	.destroy = wc_destroy,
 	.update = wc_update,
+	.save = wc_save,
 	.video_render = wc_render,
+	.audio_render = wc_audio_render,
 	.hide = wc_hide,
 	.video_tick = wc_tick,
 	.get_width = wc_width,
 	.get_height = wc_height,
 	.get_defaults = wc_defaults,
 	.get_properties = wc_properties,
+	.enum_active_sources = wc_child_enum,
 	.icon_type = OBS_ICON_TYPE_WINDOW_CAPTURE,
 	.video_get_color_space = wc_get_color_space,
 };
