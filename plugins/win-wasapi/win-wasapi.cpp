@@ -1766,3 +1766,21 @@ void RegisterWASAPIProcessOutput()
 	info.icon_type = OBS_ICON_TYPE_PROCESS_AUDIO_OUTPUT;
 	obs_register_source(&info);
 }
+
+void RegisterWASAPIHiddenProcessOutput()
+{
+	obs_source_info info = {};
+	info.id = "wasapi_process_output_capture_internal";
+	info.type = OBS_SOURCE_TYPE_INPUT;
+	info.output_flags = OBS_SOURCE_AUDIO | OBS_SOURCE_DO_NOT_DUPLICATE |
+			    OBS_SOURCE_DO_NOT_SELF_MONITOR |
+			    OBS_SOURCE_CAP_DISABLED;
+	info.get_name = GetWASAPIProcessOutputName;
+	info.create = CreateWASAPIProcessOutput;
+	info.destroy = DestroyWASAPISource;
+	info.update = UpdateWASAPISource;
+	info.activate = ActivateWASAPISource;
+	info.deactivate = DeactivateWASAPISource;
+	info.icon_type = OBS_ICON_TYPE_PROCESS_AUDIO_OUTPUT;
+	obs_register_source(&info);
+}
