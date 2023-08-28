@@ -30,9 +30,9 @@ void setup_audio_source(obs_source_t *parent, obs_source_t **child,
 
 				obs_data_release(audio_data);
 			} else {
-				*child = obs_source_create(
-					"wasapi_process_output_capture",
-					name.array, NULL, NULL);
+				*child = obs_source_create(AUDIO_SOURCE_TYPE,
+							   name.array, NULL,
+							   NULL);
 			}
 
 			// Make sure source is active and hidden (i.e. not automatically saved)
