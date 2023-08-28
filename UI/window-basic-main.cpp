@@ -3807,7 +3807,8 @@ void OBSBasic::VolControlContextMenu()
 	popup.addSeparator();
 	popup.addAction(&unhideAllAction);
 	popup.addAction(&hideAction);
-	popup.addAction(&mixerRenameAction);
+	if (!obs_source_is_hidden(vol->GetSource()))
+		popup.addAction(&mixerRenameAction);
 	popup.addSeparator();
 	popup.addAction(&copyFiltersAction);
 	popup.addAction(&pasteFiltersAction);
