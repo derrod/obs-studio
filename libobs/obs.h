@@ -1385,6 +1385,8 @@ EXPORT obs_data_array_t *obs_source_backup_filters(obs_source_t *source);
 EXPORT void obs_source_restore_filters(obs_source_t *source,
 				       obs_data_array_t *array);
 
+EXPORT bool obs_source_reroute_audio(obs_source_t *dst, obs_source_t *src);
+
 /* ------------------------------------------------------------------------- */
 /* Functions used by sources */
 

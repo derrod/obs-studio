@@ -772,6 +772,8 @@ struct obs_source {
 	int64_t sync_offset;
 	int64_t last_sync_offset;
 	float balance;
+	obs_source_t *reroute_target;
+	obs_source_t *reroute_source;
 
 	/* async video data */
 	gs_texture_t *async_textures[MAX_AV_PLANES];

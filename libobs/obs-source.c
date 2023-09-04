@@ -666,6 +666,11 @@ void obs_source_destroy(struct obs_source *source)
 	while (source->filters.num)
 		obs_source_filter_remove(source, source->filters.array[0]);
 
+	if (source->reroute_source)
+		obs_source_reroute_audio(source, NULL);
+	else if (source->reroute_target)
+		obs_source_reroute_audio(source->reroute_target, NULL);
+
 	obs_context_data_remove_uuid(&source->context, &obs->data.sources);
 	if (!source->context.private)
 		obs_context_data_remove_name(&source->context,
@@ -4161,6 +4166,16 @@ void obs_source_output_audio(obs_source_t *source,
 		return;
 	if (!obs_ptr_valid(audio_in, "obs_source_output_audio"))
 		return;
+	/* Drop audio if source is reroute target */
+	if (source->reroute_source)
+		return;
+
+	if (source->reroute_target) {
+		if (destroying(source->reroute_target))
+			return;
+
+		source = source->reroute_target;
+	}
 
 	/* sets unused data pointers to NULL automatically because apparently
 	 * some filter plugins aren't checking the actual channel count, and
@@ -4190,6 +4205,33 @@ void obs_source_output_audio(obs_source_t *source,
 	}
 
 	pthread_mutex_unlock(&source->filter_mutex);
+}
+
+bool obs_source_reroute_audio(obs_source_t *dst, obs_source_t *src)
+{
+	if (!obs_source_valid(dst, "obs_source_reroute_audio"))
+		return false;
+	if (src == dst)
+		return false;
+	if ((src && !is_audio_source(src)) || !is_audio_source(dst))
+		return false;
+	/* Rerouting does not work if src or dst use custom audio rendering */
+	if (dst->info.audio_render || (src && src->info.audio_render))
+		return false;
+	/* Do not allow chaining of rerouted sources */
+	if (dst->reroute_target || (src && src->reroute_source))
+		return false;
+	/* Remove existing rerouting from dst and src */
+	if (dst->reroute_source)
+		dst->reroute_source->reroute_target = NULL;
+	if (src && src->reroute_target)
+		obs_source_reroute_audio(src->reroute_target, NULL);
+
+	dst->reroute_source = src;
+	if (src)
+		src->reroute_target = dst;
+
+	return true;
 }
 
 void remove_async_frame(obs_source_t *source, struct obs_source_frame *frame)
