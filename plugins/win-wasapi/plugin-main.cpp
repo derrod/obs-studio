@@ -12,6 +12,7 @@ MODULE_EXPORT const char *obs_module_description(void)
 void RegisterWASAPIInput();
 void RegisterWASAPIDeviceOutput();
 void RegisterWASAPIProcessOutput();
+void RegisterWASAPIProcessOutputInternal();
 
 bool obs_module_load(void)
 {
@@ -28,7 +29,9 @@ bool obs_module_load(void)
 
 	RegisterWASAPIInput();
 	RegisterWASAPIDeviceOutput();
-	if (process_filter_supported)
+	if (process_filter_supported) {
 		RegisterWASAPIProcessOutput();
+		RegisterWASAPIProcessOutputInternal();
+	}
 	return true;
 }
