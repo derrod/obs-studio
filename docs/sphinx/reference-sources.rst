@@ -1494,6 +1494,22 @@ General Source Functions
 
 ---------------------
 
+.. function:: bool obs_source_reroute_audio(obs_source_t *dst, obs_source_t *src)
+
+   :return: *true* if rerouting the source audio was successful.
+
+   Reroutes source audio output from `src` to `dst`.
+   
+   Any existing rerouting for `src` and `dst` will be overwritten.
+   Rerouting is reset if `src` is `NULL`. 
+   
+   Notes:
+   
+   - Rerouting is one-to-one, i.e. sources may only have exactly one source *or* destination
+   - Not compatible with source types that implement :c:member:`obs_source_info.audio_render` (e.g. scenes, groups, transitions)
+
+---------------------
+
 
 Functions used by sources
 -------------------------
