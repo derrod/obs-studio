@@ -311,7 +311,21 @@ std::shared_ptr<Auth> YoutubeAuth::Login(QWidget *owner,
 	QScopedPointer<QThread> thread(CreateQThread(open_external_browser));
 	thread->start();
 
+#if defined(__APPLE__) && QT_VERSION >= QT_VERSION_CHECK(6, 6, 0)
+	/* We can't show clickable links with the native NSAlert, so let's
+	 * force the old non-native dialog instead. */
+	dlg.setOption(QMessageBox::Option::DontUseNativeDialog);
 	dlg.exec();
+#elif defined(__APPLE__) && QT_VERSION >= QT_VERSION_CHECK(6, 5, 0)
+	/* Qt 6.5 does not have the option to not use native message boxes,
+	 * but we can use this hack to temporarily disable them. */
+	qApp->setAttribute(Qt::AA_DontUseNativeDialogs, true);
+	dlg.exec();
+	qApp->setAttribute(Qt::AA_DontUseNativeDialogs, false);
+#else
+	dlg.exec();
+#endif
+
 	if (dlg.result() == QMessageBox::Cancel ||
 	    dlg.result() == QDialog::Rejected)
 		return nullptr;
