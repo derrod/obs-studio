@@ -127,8 +127,8 @@ void ucirclebuf_free(struct ucirclebuf *buf)
 void ucirclebuf_push(struct ucirclebuf *buf, uint64_t val)
 {
 	if (buf->num == buf->capacity) {
-		buf->idx = (buf->idx + 1) % buf->capacity;
-		buf->array[buf->idx] = val;
+		buf->idx %= buf->capacity;
+		buf->array[buf->idx++] = val;
 		return;
 	}
 
