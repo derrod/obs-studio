@@ -91,7 +91,7 @@ PerfTreeModel::PerfTreeModel(QObject *parent) : QAbstractItemModel(parent)
 #ifndef __APPLE__
 		QTStr("PerfViewer.RenderGPU"),
 #endif
-		QTStr("PerfViewer.FPS"),
+		QTStr("PerfViewer.FPS"),       QTStr("PerfViewer.RenderedFPS"),
 	};
 
 	updater.reset(CreateQThread([this] {
@@ -439,7 +439,25 @@ static QString GetSourceFPS(profiler_result_t *perf, obs_source_t *source)
 	if (obs_source_get_type(source) != OBS_SOURCE_TYPE_FILTER &&
 	    (obs_source_get_output_flags(source) & OBS_SOURCE_ASYNC_VIDEO) ==
 		    OBS_SOURCE_ASYNC_VIDEO) {
-		return QString::asprintf("%.02f", perf->async_fps);
+		return QString::asprintf("%.02f (%.02f ms / %.02f ms)",
+					 perf->async_input,
+					 ns_to_ms(perf->async_input_best),
+					 ns_to_ms(perf->async_input_worst));
+	} else {
+		return QTStr("PerfViewer.NA");
+	}
+}
+
+static QString GetSourceRenderedFPS(profiler_result_t *perf,
+				    obs_source_t *source)
+{
+	if (obs_source_get_type(source) != OBS_SOURCE_TYPE_FILTER &&
+	    (obs_source_get_output_flags(source) & OBS_SOURCE_ASYNC_VIDEO) ==
+		    OBS_SOURCE_ASYNC_VIDEO) {
+		return QString::asprintf("%.02f (%.02f ms / %.02f ms)",
+					 perf->async_rendered,
+					 ns_to_ms(perf->async_rendered_best),
+					 ns_to_ms(perf->async_rendered_worst));
 	} else {
 		return QTStr("PerfViewer.NA");
 	}
@@ -471,6 +489,8 @@ QVariant PerfTreeItem::data(int column) const
 #endif
 	case PerfTreeModel::FPS:
 		return GetSourceFPS(m_perf, m_source);
+	case PerfTreeModel::FPS_RENDERED:
+		return GetSourceRenderedFPS(m_perf, m_source);
 	default:
 		return {};
 	}
@@ -500,7 +520,9 @@ QVariant PerfTreeItem::rawData(int column) const
 		return (qulonglong)m_perf->render_gpu_max;
 #endif
 	case PerfTreeModel::FPS:
-		return m_perf->async_fps;
+		return m_perf->async_input;
+	case PerfTreeModel::FPS_RENDERED:
+		return m_perf->async_rendered;
 	default:
 		return {};
 	}
