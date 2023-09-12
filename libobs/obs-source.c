@@ -2534,6 +2534,7 @@ static void obs_source_update_async_video(obs_source_t *source)
 				source->async_update_texture = false;
 			}
 
+			source->async_last_rendered_ts = frame->timestamp;
 			obs_source_release_frame(source, frame);
 		}
 	}
@@ -6224,4 +6225,9 @@ void obs_source_restore_filters(obs_source_t *source, obs_data_array_t *array)
 	}
 
 	da_free(cur_filters);
+}
+
+uint64_t obs_source_get_last_async_ts(const obs_source_t *source)
+{
+	return source->async_last_rendered_ts;
 }

@@ -83,6 +83,8 @@ struct profiler_entry {
 	struct ucirclebuf render_gpu_sum;
 	/* Timestamps of last N async frame submissions */
 	struct ucirclebuf async_frame_ts;
+	/* Timestamps of last N async frames rendered */
+	struct ucirclebuf async_rendered_ts;
 
 	UT_hash_handle hh;
 };
@@ -187,6 +189,7 @@ static struct profiler_entry *entry_create(void *key)
 	ucirclebuf_init(&ent->render_cpu_sum, profiler_samples);
 	ucirclebuf_init(&ent->render_gpu_sum, profiler_samples);
 	ucirclebuf_init(&ent->async_frame_ts, profiler_samples);
+	ucirclebuf_init(&ent->async_rendered_ts, profiler_samples);
 	return ent;
 }
 
@@ -198,6 +201,7 @@ static void entry_destroy(struct profiler_entry *entry)
 	ucirclebuf_free(&entry->render_cpu_sum);
 	ucirclebuf_free(&entry->render_gpu_sum);
 	ucirclebuf_free(&entry->async_frame_ts);
+	ucirclebuf_free(&entry->async_rendered_ts);
 	bfree(entry);
 }
 
@@ -288,6 +292,12 @@ void source_profiler_frame_begin(void)
 		/* Advance timer idx if gpu enabled */
 		timer_idx = (timer_idx + 1) % FRAME_BUFFER_SIZE;
 	}
+}
+
+static inline bool is_async_video_source(const struct obs_source *source)
+{
+	return (source->info.output_flags & OBS_SOURCE_ASYNC_VIDEO) ==
+	       OBS_SOURCE_ASYNC_VIDEO;
 }
 
 static const char *source_profiler_frame_collect_name =
@@ -389,6 +399,13 @@ void source_profiler_frame_collect(void)
 
 		da_clear(smp->render_cpu);
 		da_clear(smp->render_timers);
+
+		/* Store last rendered async TS */
+		const obs_source_t *src = *(const obs_source_t **)smps->hh.key;
+		if (is_async_video_source(src)) {
+			uint64_t ts = obs_source_get_last_async_ts(src);
+			ucirclebuf_push(&ent->async_rendered_ts, ts);
+		}
 
 		smps = smps->hh.next;
 	}
@@ -526,12 +543,6 @@ void source_profiler_remove_source(obs_source_t *source)
 	obs_queue_task(OBS_TASK_GRAPHICS, task_delete_source, source, false);
 }
 
-static inline bool is_async_video_source(const struct obs_source *source)
-{
-	return (source->info.output_flags & OBS_SOURCE_ASYNC_VIDEO) ==
-	       OBS_SOURCE_ASYNC_VIDEO;
-}
-
 static inline void calculate_tick(struct profiler_entry *ent,
 				  struct profiler_result *result)
 {
@@ -590,29 +601,38 @@ static inline void calculate_render(struct profiler_entry *ent,
 	}
 }
 
-static inline void calculate_fps(struct profiler_entry *ent,
-				 struct profiler_result *result)
+static inline void calculate_fps(const struct ucirclebuf *frames, double *avg,
+				 uint64_t *best, uint64_t *worst)
 {
-	uint64_t deltas = 0, delta_sum = 0;
+	uint64_t deltas = 0, delta_sum = 0, best_delta = 0, worst_delta = 0;
 
-	for (size_t idx = 0; idx < ent->async_frame_ts.num; idx++) {
-		const uint64_t ts = ent->async_frame_ts.array[idx];
+	for (size_t idx = 0; idx < frames->num; idx++) {
+		const uint64_t ts = frames->array[idx];
 		if (!ts)
 			break;
 
-		size_t prev_idx = idx ? idx - 1 : ent->async_frame_ts.num - 1;
-		const uint64_t prev_ts = ent->async_frame_ts.array[prev_idx];
-		if (!prev_ts || prev_ts > ts)
+		size_t prev_idx = idx ? idx - 1 : frames->num - 1;
+		const uint64_t prev_ts = frames->array[prev_idx];
+		if (!prev_ts || prev_ts >= ts)
 			continue;
 
-		delta_sum += (ts - prev_ts);
+		uint64_t delta = (ts - prev_ts);
+		if (delta < best_delta || !best_delta)
+			best_delta = delta;
+		if (delta > worst_delta)
+			worst_delta = delta;
+
+		delta_sum += delta;
 		deltas++;
 	}
 
-	if (deltas && delta_sum) {
-		result->async_fps =
-			1.0E9 / ((double)delta_sum / (double)deltas);
-	}
+	/* Avoid division by zero... */
+	if (deltas && delta_sum)
+		*avg = 1.0E9 / ((double)delta_sum / (double)deltas);
+	if (best_delta)
+		*best = best_delta;
+	if (worst_delta)
+		*worst = worst_delta;
 }
 
 bool source_profiler_fill_result(obs_source_t *source,
@@ -636,8 +656,16 @@ bool source_profiler_fill_result(obs_source_t *source,
 		calculate_tick(ent, result);
 		calculate_render(ent, result);
 
-		if (is_async_video_source(source))
-			calculate_fps(ent, result);
+		if (is_async_video_source(source)) {
+			calculate_fps(&ent->async_frame_ts,
+				      &result->async_input,
+				      &result->async_input_best,
+				      &result->async_input_worst);
+			calculate_fps(&ent->async_rendered_ts,
+				      &result->async_rendered,
+				      &result->async_rendered_best,
+				      &result->async_rendered_worst);
+		}
 	}
 
 	pthread_rwlock_unlock(&hm_rwlock);

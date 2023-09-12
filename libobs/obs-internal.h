@@ -803,6 +803,7 @@ struct obs_source {
 	uint32_t async_cache_height;
 	uint32_t async_convert_width[MAX_AV_PLANES];
 	uint32_t async_convert_height[MAX_AV_PLANES];
+	uint64_t async_last_rendered_ts;
 
 	pthread_mutex_t caption_cb_mutex;
 	DARRAY(struct caption_cb_info) caption_cb_list;
@@ -997,6 +998,7 @@ extern void obs_source_deactivate(obs_source_t *source, enum view_type type);
 extern void obs_source_video_tick(obs_source_t *source, float seconds);
 extern float obs_source_get_target_volume(obs_source_t *source,
 					  obs_source_t *target);
+extern uint64_t obs_source_get_last_async_ts(const obs_source_t *source);
 
 extern void obs_source_audio_render(obs_source_t *source, uint32_t mixers,
 				    size_t channels, size_t sample_rate,

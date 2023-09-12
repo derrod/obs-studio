@@ -39,7 +39,16 @@ typedef struct profiler_result {
 	uint64_t render_sum;
 	uint64_t render_gpu_sum;
 
-	double async_fps;
+	/* FPS of submitted async input */
+	double async_input;
+	/* Actually rendered async frames */
+	double async_rendered;
+
+	/* Best and worst frame times of input/output in ns */
+	uint64_t async_input_best;
+	uint64_t async_input_worst;
+	uint64_t async_rendered_best;
+	uint64_t async_rendered_worst;
 } profiler_result_t;
 
 /* Enable/disable profiler (applied on next frame) */
