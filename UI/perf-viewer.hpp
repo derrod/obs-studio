@@ -69,6 +69,7 @@ public:
 		RENDER_GPU,
 #endif
 		FPS,
+		FPS_RENDERED,
 		NUM_COLUMNS
 	};
 
