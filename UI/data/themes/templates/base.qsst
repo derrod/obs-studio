@@ -154,7 +154,7 @@ QMenu::item:selected:hover,
 QListWidget::item:selected:hover,
 SceneTree::item:selected:hover,
 SourceTree::item:selected:hover {
-    background-color: rgb(54,92,192);
+    background-color: ${color_hover_items};
     color: palette(text);
 }
 
@@ -253,7 +253,7 @@ QDockWidget::close-button, QDockWidget::float-button {
 }
 
 QDockWidget::close-button:hover, QDockWidget::float-button:hover {
-    background: rgb(79,83,94);
+    background: ${color_hover_primary};
     opacity: 1;
 }
 
@@ -350,8 +350,8 @@ QScrollBar::handle {
 }
 
 QScrollBar::handle:hover {
-    background-color: rgb(79,83,94);
-    border-color: rgb(79,83,94);
+    background-color: ${color_hover_primary};
+    border-color: ${color_hover_primary};
 }
 
 QScrollBar::handle:pressed {
@@ -411,7 +411,7 @@ QToolButton:last-child {
 }
 
 QToolButton:hover {
-    background-color: rgb(79,83,94);
+    background-color: ${color_hover_primary};
 }
 
 QToolButton:pressed {
@@ -520,7 +520,7 @@ QTabBar::tab:pressed {
 }
 
 QTabBar::tab:hover {
-    background: rgb(79,83,94);
+    background: ${color_hover_primary};
     color: palette(text);
 }
 
@@ -560,7 +560,7 @@ QComboBox:hover,
 QComboBox:selected,
 QDateTimeEdit:hover,
 QDateTimeEdit:selected {
-    background-color: rgb(79,83,94);
+    background-color: ${color_hover_primary};
 }
 
 QComboBox::drop-down,
@@ -667,7 +667,7 @@ QSpinBox::down-button, QDoubleSpinBox::down-button {
 }
 
 QSpinBox::up-button:hover, QSpinBox::down-button:hover, QDoubleSpinBox::up-button:hover, QDoubleSpinBox::down-button:hover {
-    background-color: rgb(79,83,94);
+    background-color: ${color_hover_primary};
 }
 
 QSpinBox::up-button:pressed, QSpinBox::down-button:pressed, QDoubleSpinBox::up-button:pressed, QDoubleSpinBox::down-button:pressed {
@@ -724,7 +724,7 @@ QPushButton[themeID="replayBufferButton"]:!pressed:checked,
 QPushButton[themeID="vcamButton"]:!pressed:checked,
 #modeSwitch:hover:!pressed:checked,
 #broadcastButton:hover:!pressed:checked {
-    background: rgb(54,92,192);
+    background: ${color_hover_items};
     color: palette(text);
 }
 
@@ -749,7 +749,7 @@ QPushButton:checked {
 }
 
 QPushButton:hover {
-    background-color: rgb(79,83,94);
+    background-color: ${color_hover_primary};
 }
 
 QPushButton:pressed {
@@ -850,7 +850,7 @@ QSlider::handle:disabled {
 }
 
 #stackedMixerArea QPushButton:hover {
-    background-color: rgb(79,83,94);
+    background-color: ${color_hover_primary};
 }
 
 #stackedMixerArea QPushButton:pressed {
@@ -1272,11 +1272,11 @@ SceneTree {
 }
 
 *[gridMode="true"] SceneTree::item:hover {
-    background-color: rgb(79,83,94);
+    background-color: ${color_hover_primary};
 }
 
 *[gridMode="true"] SceneTree::item:selected:hover {
-    background-color: rgb(54,92,192);
+    background-color: ${color_hover_items};
 }
 
 /* Save icon */
@@ -1349,7 +1349,7 @@ OBSYoutubeActions {
 }
 
 #ytEventList QLabel:hover {
-    background-color: rgb(79,83,94);
+    background-color: ${color_hover_primary};
 }
 
 #ytEventList QLabel[isSelectedEvent=true] {
@@ -1358,7 +1358,7 @@ OBSYoutubeActions {
 }
 
 #ytEventList QLabel[isSelectedEvent=true]:hover {
-    background-color: rgb(54,92,192);
+    background-color: ${color_hover_items};
     color: palette(text);
 }
 
@@ -1409,7 +1409,7 @@ QCalendarWidget #qt_calendar_nextmonth {
 }
 
 QCalendarWidget QToolButton:hover {
-    background-color: rgb(79,83,94);
+    background-color: ${color_hover_primary};
     border-radius: 4px;
 }
 

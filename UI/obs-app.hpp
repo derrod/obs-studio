@@ -121,8 +121,10 @@ private:
 	inline void ResetHotkeyState(bool inFocus);
 
 	QPalette defaultPalette;
+	QPalette themePalette;
 
 	void ParseExtraThemeData(const char *path);
+	void ParseUserPalette();
 	static OBSThemeMeta *ParseThemeMeta(const char *path);
 	static std::unordered_map<std::string, std::string>
 	ParseThemeConfiguration(const char *themeData);
@@ -163,6 +165,12 @@ public:
 	std::string SetParentTheme(std::string name);
 	bool SetTheme(std::string name, std::string path = "");
 	inline bool IsThemeDark() const { return themeDarkMode; };
+	QPalette GetThemePalette() const { return themePalette; }
+	void setCustomPalette(const QPalette &palette)
+	{
+		setPalette(palette);
+		emit StyleChanged();
+	}
 
 	void SetBranchData(const std::string &data);
 	std::vector<UpdateBranch> GetBranches();

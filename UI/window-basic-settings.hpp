@@ -101,6 +101,7 @@ private:
 	bool videoChanged = false;
 	bool hotkeysChanged = false;
 	bool a11yChanged = false;
+	bool appearanceChanged = false;
 	bool advancedChanged = false;
 	int pageIndex = 0;
 	bool loading = true;
@@ -203,6 +204,7 @@ private:
 		hotkeysChanged = false;
 		a11yChanged = false;
 		advancedChanged = false;
+		appearanceChanged = false;
 		EnableApplyButton(false);
 	}
 
@@ -236,6 +238,7 @@ private:
 	void
 	LoadHotkeySettings(obs_hotkey_id ignoreKey = OBS_INVALID_HOTKEY_ID);
 	void LoadA11ySettings(bool presetChange = false);
+	void LoadAppearanceSettings();
 	void LoadAdvancedSettings();
 	void LoadSettings(bool changedOnly);
 
@@ -269,6 +272,9 @@ private:
 	void UpdateServiceRecommendations();
 	void UpdateMoreInfoLink();
 	void UpdateAdvNetworkGroup();
+
+	/* Appearance */
+	void InitAppearancePage();
 
 private slots:
 	void RecreateOutputResolutionWidget();
@@ -334,6 +340,7 @@ private:
 	void SaveVideoSettings();
 	void SaveHotkeySettings();
 	void SaveA11ySettings();
+	void SaveAppearanceSettings();
 	void SaveAdvancedSettings();
 	void SaveSettings();
 
@@ -436,6 +443,7 @@ private slots:
 	bool ScanDuplicateHotkeys(QFormLayout *layout);
 	void ReloadHotkeys(obs_hotkey_id ignoreKey = OBS_INVALID_HOTKEY_ID);
 	void A11yChanged();
+	void AppearanceChanged();
 	void AdvancedChanged();
 	void AdvancedChangedRestart();
 

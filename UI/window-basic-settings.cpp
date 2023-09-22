@@ -346,6 +346,7 @@ void RestrictResetBitrates(initializer_list<QComboBox *> boxes, int maxbitrate);
 #define VIDEO_RES       &OBSBasicSettings::VideoChangedResolution
 #define VIDEO_CHANGED   &OBSBasicSettings::VideoChanged
 #define A11Y_CHANGED    &OBSBasicSettings::A11yChanged
+#define APP_CHANGED     &OBSBasicSettings::AppearanceChanged
 #define ADV_CHANGED     &OBSBasicSettings::AdvancedChanged
 #define ADV_RESTART     &OBSBasicSettings::AdvancedChangedRestart
 /* clang-format on */
@@ -532,6 +533,7 @@ OBSBasicSettings::OBSBasicSettings(QWidget *parent)
 	HookWidget(ui->fpsDenominator,       SCROLL_CHANGED, VIDEO_CHANGED);
 	HookWidget(ui->colorsGroupBox,       GROUP_CHANGED,  A11Y_CHANGED);
 	HookWidget(ui->colorPreset,          COMBO_CHANGED,  A11Y_CHANGED);
+	HookWidget(ui->paletteGroupBox,      GROUP_CHANGED,  APP_CHANGED);
 	HookWidget(ui->renderer,             COMBO_CHANGED,  ADV_RESTART);
 	HookWidget(ui->adapter,              COMBO_CHANGED,  ADV_RESTART);
 	HookWidget(ui->colorFormat,          COMBO_CHANGED,  ADV_CHANGED);
@@ -845,6 +847,7 @@ OBSBasicSettings::OBSBasicSettings(QWidget *parent)
 	obs_properties_destroy(ppts);
 
 	InitStreamPage();
+	InitAppearancePage();
 	LoadSettings(false);
 
 	ui->advOutTrack1->setAccessibleName(
@@ -3265,6 +3268,8 @@ void OBSBasicSettings::LoadSettings(bool changedOnly)
 		LoadVideoSettings();
 	if (!changedOnly || a11yChanged)
 		LoadA11ySettings();
+	if (!changedOnly || appearanceChanged)
+		LoadAppearanceSettings();
 	if (!changedOnly || advancedChanged)
 		LoadAdvancedSettings();
 }
@@ -4077,7 +4082,8 @@ void OBSBasicSettings::SaveSettings()
 		SaveA11ySettings();
 	if (advancedChanged)
 		SaveAdvancedSettings();
-
+	if (appearanceChanged)
+		SaveAppearanceSettings();
 	if (videoChanged || advancedChanged)
 		main->ResetVideo();
 
@@ -4101,6 +4107,8 @@ void OBSBasicSettings::SaveSettings()
 			AddChangedVal(changed, "hotkeys");
 		if (a11yChanged)
 			AddChangedVal(changed, "a11y");
+		if (appearanceChanged)
+			AddChangedVal(changed, "appearance");
 		if (advancedChanged)
 			AddChangedVal(changed, "advanced");
 
@@ -4223,6 +4231,8 @@ void OBSBasicSettings::on_theme_activated(int idx)
 	QString currT = ui->theme->itemData(idx).toString();
 
 	App()->SetTheme(currT.toUtf8().constData());
+	// Reload appearance settings as they are theme dependent
+	LoadAppearanceSettings();
 }
 
 void OBSBasicSettings::on_listWidget_itemSelectionChanged()
@@ -4928,6 +4938,15 @@ void OBSBasicSettings::A11yChanged()
 {
 	if (!loading) {
 		a11yChanged = true;
+		sender()->setProperty("changed", QVariant(true));
+		EnableApplyButton(true);
+	}
+}
+
+void OBSBasicSettings::AppearanceChanged()
+{
+	if (!loading) {
+		appearanceChanged = true;
 		sender()->setProperty("changed", QVariant(true));
 		EnableApplyButton(true);
 	}
@@ -6083,7 +6102,7 @@ void OBSBasicSettings::SetAccessibilityIcon(const QIcon &icon)
 
 void OBSBasicSettings::SetAdvancedIcon(const QIcon &icon)
 {
-	ui->listWidget->item(7)->setIcon(icon);
+	ui->listWidget->item(8)->setIcon(icon);
 }
 
 int OBSBasicSettings::CurrentFLVTrack()

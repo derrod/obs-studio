@@ -37,6 +37,7 @@
 #include <QScreen>
 #include <QProcess>
 #include <QAccessible>
+#include <QMetaEnum>
 
 #include "qt-wrappers.hpp"
 #include "obs-app.hpp"
@@ -1120,6 +1121,43 @@ void OBSApp::ParseExtraThemeData(const char *path)
 			continue;
 	}
 
+	themePalette = pal;
+	setPalette(pal);
+}
+
+void OBSApp::ParseUserPalette()
+{
+	QPalette pal = palette();
+	std::string sectionName = "CustomPalette." + theme;
+	QString keyTemplate = "%1.%2";
+
+	QMetaEnum roleMeta = QMetaEnum::fromType<QPalette::ColorRole>();
+	QMetaEnum groupMeta = QMetaEnum::fromType<QPalette::ColorGroup>();
+
+	for (int i = 0; i < roleMeta.keyCount(); i++) {
+		auto role = QPalette::ColorRole(i);
+		if (role == QPalette::NColorRoles)
+			break;
+
+		for (int j = 0; j < groupMeta.keyCount(); j++) {
+			auto group = QPalette::ColorGroup(j);
+			if (group == QPalette::NColorGroups)
+				break;
+
+			QString configKey =
+				keyTemplate.arg(roleMeta.valueToKey(role),
+						groupMeta.valueToKey(group));
+			const char *colorHex = config_get_string(
+				globalConfig, sectionName.c_str(),
+				QT_TO_UTF8(configKey));
+			if (!colorHex)
+				continue;
+
+			QColor color(colorHex);
+			pal.setColor(group, role, color);
+		}
+	}
+
 	setPalette(pal);
 }
 
@@ -1311,6 +1349,7 @@ bool OBSApp::SetTheme(std::string name, std::string path)
 
 	QString mpath = QString("file:///") + lpath.c_str();
 	ParseExtraThemeData(path.c_str());
+	ParseUserPalette();
 	setStyleSheet(mpath);
 	if (themeMeta) {
 		themeDarkMode = themeMeta->dark;
