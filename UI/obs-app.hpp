@@ -124,6 +124,9 @@ private:
 
 	void ParseExtraThemeData(const char *path);
 	static OBSThemeMeta *ParseThemeMeta(const char *path);
+	static std::unordered_map<std::string, std::string>
+	ParseThemeConfiguration(const char *themeData);
+
 	void AddExtraThemeColor(QPalette &pal, int group, const char *name,
 				uint32_t color);
 

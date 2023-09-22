@@ -1195,6 +1195,65 @@ OBSThemeMeta *OBSApp::ParseThemeMeta(const char *path)
 	return nullptr;
 }
 
+std::unordered_map<std::string, std::string>
+OBSApp::ParseThemeConfiguration(const char *themeData)
+{
+	CFParser cfp;
+	int ret;
+
+	if (!cf_parser_parse(cfp, themeData, nullptr))
+		return {};
+
+	if (cf_token_is(cfp, "OBSThemeConfig") ||
+	    cf_go_to_token(cfp, "OBSThemeConfig", nullptr)) {
+
+		if (!cf_next_token(cfp))
+			return {};
+
+		if (!cf_token_is(cfp, "{"))
+			return {};
+
+		std::unordered_map<std::string, std::string> dict;
+
+		for (;;) {
+			if (!cf_next_token(cfp))
+				return dict;
+
+			ret = cf_token_is_type(cfp, CFTOKEN_NAME, "key",
+					       nullptr);
+			if (ret != PARSE_SUCCESS)
+				break;
+
+			std::string key(cfp->cur_token->str.array,
+					cfp->cur_token->str.len);
+
+			ret = cf_next_token_should_be(cfp, ":", ";", nullptr);
+			if (ret != PARSE_SUCCESS)
+				continue;
+
+			if (!cf_next_token(cfp))
+				return dict;
+
+			ret = cf_token_is_type(cfp, CFTOKEN_STRING, "value",
+					       ";");
+
+			if (ret != PARSE_SUCCESS)
+				continue;
+
+			BPtr str = cf_literal_to_str(cfp->cur_token->str.array,
+						     cfp->cur_token->str.len);
+			dict[key] = str;
+
+			if (!cf_go_to_token(cfp, ";", nullptr))
+				return dict;
+		}
+
+		return dict;
+	}
+
+	return {};
+}
+
 std::string OBSApp::GetTheme(std::string name, std::string path)
 {
 	/* Check user dir first, then preinstalled themes. */
