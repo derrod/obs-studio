@@ -1005,7 +1005,7 @@ struct CFParser {
 	inline cf_parser *operator->() { return &cfp; }
 };
 
-void OBSApp::ParseExtraThemeData(const char *path)
+QPalette OBSApp::ParseExtraThemeData(const char *path)
 {
 	BPtr<char> data = os_quick_read_utf8_file(path);
 	QPalette pal = palette();
@@ -1016,7 +1016,7 @@ void OBSApp::ParseExtraThemeData(const char *path)
 
 	while (cf_go_to_token(cfp, "OBSTheme", nullptr)) {
 		if (!cf_next_token(cfp))
-			return;
+			return pal;
 
 		int group = -1;
 
@@ -1027,7 +1027,7 @@ void OBSApp::ParseExtraThemeData(const char *path)
 				continue;
 
 			if (!cf_next_token(cfp))
-				return;
+				return pal;
 
 			if (cf_token_is(cfp, "disabled")) {
 				group = QPalette::Disabled;
@@ -1040,7 +1040,7 @@ void OBSApp::ParseExtraThemeData(const char *path)
 			}
 
 			if (!cf_next_token(cfp))
-				return;
+				return pal;
 		}
 
 		if (!cf_token_is(cfp, "{"))
@@ -1048,7 +1048,7 @@ void OBSApp::ParseExtraThemeData(const char *path)
 
 		for (;;) {
 			if (!cf_next_token(cfp))
-				return;
+				return pal;
 
 			ret = cf_token_is_type(cfp, CFTOKEN_NAME, "name",
 					       nullptr);
@@ -1063,7 +1063,7 @@ void OBSApp::ParseExtraThemeData(const char *path)
 				continue;
 
 			if (!cf_next_token(cfp))
-				return;
+				return pal;
 
 			const char *array;
 			uint32_t color = 0;
@@ -1078,7 +1078,7 @@ void OBSApp::ParseExtraThemeData(const char *path)
 				if (ret != PARSE_SUCCESS)
 					continue;
 				if (!cf_next_token(cfp))
-					return;
+					return pal;
 
 				array = cfp->cur_token->str.array;
 				color |= strtol(array, nullptr, 10) << 16;
@@ -1088,7 +1088,7 @@ void OBSApp::ParseExtraThemeData(const char *path)
 				if (ret != PARSE_SUCCESS)
 					continue;
 				if (!cf_next_token(cfp))
-					return;
+					return pal;
 
 				array = cfp->cur_token->str.array;
 				color |= strtol(array, nullptr, 10) << 8;
@@ -1098,7 +1098,7 @@ void OBSApp::ParseExtraThemeData(const char *path)
 				if (ret != PARSE_SUCCESS)
 					continue;
 				if (!cf_next_token(cfp))
-					return;
+					return pal;
 
 				array = cfp->cur_token->str.array;
 				color |= strtol(array, nullptr, 10);
@@ -1111,7 +1111,7 @@ void OBSApp::ParseExtraThemeData(const char *path)
 			}
 
 			if (!cf_go_to_token(cfp, ";", nullptr))
-				return;
+				return pal;
 
 			AddExtraThemeColor(pal, group, name->array, color);
 		}
@@ -1121,14 +1121,19 @@ void OBSApp::ParseExtraThemeData(const char *path)
 			continue;
 	}
 
+	// Todo don't do that
 	themePalette = pal;
-	setPalette(pal);
+	//setPalette(pal);
+	return pal;
 }
 
 void OBSApp::ParseUserPalette()
 {
+	if (!config_get_bool(globalConfig, "Appearance", "UseCustomPalette"))
+		return;
+
 	QPalette pal = palette();
-	std::string sectionName = "CustomPalette." + theme;
+	std::string sectionName = "Appearance.CustomPalette." + theme;
 	QString keyTemplate = "%1.%2";
 
 	QMetaEnum roleMeta = QMetaEnum::fromType<QPalette::ColorRole>();
@@ -1319,7 +1324,7 @@ std::string OBSApp::SetParentTheme(std::string name)
 
 	setPalette(defaultPalette);
 
-	ParseExtraThemeData(path.c_str());
+	setPalette(ParseExtraThemeData(path.c_str()));
 	return path;
 }
 
@@ -1348,7 +1353,7 @@ bool OBSApp::SetTheme(std::string name, std::string path)
 	}
 
 	QString mpath = QString("file:///") + lpath.c_str();
-	ParseExtraThemeData(path.c_str());
+	setPalette(ParseExtraThemeData(path.c_str()));
 	ParseUserPalette();
 	setStyleSheet(mpath);
 	if (themeMeta) {
@@ -1384,8 +1389,16 @@ bool OBSApp::InitTheme()
 		QDir::addSearchPath("theme", absolute(configSearchDir));
 	}
 
+	if (config_has_user_value(globalConfig, "General", "CurrentTheme3") &&
+	    !config_has_user_value(globalConfig, "Appearance", "Theme")) {
+		config_set_string(globalConfig, "Appearance", "Theme",
+				  config_get_string(globalConfig, "General",
+						    "CurrentTheme3"));
+	}
+
 	const char *themeName =
-		config_get_string(globalConfig, "General", "CurrentTheme3");
+		config_get_string(globalConfig, "Appearance", "Theme");
+
 	if (!themeName)
 		themeName = DEFAULT_THEME;
 

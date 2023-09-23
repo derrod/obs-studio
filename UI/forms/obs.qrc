@@ -80,6 +80,8 @@
     <file>images/settings/general.svg</file>
     <file>images/settings/hotkeys.svg</file>
     <file>images/settings/accessibility.svg</file>
+    <file>images/settings/appearance.svg</file>
+    <file>images/settings/theme_preview.svg</file>
   </qresource>
   <qresource prefix="">
     <file>fonts/OpenSans-Regular.ttf</file>

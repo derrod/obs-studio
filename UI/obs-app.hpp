@@ -123,7 +123,6 @@ private:
 	QPalette defaultPalette;
 	QPalette themePalette;
 
-	void ParseExtraThemeData(const char *path);
 	void ParseUserPalette();
 	static OBSThemeMeta *ParseThemeMeta(const char *path);
 	static std::unordered_map<std::string, std::string>
@@ -164,13 +163,10 @@ public:
 	std::string GetTheme(std::string name, std::string path);
 	std::string SetParentTheme(std::string name);
 	bool SetTheme(std::string name, std::string path = "");
-	inline bool IsThemeDark() const { return themeDarkMode; };
+	inline bool IsThemeDark() const { return themeDarkMode; }
 	QPalette GetThemePalette() const { return themePalette; }
-	void setCustomPalette(const QPalette &palette)
-	{
-		setPalette(palette);
-		emit StyleChanged();
-	}
+	QPalette GetDefaultPalette() const { return defaultPalette; }
+	QPalette ParseExtraThemeData(const char *path);
 
 	void SetBranchData(const std::string &data);
 	std::vector<UpdateBranch> GetBranches();

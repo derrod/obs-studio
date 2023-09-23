@@ -1,3 +1,5 @@
+#pragma once
+
 #include "window-basic-settings.hpp"
 #include "window-basic-main.hpp"
 #include "obs-frontend-api.h"
@@ -7,30 +9,75 @@
 #include <QColorDialog>
 #include <QMetaEnum>
 
-class ColorPickPreview : public QWidget {
+class ColorPickingWidget : public QWidget {
 	Q_OBJECT
 
 public:
-	ColorPickPreview(QString &name, QPalette::ColorGroup group,
-		     QPalette::ColorRole role, QColor color,
-		     QWidget *parent = nullptr);
+	ColorPickingWidget(QColor color, const QString &name,
+			   QWidget *parent = nullptr);
 
 	QColor getColor() const { return m_color; }
-	QPalette::ColorRole getRole() const { return m_role; }
-	QPalette::ColorGroup getGroup() const { return m_group; }
+
+	void SetColor(QColor color);
 
 signals:
 	void colorChanged();
 
 private:
-	void SetColor(QColor color);
-
-	const QPalette::ColorRole m_role;
-	const QPalette::ColorGroup m_group;
-	const QString m_paletteName;
+	QString m_name;
 	QColor m_color;
-
-	QHBoxLayout *m_layout = nullptr;
 	QPushButton *m_button = nullptr;
-	QLabel *m_colorPreview = nullptr;
+};
+
+class PaletteColorPicker : public QWidget {
+	Q_OBJECT
+
+public:
+	PaletteColorPicker(const QPalette *palette,
+			   const QPalette *themePalette,
+			   QPalette::ColorRole role, QWidget *parent = nullptr);
+
+	QPalette::ColorRole getRole() const { return m_role; };
+	QColor getColor(QPalette::ColorGroup group) const;
+
+signals:
+	void colorChanged();
+
+private slots:
+	void PickerChanged();
+	void ResetClicked();
+
+private:
+	QColor m_activeColor;
+	QColor m_inactiveColor;
+	QColor m_disabledColor;
+
+	QColor m_defaultActiveColor;
+	QColor m_defaultInactiveColor;
+	QColor m_defaultDisabledColor;
+
+	QPalette::ColorRole m_role;
+
+	QHBoxLayout *layout = nullptr;
+	QPushButton *resetBtn = nullptr;
+
+	ColorPickingWidget *pickerActive = nullptr;
+	ColorPickingWidget *pickerInactive = nullptr;
+	ColorPickingWidget *pickerDisabled = nullptr;
+};
+
+class ThemePreviewButton : public QPushButton {
+	Q_OBJECT
+
+public:
+	ThemePreviewButton(const QString &name, const QPalette &palette,
+			   QWidget *parent = nullptr);
+
+	QSize sizeHint() const override;
+
+private:
+	QPixmap image;
+	QVBoxLayout *layout = nullptr;
+	QLabel *label = nullptr;
+	QLabel *preview = nullptr;
 };
