@@ -1,0 +1,22 @@
+OBSThemeMeta {
+    name: 'Test';
+    id: 'com.obsproject.Yami.Dark';
+    extends: 'com.obsproject.Yami';
+    author: 'Warchamp7';
+    dark: 'true';
+}
+
+OBSThemeVars {
+    preview: rgb(255,0,255) !editable;
+    button: rgb(0,255,255) !editable;
+    base: #FFFF00 !editable;
+    
+    control_margin: 3px !editable;
+    
+    test_size: 3px;
+    test_size_edit: 3px !editable;
+    test_num: 5;
+    test_num_edit: 5 !editable;
+    test_str: 'hi!';
+    test_str_edit: 'hi!' !editable;
+}
