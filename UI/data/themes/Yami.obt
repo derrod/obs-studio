@@ -29,6 +29,13 @@ OBSThemeVars {
     highlight_inactive: rgb(25,28,34);
     
     control_margin: 3px;
+
+    /* Palette variables can be set with the "palette_" prefix */
+    palette_window: alias(window);
+    /* They can be selectively set for palette groups by appending those as well */
+    palette_text_active: alias(text);
+    palette_text_disabled: alias(text_disabled);
+    palette_text_inactive: alias(text_inactive);
 }
 
 /* Default widget style, we override only what is needed. */
