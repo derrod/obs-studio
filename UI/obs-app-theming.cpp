@@ -20,6 +20,7 @@
 #include <QDir>
 #include <QFile>
 #include <QTimer>
+#include <QMetaEnum>
 #include <QDirIterator>
 #include <QGuiApplication>
 
@@ -501,6 +502,96 @@ static QString PrepareQSS(const QHash<QString, OBSThemeVariable> &vars,
 	return stylesheet;
 }
 
+template<typename T> static void FillEnumMap(QHash<QString, T> &map)
+{
+	QMetaEnum meta = QMetaEnum::fromType<T>();
+
+	int numKeys = meta.keyCount();
+	for (int i = 0; i < numKeys; i++) {
+		const char *key = meta.key(i);
+		QString keyName(key);
+		map[keyName.toLower()] = static_cast<T>(meta.keyToValue(key));
+	}
+}
+
+static QPalette PreparePalette(const QHash<QString, OBSThemeVariable> &vars,
+			       const QPalette &defaultPalette)
+{
+	static QHash<QString, QPalette::ColorRole> roleMap;
+	static QHash<QString, QPalette::ColorGroup> groupMap;
+
+	if (roleMap.empty())
+		FillEnumMap<QPalette::ColorRole>(roleMap);
+	if (groupMap.empty())
+		FillEnumMap<QPalette::ColorGroup>(groupMap);
+
+	QPalette pal(defaultPalette);
+
+	for (const OBSThemeVariable &var : vars) {
+		if (!var.name.startsWith("palette_"))
+			continue;
+		if (var.name.count("_") < 1 || var.name.count("_") > 2)
+			continue;
+
+		const OBSThemeVariable *realVar = &var;
+
+		while (realVar->type == OBSThemeVariable::Alias) {
+			QString newKey = var.value.toString();
+
+			if (!vars.contains(newKey)) {
+				blog(LOG_ERROR,
+				     R"(Variable "%s" (aliased by "%s") does not exist!)",
+				     QT_TO_UTF8(newKey), QT_TO_UTF8(var.name));
+				realVar = nullptr;
+				break;
+			}
+
+			const OBSThemeVariable &newVar = vars.value(newKey);
+			realVar = &newVar;
+		}
+
+		if (!realVar || realVar->type != OBSThemeVariable::Color)
+			continue;
+
+		/* Determine role and optionally group based on name.
+		 * Format is: palette_<role>[_<group>] */
+		QPalette::ColorRole role = QPalette::NoRole;
+		QPalette::ColorGroup group = QPalette::All;
+
+		QStringList parts = var.name.split("_");
+		if (parts.length() >= 2) {
+			QString key = parts[1].toLower();
+			if (!roleMap.contains(key)) {
+				blog(LOG_WARNING,
+				     "Palette role \"%s\" is not valid!",
+				     QT_TO_UTF8(parts[1]));
+				continue;
+			}
+			role = roleMap[key];
+		}
+
+		if (parts.length() == 3) {
+			QString key = parts[2].toLower();
+			if (!groupMap.contains(key)) {
+				blog(LOG_WARNING,
+				     "Palette group \"%s\" is not valid!",
+				     QT_TO_UTF8(parts[2]));
+				continue;
+			}
+			group = groupMap[key];
+		}
+
+		QVariant value = realVar->userValue.isValid()
+					 ? realVar->userValue
+					 : realVar->value;
+
+		QColor color = value.value<QColor>().name(QColor::HexRgb);
+		pal.setColor(group, role, color);
+	}
+
+	return pal;
+}
+
 OBSTheme *OBSApp::GetTheme(const QString &name)
 {
 	if (!themes.contains(name))
@@ -599,6 +690,8 @@ bool OBSApp::SetTheme(const QString &name)
 
 	ParseThemeCustomisation(vars);
 	const QString stylesheet = PrepareQSS(vars, contents);
+	const QPalette palette = PreparePalette(vars, defaultPalette);
+	setPalette(palette);
 	setStyleSheet(stylesheet);
 
 #ifdef DEBUG_THEME_OUTPUT
