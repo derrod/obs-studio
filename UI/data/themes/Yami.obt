@@ -36,9 +36,35 @@ OBSThemeVars {
     palette_text_active: alias(text);
     palette_text_disabled: alias(text_disabled);
     palette_text_inactive: alias(text_inactive);
+
+    /*
+    * Variables calculated at runtime (after all themes have been composed).
+    *
+    * Support standard add, sub, mul, div operations.
+    * Also supports nested calls (but keep it reasonable).
+    *
+    * Note: When using two operands that have a type (e.g. "px") the type must match!
+    *       If only one operand has a type it'll be used for the result.
+    * Note 2: Cannot be !editable
+    * Note 3: Operands and operator MUST be separated by whitespace
+    */
+
+    margin_factor: 3 !editable;
+
+    example_var_num: calc(control_margin * 2);
+    example_var_var: calc(control_margin * margin_factor);
+    example_var_nested: calc(control_margin * calc(margin_factor * 2));
+    example_var_nested_alt: calc(control_margin * example_var_var);
 }
 
 /* Default widget style, we override only what is needed. */
+
+CalcDemo {
+    example1: ${example_var_num};
+    example2: ${example_var_var};
+    example3: ${example_var_nested};
+    example4: ${example_var_nested_alt};
+}
 
 QWidget {
     alternate-background-color: ${base};

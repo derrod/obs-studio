@@ -195,8 +195,6 @@ static bool ParseCalc(CFParser &cfp, QStringList &calc,
 		if (cf_token_is(cfp, ";"))
 			break;
 
-		qDebug() << QString::fromUtf8(cfp->cur_token->str.array,
-					      cfp->cur_token->str.len);
 		if (cf_token_is(cfp, "calc")) {
 			/* Internal calc's do not have proper names,
 			 * they are anonymous variables */
