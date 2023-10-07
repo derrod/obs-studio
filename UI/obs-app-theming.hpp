@@ -48,6 +48,7 @@ struct OBSThemeVariable {
 		Number, /* Number without suffix */
 		String, /* Raw string (e.g. colour name, border style, etc.) */
 		Alias,  /* Points at another variable, value will be the key */
+		Calc,   /* Simple calculation with two operands */
 	};
 
 	/* Whether the variable should be editable in the UI */

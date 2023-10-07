@@ -243,7 +243,8 @@ void OBSBasicSettings::LoadAppearanceSettings(bool reload)
 
 		switch (var.type) {
 		case OBSThemeVariable::Alias:
-			/* Aliases aren't supported here */
+		case OBSThemeVariable::Calc:
+			/* Not user-editable */
 			continue;
 		case OBSThemeVariable::Number:
 			sb = new QDoubleSpinBox(ui->paletteGroupBox);

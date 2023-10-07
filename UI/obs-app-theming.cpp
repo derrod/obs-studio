@@ -15,6 +15,8 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
 ******************************************************************************/
 
+#include <cinttypes>
+
 #include <util/cf-parser.h>
 
 #include <QDir>
@@ -23,6 +25,7 @@
 #include <QMetaEnum>
 #include <QDirIterator>
 #include <QGuiApplication>
+#include <QRandomGenerator>
 
 #include "qt-wrappers.hpp"
 #include "obs-app.hpp"
@@ -179,6 +182,50 @@ static QColor ParseColour(CFParser &cfp)
 	return res;
 }
 
+static bool ParseCalc(CFParser &cfp, QStringList &calc,
+		      vector<OBSThemeVariable> &vars)
+{
+	int ret = cf_next_token_should_be(cfp, "(", ";", nullptr);
+	if (ret != PARSE_SUCCESS)
+		return false;
+	if (!cf_next_token(cfp))
+		return false;
+
+	while (!cf_token_is(cfp, ")")) {
+		if (cf_token_is(cfp, ";"))
+			break;
+
+		qDebug() << QString::fromUtf8(cfp->cur_token->str.array,
+					      cfp->cur_token->str.len);
+		if (cf_token_is(cfp, "calc")) {
+			/* Internal calc's do not have proper names,
+			 * they are anonymous variables */
+			OBSThemeVariable var;
+			QStringList subcalc;
+
+			var.name = QString("__unnamed_%1")
+					   .arg(QRandomGenerator::global()
+							->generate64());
+
+			if (!ParseCalc(cfp, subcalc, vars))
+				return false;
+
+			var.type = OBSThemeVariable::Calc;
+			var.value = subcalc;
+			calc << var.name;
+			vars.push_back(std::move(var));
+		} else {
+			calc << QString::fromUtf8(cfp->cur_token->str.array,
+						  cfp->cur_token->str.len);
+		}
+
+		if (!cf_next_token(cfp))
+			return false;
+	}
+
+	return !calc.isEmpty();
+}
+
 static vector<OBSThemeVariable> ParseThemeVariables(const char *themeData)
 {
 	CFParser cfp;
@@ -258,6 +305,14 @@ static vector<OBSThemeVariable> ParseThemeVariables(const char *themeData)
 			ret = cf_next_token_should_be(cfp, ")", ";", nullptr);
 			if (ret != PARSE_SUCCESS)
 				continue;
+		} else if (cf_token_is(cfp, "calc")) {
+			QStringList calc;
+
+			if (!ParseCalc(cfp, calc, vars))
+				continue;
+
+			var.type = OBSThemeVariable::Calc;
+			var.value = calc;
 		} else {
 			var.type = OBSThemeVariable::String;
 			BPtr strVal =
@@ -272,7 +327,14 @@ static vector<OBSThemeVariable> ParseThemeVariables(const char *themeData)
 		if (cf_token_is(cfp, "!") &&
 		    cf_next_token_should_be(cfp, "editable", nullptr,
 					    nullptr) == PARSE_SUCCESS) {
-			var.editable = true;
+			if (var.type == OBSThemeVariable::Calc ||
+			    var.type == OBSThemeVariable::Alias) {
+				blog(LOG_WARNING,
+				     "Variable of calc/alias type cannot be editable: %s",
+				     QT_TO_UTF8(var.name));
+			} else {
+				var.editable = true;
+			}
 		}
 
 		vars.push_back(std::move(var));
@@ -305,6 +367,7 @@ void OBSApp::ParseThemeCustomisation(QHash<QString, OBSThemeVariable> &vars)
 
 		switch (var.type) {
 		case OBSThemeVariable::Alias:
+		case OBSThemeVariable::Calc:
 			continue;
 		case OBSThemeVariable::Size:
 		case OBSThemeVariable::Number:
@@ -441,6 +504,168 @@ static qsizetype FindEndOfOBSMetadata(const QString &content)
 	return end;
 }
 
+static bool ResolveVariable(const QHash<QString, OBSThemeVariable> &vars,
+			    OBSThemeVariable &var)
+{
+	const OBSThemeVariable *varPtr = &var;
+	const OBSThemeVariable *realVar = varPtr;
+
+	while (realVar->type == OBSThemeVariable::Alias) {
+		QString newKey = realVar->value.toString();
+
+		if (!vars.contains(newKey)) {
+			blog(LOG_ERROR,
+			     R"(Variable "%s" (aliased by "%s") does not exist!)",
+			     QT_TO_UTF8(newKey), QT_TO_UTF8(var.name));
+			return false;
+		}
+
+		const OBSThemeVariable &newVar = vars[newKey];
+		realVar = &newVar;
+	}
+
+	if (realVar != varPtr)
+		var = *realVar;
+
+	return true;
+}
+
+static QString EvalCalc(const QHash<QString, OBSThemeVariable> &vars,
+			const OBSThemeVariable &var, const int recursion = 0);
+
+static OBSThemeVariable
+ParseCalcVariable(const QHash<QString, OBSThemeVariable> &vars,
+		  const QString &value, const int recursion = 0)
+{
+	OBSThemeVariable var;
+	const QByteArray utf8 = value.toUtf8();
+	const char *data = utf8.constData();
+
+	if (isdigit(*data)) {
+		double f = os_strtod(data);
+		var.type = OBSThemeVariable::Number;
+		var.value = f;
+
+		const char *dataEnd = data + utf8.size();
+		while (data < dataEnd) {
+			if (*data && !isdigit(*data)) {
+				var.suffix =
+					QString::fromUtf8(data, dataEnd - data);
+				var.type = OBSThemeVariable::Size;
+				break;
+			}
+
+			data++;
+		}
+	} else {
+		/* Treat value as an alias/key and resolve it */
+		var.type = OBSThemeVariable::Alias;
+		var.value = value;
+		ResolveVariable(vars, var);
+
+		/* Handle nested calc()s */
+		if (var.type == OBSThemeVariable::Calc) {
+			QString val = EvalCalc(vars, var, recursion + 1);
+			var = ParseCalcVariable(vars, val);
+		}
+
+		/* Only number or size would be valid here */
+		if (var.type != OBSThemeVariable::Number &&
+		    var.type != OBSThemeVariable::Size) {
+			blog(LOG_ERROR,
+			     "calc() operand is not a size or number: %s",
+			     QT_TO_UTF8(var.value.toString()));
+			throw invalid_argument("Operand not of numeric type");
+		}
+	}
+
+	return var;
+}
+
+static QString EvalCalc(const QHash<QString, OBSThemeVariable> &vars,
+			const OBSThemeVariable &var, const int recursion)
+{
+	if (recursion >= 10) {
+		/* Abort after 10 levels of recursion */
+		blog(LOG_ERROR, "Maximum calc() recursion levels hit!");
+		return "'Invalid expression'";
+	}
+
+	QStringList args = var.value.toStringList();
+	if (args.length() != 3) {
+		blog(LOG_ERROR,
+		     "calc() had invalid number of arguments: %lld (%s)",
+		     args.length(), QT_TO_UTF8(args.join(", ")));
+		return "'Invalid expression'";
+	}
+
+	QString &opt = args[1];
+	if (opt != '*' && opt != '+' && opt != '-' && opt != '/') {
+		blog(LOG_ERROR, "Unknown/invalid calc() operator: %s",
+		     QT_TO_UTF8(opt));
+		return "'Invalid expression'";
+	}
+
+	OBSThemeVariable val1, val2;
+	try {
+		val1 = ParseCalcVariable(vars, args[0], recursion);
+		val2 = ParseCalcVariable(vars, args[2], recursion);
+	} catch (...) {
+		return "'Invalid expression'";
+	}
+
+	/* Ensure that suffixes match (if any) */
+	if (!val1.suffix.isEmpty() && !val2.suffix.isEmpty() &&
+	    val1.suffix != val2.suffix) {
+		blog(LOG_ERROR,
+		     "calc() requires suffixes to match or only one to be present! %s != %s",
+		     QT_TO_UTF8(val1.suffix), QT_TO_UTF8(val2.suffix));
+		return "'Invalid expression'";
+	}
+
+	double val = numeric_limits<double>::quiet_NaN();
+	double d1 = val1.userValue.isValid() ? val1.userValue.toDouble()
+					     : val1.value.toDouble();
+	double d2 = val2.userValue.isValid() ? val2.userValue.toDouble()
+					     : val2.value.toDouble();
+
+	if (!isnormal(d1) || !isnormal(d2)) {
+		blog(LOG_ERROR,
+		     "calc() received at least one invalid value:"
+		     " op1: %f, op2: %f",
+		     d1, d2);
+		return "'Invalid expression'";
+	}
+
+	if (opt == "+")
+		val = d1 + d2;
+	else if (opt == "-")
+		val = d1 - d2;
+	else if (opt == "*")
+		val = d1 * d2;
+	else if (opt == "/")
+		val = d1 / d2;
+
+	if (!isnormal(val)) {
+		blog(LOG_ERROR,
+		     "Invalid calc() math resulted in non-normal number:"
+		     " %f %s %f = %f",
+		     d1, QT_TO_UTF8(opt), d2, val);
+		return "'Invalid expression'";
+	}
+
+	bool isInteger = ceill(val) == val;
+	QString result = QString::number(val, 'f', isInteger ? 0 : -1);
+
+	/* Carry-over suffix */
+	if (!val1.suffix.isEmpty())
+		result += val1.suffix;
+	else if (!val2.suffix.isEmpty())
+		result += val2.suffix;
+
+	return result;
+}
+
 static QString PrepareQSS(const QHash<QString, OBSThemeVariable> &vars,
 			  const QStringList &contents)
 {
@@ -455,43 +680,30 @@ static QString PrepareQSS(const QHash<QString, OBSThemeVariable> &vars,
 		}
 	}
 
-	for (const OBSThemeVariable &var : vars) {
-		const OBSThemeVariable *realVar = &var;
-		QString needle = needleTemplate.arg(var.name);
+	for (const OBSThemeVariable &var_ : vars) {
+		OBSThemeVariable var(var_);
 
-		while (realVar->type == OBSThemeVariable::Alias) {
-			QString newKey = var.value.toString();
-
-			if (!vars.contains(newKey)) {
-				blog(LOG_ERROR,
-				     R"(Variable "%s" (aliased by "%s") does not exist!)",
-				     QT_TO_UTF8(newKey), QT_TO_UTF8(var.name));
-				realVar = nullptr;
-				break;
-			}
-
-			const OBSThemeVariable &newVar = vars.value(newKey);
-			realVar = &newVar;
-		}
-
-		if (!realVar)
+		if (!ResolveVariable(vars, var))
 			continue;
 
+		QString needle = needleTemplate.arg(var_.name);
 		QString replace;
-		QVariant value = realVar->userValue.isValid()
-					 ? realVar->userValue
-					 : realVar->value;
 
-		if (realVar->type == OBSThemeVariable::Color) {
+		QVariant value = var.userValue.isValid() ? var.userValue
+							 : var.value;
+
+		if (var.type == OBSThemeVariable::Color) {
 			replace = value.value<QColor>().name(QColor::HexRgb);
-		} else if (realVar->type == OBSThemeVariable::Size ||
-			   realVar->type == OBSThemeVariable::Number) {
+		} else if (var.type == OBSThemeVariable::Calc) {
+			replace = EvalCalc(vars, var);
+		} else if (var.type == OBSThemeVariable::Size ||
+			   var.type == OBSThemeVariable::Number) {
 			double val = value.toDouble();
 			bool isInteger = ceill(val) == val;
 			replace = QString::number(val, 'f', isInteger ? 0 : -1);
 
-			if (!realVar->suffix.isEmpty())
-				replace += realVar->suffix;
+			if (!var.suffix.isEmpty())
+				replace += var.suffix;
 		} else {
 			replace = value.toString();
 		}
@@ -527,30 +739,15 @@ static QPalette PreparePalette(const QHash<QString, OBSThemeVariable> &vars,
 
 	QPalette pal(defaultPalette);
 
-	for (const OBSThemeVariable &var : vars) {
-		if (!var.name.startsWith("palette_"))
+	for (const OBSThemeVariable &var_ : vars) {
+		if (!var_.name.startsWith("palette_"))
 			continue;
-		if (var.name.count("_") < 1 || var.name.count("_") > 2)
+		if (var_.name.count("_") < 1 || var_.name.count("_") > 2)
 			continue;
 
-		const OBSThemeVariable *realVar = &var;
-
-		while (realVar->type == OBSThemeVariable::Alias) {
-			QString newKey = var.value.toString();
-
-			if (!vars.contains(newKey)) {
-				blog(LOG_ERROR,
-				     R"(Variable "%s" (aliased by "%s") does not exist!)",
-				     QT_TO_UTF8(newKey), QT_TO_UTF8(var.name));
-				realVar = nullptr;
-				break;
-			}
-
-			const OBSThemeVariable &newVar = vars.value(newKey);
-			realVar = &newVar;
-		}
-
-		if (!realVar || realVar->type != OBSThemeVariable::Color)
+		OBSThemeVariable var(var_);
+		if (!ResolveVariable(vars, var) ||
+		    var.type != OBSThemeVariable::Color)
 			continue;
 
 		/* Determine role and optionally group based on name.
@@ -558,7 +755,7 @@ static QPalette PreparePalette(const QHash<QString, OBSThemeVariable> &vars,
 		QPalette::ColorRole role = QPalette::NoRole;
 		QPalette::ColorGroup group = QPalette::All;
 
-		QStringList parts = var.name.split("_");
+		QStringList parts = var_.name.split("_");
 		if (parts.length() >= 2) {
 			QString key = parts[1].toLower();
 			if (!roleMap.contains(key)) {
@@ -581,9 +778,8 @@ static QPalette PreparePalette(const QHash<QString, OBSThemeVariable> &vars,
 			group = groupMap[key];
 		}
 
-		QVariant value = realVar->userValue.isValid()
-					 ? realVar->userValue
-					 : realVar->value;
+		QVariant value = var.userValue.isValid() ? var.userValue
+							 : var.value;
 
 		QColor color = value.value<QColor>().name(QColor::HexRgb);
 		pal.setColor(group, role, color);
