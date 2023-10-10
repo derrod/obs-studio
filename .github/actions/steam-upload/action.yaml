@@ -78,6 +78,7 @@ runs:
       shell: zsh --no-rcs --errexit --pipefail {0}
       env:
         GH_TOKEN: ${{ inputs.workflowSecret }}
+        GH_REPO: "obsproject/obs-studio"
         windows_custom_asset: ${{ inputs.customAssetWindows }}
         macos_apple_custom_asset: ${{ inputs.customAssetMacOSApple }}
         macos_intel_custom_asset: ${{ inputs.customAssetMacOSIntel }}
