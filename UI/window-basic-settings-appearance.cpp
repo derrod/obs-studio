@@ -399,10 +399,10 @@ void OBSBasicSettings::SaveAppearanceSettings()
 					QT_TO_UTF8(label->text()),
 					QT_TO_UTF8(
 						cb->currentData().toString()));
-			} else if (w->inherits("QLineEdit") &&
-				   w->inherits("QComboBox") &&
-				   w->inherits("QDoubleSpinBox") &&
-				   w->inherits("ColorPickingWidget")) {
+			} else if (!w->inherits("QLineEdit") &&
+				   !w->inherits("QComboBox") &&
+				   !w->inherits("QDoubleSpinBox") &&
+				   !w->inherits("ColorPickingWidget")) {
 				blog(LOG_WARNING,
 				     "Unknown theme customisation field type: %s",
 				     w->metaObject()->className());
