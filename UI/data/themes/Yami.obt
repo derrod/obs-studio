@@ -55,15 +55,22 @@ OBSThemeVars {
     example_var_var: calc(control_margin * margin_factor);
     example_var_nested: calc(control_margin * calc(margin_factor * 2));
     example_var_nested_alt: calc(control_margin * example_var_var);
+
+    range_test: range(1,0,10);
+    range_test_step: range(2,0,10,2);
+    range_test_unit: range(1,0,10,1,pt);
+
+    preset_test: preset(margin_factor, margin_factor, 'TEST', control_margin, 'TEST2', example_var_nested_alt, 'TEST3');
 }
 
 /* Default widget style, we override only what is needed. */
 
 CalcDemo {
-    example1: ${example_var_num};
-    example2: ${example_var_var};
-    example3: ${example_var_nested};
-    example4: ${example_var_nested_alt};
+    example1: ${example_var_nested};
+    example2: ${range_test};
+    example3: ${range_test_step};
+    example4: ${range_test_unit};
+    example5: ${preset_test};
 }
 
 QWidget {

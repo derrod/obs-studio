@@ -224,6 +224,99 @@ static bool ParseCalc(CFParser &cfp, QStringList &calc,
 	return !calc.isEmpty();
 }
 
+static bool ParseRange(CFParser &cfp, OBSThemeVariable &var)
+{
+	int ret = cf_next_token_should_be(cfp, "(", ";", nullptr);
+	if (ret != PARSE_SUCCESS || !cf_next_token(cfp))
+		return false;
+
+	const char *array = cfp->cur_token->str.array;
+	var.value = os_strtod(array);
+
+	ret = cf_next_token_should_be(cfp, ",", ";", nullptr);
+	if (ret != PARSE_SUCCESS || !cf_next_token(cfp))
+		return false;
+
+	array = cfp->cur_token->str.array;
+	var.rangeMin = os_strtod(array);
+
+	ret = cf_next_token_should_be(cfp, ",", ";", nullptr);
+	if (ret != PARSE_SUCCESS || !cf_next_token(cfp))
+		return false;
+
+	array = cfp->cur_token->str.array;
+	var.rangeMax = os_strtod(array);
+
+	/* At this point everything is optional */
+	ret = cf_next_token_should_be(cfp, ",", nullptr, nullptr);
+	if (ret != PARSE_SUCCESS)
+		return true;
+	if (!cf_next_token(cfp))
+		return false;
+
+	array = cfp->cur_token->str.array;
+	var.rangeStep = os_strtod(array);
+
+	ret = cf_next_token_should_be(cfp, ",", nullptr, nullptr);
+	if (ret != PARSE_SUCCESS)
+		return true;
+	if (!cf_next_token(cfp))
+		return false;
+
+	var.suffix = QString::fromUtf8(cfp->cur_token->str.array,
+				       cfp->cur_token->str.len);
+
+	ret = cf_next_token_should_be(cfp, ")", ";", nullptr);
+	if (ret != PARSE_SUCCESS)
+		return false;
+
+	return true;
+}
+
+static bool ParsePresets(CFParser &cfp, OBSThemeVariable &var)
+{
+	int ret = cf_next_token_should_be(cfp, "(", ";", nullptr);
+	if (ret != PARSE_SUCCESS)
+		return false;
+	if (!cf_next_token(cfp))
+		return false;
+
+	while (!cf_token_is(cfp, ")")) {
+		if (cf_token_is(cfp, ";"))
+			break;
+
+		/* Default value */
+		cf_token_type type = cfp->cur_token->type;
+		if (type == CFTOKEN_NAME && !var.value.isValid()) {
+			var.value = QString::fromUtf8(cfp->cur_token->str.array,
+						      cfp->cur_token->str.len);
+			ret = cf_next_token_should_be(cfp, ",", ";", nullptr);
+			if (ret != PARSE_SUCCESS || !cf_next_token(cfp))
+				return false;
+			continue;
+		}
+
+		QString key = QString::fromUtf8(cfp->cur_token->str.array,
+						cfp->cur_token->str.len);
+		ret = cf_next_token_should_be(cfp, ",", ";", nullptr);
+		if (ret != PARSE_SUCCESS || !cf_next_token(cfp))
+			return false;
+
+		BPtr str = cf_literal_to_str(cfp->cur_token->str.array,
+					     cfp->cur_token->str.len);
+		QString value = QString::fromUtf8(str.Get());
+		var.presets.emplaceBack(make_pair(key, value));
+
+		ret = cf_next_token_should_be(cfp, ",", nullptr, nullptr);
+		if (ret != PARSE_SUCCESS)
+			break;
+		if (!cf_next_token(cfp))
+			return false;
+	}
+
+	return !var.presets.isEmpty();
+}
+
 static vector<OBSThemeVariable> ParseThemeVariables(const char *themeData)
 {
 	CFParser cfp;
@@ -311,6 +404,18 @@ static vector<OBSThemeVariable> ParseThemeVariables(const char *themeData)
 
 			var.type = OBSThemeVariable::Calc;
 			var.value = calc;
+		} else if (cf_token_is(cfp, "range")) {
+			if (!ParseRange(cfp, var))
+				continue;
+
+			var.editable = true;
+			var.type = OBSThemeVariable::Range;
+		} else if (cf_token_is(cfp, "preset")) {
+			if (!ParsePresets(cfp, var))
+				continue;
+
+			var.editable = true;
+			var.type = OBSThemeVariable::Preset;
 		} else {
 			var.type = OBSThemeVariable::String;
 			BPtr strVal =
@@ -369,6 +474,7 @@ void OBSApp::ParseThemeCustomisation(QHash<QString, OBSThemeVariable> &vars)
 			continue;
 		case OBSThemeVariable::Size:
 		case OBSThemeVariable::Number:
+		case OBSThemeVariable::Range:
 			dbl = config_get_double(globalConfig,
 						QT_TO_UTF8(sectionName),
 						QT_TO_UTF8(key));
@@ -381,6 +487,7 @@ void OBSApp::ParseThemeCustomisation(QHash<QString, OBSThemeVariable> &vars)
 			var.userValue = QColor(str);
 			break;
 		case OBSThemeVariable::String:
+		case OBSThemeVariable::Preset:
 			str = config_get_string(globalConfig,
 						QT_TO_UTF8(sectionName),
 						QT_TO_UTF8(key));
@@ -508,8 +615,11 @@ static bool ResolveVariable(const QHash<QString, OBSThemeVariable> &vars,
 	const OBSThemeVariable *varPtr = &var;
 	const OBSThemeVariable *realVar = varPtr;
 
-	while (realVar->type == OBSThemeVariable::Alias) {
-		QString newKey = realVar->value.toString();
+	while (realVar->type == OBSThemeVariable::Alias ||
+	       realVar->type == OBSThemeVariable::Preset) {
+		QString newKey = realVar->userValue.isValid()
+					 ? realVar->userValue.toString()
+					 : realVar->value.toString();
 
 		if (!vars.contains(newKey)) {
 			blog(LOG_ERROR,
@@ -664,6 +774,11 @@ static QString EvalCalc(const QHash<QString, OBSThemeVariable> &vars,
 	return result;
 }
 
+static QString PresetValue(const QHash<QString, OBSThemeVariable> &vars,
+			   const OBSThemeVariable &var)
+{
+}
+
 static QString PrepareQSS(const QHash<QString, OBSThemeVariable> &vars,
 			  const QStringList &contents)
 {
@@ -695,7 +810,8 @@ static QString PrepareQSS(const QHash<QString, OBSThemeVariable> &vars,
 		} else if (var.type == OBSThemeVariable::Calc) {
 			replace = EvalCalc(vars, var);
 		} else if (var.type == OBSThemeVariable::Size ||
-			   var.type == OBSThemeVariable::Number) {
+			   var.type == OBSThemeVariable::Number ||
+			   var.type == OBSThemeVariable::Range) {
 			double val = value.toDouble();
 			bool isInteger = ceill(val) == val;
 			replace = QString::number(val, 'f', isInteger ? 0 : -1);

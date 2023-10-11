@@ -111,8 +111,9 @@ SVGColourReplacement(const QHash<QString, OBSThemeVariable> &vars)
 	for (const OBSThemeVariable &var : vars) {
 		OBSThemeVariable realVar;
 
-		if (var.type == OBSThemeVariable::Alias)
-			realVar = vars[var.name];
+		if (var.type == OBSThemeVariable::Alias ||
+		    var.type == OBSThemeVariable::Preset)
+			realVar = vars[var.value.toString()];
 		else
 			realVar = var;
 
@@ -238,6 +239,7 @@ void OBSBasicSettings::LoadAppearanceSettings(bool reload)
 		QWidget *control = nullptr;
 
 		QLineEdit *le;
+		QComboBox *cb;
 		QDoubleSpinBox *sb;
 		ColorPickingWidget *cp;
 
@@ -270,6 +272,33 @@ void OBSBasicSettings::LoadAppearanceSettings(bool reload)
 			connect(sb, &QDoubleSpinBox::valueChanged, this,
 				&OBSBasicSettings::AppearanceChanged);
 			break;
+		case OBSThemeVariable::Range:
+			sb = new QDoubleSpinBox(ui->paletteGroupBox);
+			sb->setSingleStep(var.rangeStep);
+			sb->setRange(var.rangeMin, var.rangeMax);
+			sb->setValue(var.userValue.isValid()
+					     ? var.userValue.toDouble()
+					     : var.value.toDouble());
+			sb->setSuffix(var.suffix);
+			control = sb;
+			connect(sb, &QDoubleSpinBox::valueChanged, this,
+				&OBSBasicSettings::AppearanceChanged);
+			break;
+		case OBSThemeVariable::Preset:
+			cb = new QComboBox(ui->paletteGroupBox);
+
+			for (const auto &[key, desc] : var.presets)
+				cb->addItem(desc, key);
+
+			cb->setCurrentIndex(
+				cb->findData(var.userValue.isValid()
+						     ? var.userValue.toString()
+						     : var.value.toString()));
+
+			connect(cb, &QComboBox::currentIndexChanged, this,
+				&OBSBasicSettings::AppearanceChanged);
+			control = cb;
+			break;
 		case OBSThemeVariable::Color:
 			cp = new ColorPickingWidget(
 				var.userValue.value<QColor>(),
@@ -289,6 +318,7 @@ void OBSBasicSettings::LoadAppearanceSettings(bool reload)
 		default:
 			blog(LOG_ERROR, "Unknown variable format: %d",
 			     var.type);
+			label->deleteLater();
 			continue;
 		}
 		label->setBuddy(control);
@@ -360,7 +390,18 @@ void OBSBasicSettings::SaveAppearanceSettings()
 						  QT_TO_UTF8(sectionName),
 						  QT_TO_UTF8(label->text()),
 						  QT_TO_UTF8(le->text()));
-			} else {
+			} else if (w->inherits("QComboBox") &&
+				   WidgetChanged(w)) {
+				auto cb = dynamic_cast<QComboBox *>(w);
+				config_set_string(
+					config, QT_TO_UTF8(sectionName),
+					QT_TO_UTF8(label->text()),
+					QT_TO_UTF8(
+						cb->currentData().toString()));
+			} else if (w->inherits("QLineEdit") &&
+				   w->inherits("QComboBox") &&
+				   w->inherits("QDoubleSpinBox") &&
+				   w->inherits("ColorPickingWidget")) {
 				blog(LOG_WARNING,
 				     "Unknown theme customisation field type: %s",
 				     w->metaObject()->className());

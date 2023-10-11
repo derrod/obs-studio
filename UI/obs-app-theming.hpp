@@ -49,12 +49,22 @@ struct OBSThemeVariable {
 		String, /* Raw string (e.g. colour name, border style, etc.) */
 		Alias,  /* Points at another variable, value will be the key */
 		Calc,   /* Simple calculation with two operands */
+		Range,  /* Property with range for user-customisation */
+		Preset, /* Variable allowing for selection from various values */
 	};
 
 	/* Whether the variable should be editable in the UI */
 	bool editable = false;
 	/* Used for VariableType::Size only */
 	QString suffix;
+
+	/* Range stuff */
+	double rangeMin = 0.0;
+	double rangeMax = 100.0;
+	double rangeStep = 1.0;
+
+	/* Preset stuff (keys are aliases, value descriptions) */
+	QList<std::pair<QString, QString>> presets;
 
 	VariableType type;
 	QString name;
