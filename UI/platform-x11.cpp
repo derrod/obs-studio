@@ -207,7 +207,7 @@ string GetDefaultVideoSavePath()
 	if (!videoPath || videoPath[0] == '\0')
 		return getenv("HOME");
 
-	return videoPath;
+	return string(videoPath) + pathSuffix;
 }
 
 vector<string> GetPreferredLocales()

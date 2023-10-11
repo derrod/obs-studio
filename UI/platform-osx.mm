@@ -65,7 +65,7 @@ string GetDefaultVideoSavePath()
     if (!url)
         return getenv("HOME");
 
-    return url.path.fileSystemRepresentation;
+    return string(url.path.fileSystemRepresentation) + pathSuffix;
 }
 
 vector<string> GetPreferredLocales()

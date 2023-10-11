@@ -68,7 +68,7 @@ string GetDefaultVideoSavePath()
 			 path_utf16);
 
 	os_wcs_to_utf8(path_utf16, wcslen(path_utf16), path_utf8, MAX_PATH);
-	return string(path_utf8);
+	return string(path_utf8) + pathSuffix;
 }
 
 static vector<string> GetUserPreferredLocales()
