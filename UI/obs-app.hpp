@@ -119,6 +119,7 @@ private:
 	OBSTheme *currentTheme = nullptr;
 	QHash<QString, OBSTheme> themes;
 	QHash<QString, OBSThemeVariable> userVariables;
+	QStringList userVariableOrder;
 	QPointer<QFileSystemWatcher> themeWatcher;
 
 	void FindThemes();
@@ -158,9 +159,13 @@ public:
 	OBSTheme *GetTheme() const { return currentTheme; }
 	QList<OBSTheme> GetThemes() const { return themes.values(); }
 	OBSTheme *GetTheme(const QString &name);
-	QHash<QString, OBSThemeVariable> &GetThemeUserVars()
+	const QHash<QString, OBSThemeVariable> &GetThemeUserVars() const
 	{
 		return userVariables;
+	}
+	const QStringList &GetThemeVariableOrder() const
+	{
+		return userVariableOrder;
 	}
 	bool SetTheme(const QString &name);
 	bool IsThemeDark() const

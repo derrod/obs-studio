@@ -956,6 +956,7 @@ bool OBSApp::SetTheme(const QString &name)
 	currentTheme = theme;
 
 	userVariables.clear();
+	userVariableOrder.clear();
 	themeWatcher->removePaths(themeWatcher->files());
 
 	QStringList contents;
@@ -989,8 +990,12 @@ bool OBSApp::SetTheme(const QString &name)
 
 		for (OBSThemeVariable &var :
 		     ParseThemeVariables(content.constData())) {
-			if (var.editable)
+			if (var.editable) {
+				if (!userVariables.count(var.name))
+					userVariableOrder.append(var.name);
+
 				userVariables[var.name] = var;
+			}
 
 			vars[var.name] = std::move(var);
 		}

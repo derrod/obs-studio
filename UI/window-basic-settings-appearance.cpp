@@ -231,9 +231,11 @@ void OBSBasicSettings::LoadAppearanceSettings(bool reload)
 	ui->paletteGroupBox->setChecked(config_get_bool(
 		GetGlobalConfig(), "Appearance", "Customisation"));
 
-	auto userVars = App()->GetThemeUserVars();
+	auto &userVars = App()->GetThemeUserVars();
+	auto &userVarOrdered = App()->GetThemeVariableOrder();
 
-	for (const OBSThemeVariable &var : userVars) {
+	for (auto &key : userVarOrdered) {
+		const OBSThemeVariable &var = userVars[key];
 		auto label = new QLabel(var.name, ui->paletteGroupBox);
 
 		QWidget *control;
