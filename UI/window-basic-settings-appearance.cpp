@@ -236,8 +236,7 @@ void OBSBasicSettings::LoadAppearanceSettings(bool reload)
 	for (const OBSThemeVariable &var : userVars) {
 		auto label = new QLabel(var.name, ui->paletteGroupBox);
 
-		QWidget *control = nullptr;
-
+		QWidget *control;
 		QLineEdit *le;
 		QComboBox *cb;
 		QDoubleSpinBox *sb;
