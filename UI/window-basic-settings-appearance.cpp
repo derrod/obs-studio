@@ -239,6 +239,7 @@ void OBSBasicSettings::LoadAppearanceSettings(bool reload)
 		auto label = new QLabel(var.name, ui->paletteGroupBox);
 
 		QWidget *control;
+		QSlider *sl;
 		QLineEdit *le;
 		QComboBox *cb;
 		QDoubleSpinBox *sb;
@@ -274,15 +275,14 @@ void OBSBasicSettings::LoadAppearanceSettings(bool reload)
 				&OBSBasicSettings::AppearanceChanged);
 			break;
 		case OBSThemeVariable::Range:
-			sb = new QDoubleSpinBox(ui->paletteGroupBox);
-			sb->setSingleStep(var.rangeStep);
-			sb->setRange(var.rangeMin, var.rangeMax);
-			sb->setValue(var.userValue.isValid()
-					     ? var.userValue.toDouble()
-					     : var.value.toDouble());
-			sb->setSuffix(var.suffix);
-			control = sb;
-			connect(sb, &QDoubleSpinBox::valueChanged, this,
+			sl = new QSlider(Qt::Horizontal, ui->paletteGroupBox);
+			sl->setSingleStep((int)var.rangeStep);
+			sl->setRange((int)var.rangeMin, (int)var.rangeMax);
+			sl->setValue(var.userValue.isValid()
+					     ? var.userValue.toInt()
+					     : var.value.toInt());
+			control = sl;
+			connect(sl, &QSlider::valueChanged, this,
 				&OBSBasicSettings::AppearanceChanged);
 			break;
 		case OBSThemeVariable::Preset:
@@ -399,7 +399,14 @@ void OBSBasicSettings::SaveAppearanceSettings()
 					QT_TO_UTF8(label->text()),
 					QT_TO_UTF8(
 						cb->currentData().toString()));
-			} else if (!w->inherits("QLineEdit") &&
+			} else if (w->inherits("QSlider") && WidgetChanged(w)) {
+				auto dsb = dynamic_cast<QSlider *>(w);
+				config_set_double(config,
+						  QT_TO_UTF8(sectionName),
+						  QT_TO_UTF8(label->text()),
+						  dsb->value());
+			} else if (!w->inherits("QSlider") &&
+				   !w->inherits("QLineEdit") &&
 				   !w->inherits("QComboBox") &&
 				   !w->inherits("QDoubleSpinBox") &&
 				   !w->inherits("ColorPickingWidget")) {
