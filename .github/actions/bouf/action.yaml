@@ -81,16 +81,19 @@ runs:
         echo $KMS_BASE64 | base64 --decode > sa-kms.json
 
     - name: Download old builds
+      shell: pwsh
       run: |
         rclone -v copy --drive-shared-with-me --drive-service-account-file ${{ github.workspace }}/sa-drive.json :drive:old_builds old_builds
 
     - name: Log into gcloud
+      shell: pwsh
       env:
         ACCOUNT_NAME: ${{ inputs.kmsServiceAccountName }}
       run: |
         gcloud auth activate-service-account ${ACCOUNT_NAME} --key-file=${{ github.workspace }}/sa-kms.json
 
     - name: Run bouf
+      shell: pwsh
       env:
         UPDATER_PRIVATE_KEY: ${{ inputs.updaterPrivateKey }}
       run: |
