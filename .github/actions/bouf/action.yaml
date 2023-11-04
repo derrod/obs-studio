@@ -1,0 +1,89 @@
+name: Run bouf
+description: Generates signed OBS install files and updater files
+inputs:
+  updaterPrivateKey:
+    description: Private key for signing update manifest
+    required: true
+  driveServiceAccount:
+    description: base64-encoded Google service account file for syncing old builds for delta generation
+    required: true
+  kmsServiceAccount:
+    description: base64-encoded Google service account file for code signing
+    required: true
+  kmsServiceAccountName:
+    description: Google service account name
+    required: true
+  version:
+    description: Version string (e.g. 30.0.0-rc1)
+    required: true
+  channel:
+    description: Update channel
+    required: false
+    default: 'stable'
+
+runs:
+  using: composite
+  steps:
+    - name: Extract build
+      shell: bash
+      run: |
+        cd build
+        unzip *.zip
+        rm *.zip
+
+    - name: Setup rclone
+      shell: bash
+      run: |
+        mkdir rclone && cd rclone
+        wget https://downloads.rclone.org/v1.64.2/rclone-v1.64.2-windows-amd64.zip
+        # todo hash check
+        unzip rclone-v1.64.2-windows-amd64.zip
+        echo "${{ github.workspace }}\\rclone" >> $GITHUB_PATH
+
+    - name: Setup bouf
+      shell: bash
+      run: |
+        mkdir bouf && cd bouf
+        wget https://r2.rodney.io/bouf-build-windows-latest.zip
+        # todo hash check
+        unzip bouf-build-windows-latest.zip
+        echo "${{ github.workspace }}\\bouf" >> $GITHUB_PATH
+
+    - name: Setup Google CNG Provider
+      shell: bash
+      run: |
+        mkdir gcng && cd gcng
+        wget https://github.com/GoogleCloudPlatform/kms-integrations/releases/download/cng-v0.9/kmscng-0.9-windows-amd64.zip
+        unzip kmscng-0.9-windows-amd64.zip
+        openssl dgst -sha384 -verify repo/build-aux/bouf/cng-release-signing-key.pem -signature kmscng.msi.sig kmscng.msi
+        msiexec /i kmscng.msi /quiet /qn /norestart
+
+    - name: Setup Google Cloud CLI
+      shell: bash
+      run: |
+        mkdir gcloud-cli && cd gcloud-cli
+        wget https://dl.google.com/dl/cloudsdk/channels/rapid/GoogleCloudSDKInstaller.exe
+        ./GoogleCloudSDKInstaller.exe /S
+
+    - name: Restore service accounts
+      shell: bash
+      env:
+        DRIVE_BASE64: ${{ inputs.driveServiceAccount }}
+        KMS_BASE64: ${{ inputs.kmsServiceAccount }}
+      run: |
+        echo $DRIVE_BASE64 | base64 --decode > sa-drive.json
+        echo $KMS_BASE64 | base64 --decode > sa-kms.json
+
+    - name: Download old builds
+      run: |
+        rclone -v copy --drive-shared-with-me --drive-service-account-file ${{ github.workspace }}/sa-drive.json :drive:old_builds old_builds
+
+    - name: Log into gcloud
+      env:
+        ACCOUNT_NAME: ${{ inputs.kmsServiceAccountName }}
+      run: |
+        gcloud auth activate-service-account ${ACCOUNT_NAME} --key-file=${{ github.workspace }}/sa-kms.json
+
+    - name: Run bouf
+      run: |
+        bouf --config repo/build-aux/bouf/config.toml --version ${{ inputs.version }} -i build -p old_builds -o output --clear-output

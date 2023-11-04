@@ -194,6 +194,55 @@ jobs:
           name: macos-sparkle-update
           path: ${{ github.workspace }}/output
 
+  create-windows-update:
+    name: Create Windows Update 🎙️
+    if: github.ref_type == 'tag'
+    runs-on: windows-2022
+    needs: build-project
+    strategy:
+      fail-fast: false
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          path: "repo"
+          fetch-depth: 0
+          ref: ${{ github.ref }}
+
+      - name: Set Up Environment 🔧
+        id: setup
+        shell: bash
+        run: |
+          channel='stable'
+          if [[ ${GITHUB_REF_NAME} =~ (beta|rc) ]]; then
+            channel="beta"
+          fi
+
+          echo "commitHash=${GITHUB_SHA:0:9}" >> $GITHUB_OUTPUT
+          echo "channel=${channel}" >> $GITHUB_OUTPUT
+
+      - name: Download Artifact 📥
+        uses: actions/download-artifact@v3
+        with:
+          name: obs-studio-windows-x64-${{ steps.setup.outputs.commitHash }}
+          path: ${{ github.workspace }}/build
+
+      - name: Run bouf 🎙️
+        id: bouf
+        uses: ./.github/actions/bouf
+        with:
+          updaterPrivateKey: ${{ secrets.UPDATER_PRIVATE_KEY }}
+          driveServiceAccount: ${{ secrets.RCLONE_SERVICE_ACCOUNT }}
+          kmsServiceAccount: ${{ secrets.KMS_SERVICE_ACCOUNT }}
+          kmsServiceAccountName: ${{ secrets.KMS_SERVICE_ACCOUNT_NAME }}
+          version: ${{ github.ref_name }}
+          channel: ${{ steps.setup.outputs.channel }}
+
+      - name: Upload Artifacts 📡
+        uses: actions/upload-artifact@v3
+        with:
+          name: windows-bouf-output
+          path: ${{ github.workspace }}/output
+
   create-release:
     name: Create Release 🛫
     if: github.ref_type == 'tag'
