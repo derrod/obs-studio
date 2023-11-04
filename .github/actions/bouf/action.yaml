@@ -24,6 +24,12 @@ inputs:
 runs:
   using: composite
   steps:
+    - name: Checkout bouf repo
+      uses: actions/checkout@v4
+      with:
+        repository: 'obsproject/bouf'
+        path: 'bouf-repo'
+
     - name: Extract build
       shell: bash
       run: |
@@ -85,5 +91,7 @@ runs:
         gcloud auth activate-service-account ${ACCOUNT_NAME} --key-file=${{ github.workspace }}/sa-kms.json
 
     - name: Run bouf
+      env:
+        UPDATER_PRIVATE_KEY: ${{ inputs.updaterPrivateKey }}
       run: |
         bouf --config repo/build-aux/bouf/config.toml --version ${{ inputs.version }} -i build -p old_builds -o output --clear-output
