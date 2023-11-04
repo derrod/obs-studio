@@ -228,7 +228,7 @@ jobs:
 
       - name: Run bouf 🎙️
         id: bouf
-        uses: ./.github/actions/bouf
+        uses: ./repo/.github/actions/bouf
         with:
           updaterPrivateKey: ${{ secrets.UPDATER_PRIVATE_KEY }}
           driveServiceAccount: ${{ secrets.RCLONE_SERVICE_ACCOUNT }}
