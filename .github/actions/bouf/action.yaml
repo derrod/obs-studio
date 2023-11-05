@@ -44,7 +44,7 @@ runs:
         curl -O -L https://downloads.rclone.org/v1.64.2/rclone-v1.64.2-windows-amd64.zip
         # todo hash check
         unzip rclone-v1.64.2-windows-amd64.zip
-        echo '${{ github.workspace }}\rlone\rclone-v1.64.2-windows-amd64' >> $GITHUB_PATH
+        echo '${{ github.workspace }}\rclone\rclone-v1.64.2-windows-amd64' >> $GITHUB_PATH
 
     - name: Setup bouf
       shell: bash
