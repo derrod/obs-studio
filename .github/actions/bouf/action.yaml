@@ -44,7 +44,7 @@ runs:
         curl -O -L https://downloads.rclone.org/v1.64.2/rclone-v1.64.2-windows-amd64.zip
         # todo hash check
         unzip rclone-v1.64.2-windows-amd64.zip
-        echo "${{ github.workspace }}\\rclone" >> $GITHUB_PATH
+        echo '${{ github.workspace }}\rlone\rclone-v1.64.2-windows-amd64' >> $GITHUB_PATH
 
     - name: Setup bouf
       shell: bash
@@ -53,23 +53,26 @@ runs:
         curl -O -L https://r2.rodney.io/bouf-build-windows-latest.zip
         # todo hash check
         unzip bouf-build-windows-latest.zip
-        echo "${{ github.workspace }}\\bouf" >> $GITHUB_PATH
+        echo "${{ github.workspace }}\bouf" >> $GITHUB_PATH
 
-    - name: Setup Google CNG Provider
+    - name: Download Google CNG Provider
       shell: bash
       run: |
         mkdir gcng && cd gcng
         curl -O -L https://github.com/GoogleCloudPlatform/kms-integrations/releases/download/cng-v0.9/kmscng-0.9-windows-amd64.zip
         unzip kmscng-0.9-windows-amd64.zip
         openssl dgst -sha384 -verify ../repo/build-aux/bouf/cng-release-signing-key.pem -signature kmscng-0.9-windows-amd64/kmscng.msi.sig kmscng-0.9-windows-amd64/kmscng.msi
-        msiexec.exe /i kmscng-0.9-windows-amd64/kmscng.msi /qn /norestart
+
+    - name: Setup Google CNG Provider
+      shell: cmd
+      run: |
+        msiexec /i gcng\kmscng-0.9-windows-amd64\kmscng.msi /qn /norestart
 
     - name: Setup Google Cloud CLI
-      shell: bash
+      shell: pwsh
       run: |
-        mkdir gcloud-cli && cd gcloud-cli
-        curl -O -L https://dl.google.com/dl/cloudsdk/channels/rapid/GoogleCloudSDKInstaller.exe
-        ./GoogleCloudSDKInstaller.exe /S
+        (New-Object Net.WebClient).DownloadFile("https://dl.google.com/dl/cloudsdk/channels/rapid/GoogleCloudSDKInstaller.exe", "$env:Temp\GoogleCloudSDKInstaller.exe")
+        & $env:Temp\GoogleCloudSDKInstaller.exe /S
 
     - name: Restore service accounts
       shell: bash
