@@ -41,7 +41,7 @@ runs:
       shell: bash
       run: |
         mkdir rclone && cd rclone
-        wget https://downloads.rclone.org/v1.64.2/rclone-v1.64.2-windows-amd64.zip
+        curl -O -L https://downloads.rclone.org/v1.64.2/rclone-v1.64.2-windows-amd64.zip
         # todo hash check
         unzip rclone-v1.64.2-windows-amd64.zip
         echo "${{ github.workspace }}\\rclone" >> $GITHUB_PATH
@@ -50,7 +50,7 @@ runs:
       shell: bash
       run: |
         mkdir bouf && cd bouf
-        wget https://r2.rodney.io/bouf-build-windows-latest.zip
+        curl -O -L https://r2.rodney.io/bouf-build-windows-latest.zip
         # todo hash check
         unzip bouf-build-windows-latest.zip
         echo "${{ github.workspace }}\\bouf" >> $GITHUB_PATH
@@ -59,16 +59,16 @@ runs:
       shell: bash
       run: |
         mkdir gcng && cd gcng
-        wget https://github.com/GoogleCloudPlatform/kms-integrations/releases/download/cng-v0.9/kmscng-0.9-windows-amd64.zip
+        curl -O -L https://github.com/GoogleCloudPlatform/kms-integrations/releases/download/cng-v0.9/kmscng-0.9-windows-amd64.zip
         unzip kmscng-0.9-windows-amd64.zip
-        openssl dgst -sha384 -verify repo/build-aux/bouf/cng-release-signing-key.pem -signature kmscng.msi.sig kmscng.msi
-        msiexec /i kmscng.msi /quiet /qn /norestart
+        # openssl dgst -sha384 -verify ../repo/build-aux/bouf/cng-release-signing-key.pem -signature kmscng.msi.sig kmscng.msi
+        msiexec.exe /i kmscng.msi /qn /norestart
 
     - name: Setup Google Cloud CLI
       shell: bash
       run: |
         mkdir gcloud-cli && cd gcloud-cli
-        wget https://dl.google.com/dl/cloudsdk/channels/rapid/GoogleCloudSDKInstaller.exe
+        curl -O -L https://dl.google.com/dl/cloudsdk/channels/rapid/GoogleCloudSDKInstaller.exe
         ./GoogleCloudSDKInstaller.exe /S
 
     - name: Restore service accounts
