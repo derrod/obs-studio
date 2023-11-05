@@ -61,8 +61,8 @@ runs:
         mkdir gcng && cd gcng
         curl -O -L https://github.com/GoogleCloudPlatform/kms-integrations/releases/download/cng-v0.9/kmscng-0.9-windows-amd64.zip
         unzip kmscng-0.9-windows-amd64.zip
-        # openssl dgst -sha384 -verify ../repo/build-aux/bouf/cng-release-signing-key.pem -signature kmscng.msi.sig kmscng.msi
-        msiexec.exe /i kmscng.msi /qn /norestart
+        openssl dgst -sha384 -verify ../repo/build-aux/bouf/cng-release-signing-key.pem -signature kmscng-0.9-windows-amd64/kmscng.msi.sig kmscng-0.9-windows-amd64/kmscng.msi
+        msiexec.exe /i kmscng-0.9-windows-amd64/kmscng.msi /qn /norestart
 
     - name: Setup Google Cloud CLI
       shell: bash
