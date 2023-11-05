@@ -34,7 +34,7 @@ runs:
       shell: bash
       run: |
         cd build
-        unzip *.zip
+        unzip -q *.zip
         rm *.zip
 
     - name: Setup rclone
