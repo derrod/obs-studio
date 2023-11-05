@@ -77,7 +77,7 @@ runs:
     - name: Install Google Cloud CLI
       shell: cmd
       run: |
-        gcloud-cli\GoogleCloudSDKInstaller.exe /S
+        gcloud-cli\GoogleCloudSDKInstaller.exe /S /allusers
 
     - name: Restore service accounts
       shell: bash
@@ -91,7 +91,7 @@ runs:
     - name: Download old builds
       shell: pwsh
       run: |
-        rclone -v copy --drive-shared-with-me --drive-service-account-file ${{ github.workspace }}/sa-drive.json :drive:old_builds old_builds
+        rclone copy --transfers 20 --drive-shared-with-me --drive-service-account-file ${{ github.workspace }}/sa-drive.json :drive:old_builds old_builds
 
     - name: Log into gcloud
       shell: pwsh
