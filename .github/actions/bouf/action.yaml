@@ -100,5 +100,6 @@ runs:
       shell: pwsh
       env:
         UPDATER_PRIVATE_KEY: ${{ inputs.updaterPrivateKey }}
+        GOOGLE_APPLICATION_CREDENTIALS: '${{ github.workspace }}/sa-kms.json'
       run: |
         bouf --config repo/build-aux/bouf/config.toml --version ${{ inputs.version }} -i build -p old_builds -o output --clear-output
