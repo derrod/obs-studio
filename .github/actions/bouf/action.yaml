@@ -68,9 +68,6 @@ runs:
       run: |
         msiexec /i gcng\kmscng-0.9-windows-amd64\kmscng.msi /qn /norestart
 
-    - name: 'Set up Cloud SDK'
-      uses: 'google-github-actions/setup-gcloud@v1'
-
     - name: Install pandoc
       shell: pwsh
       run: choco install pandoc --no-progress -y
@@ -88,13 +85,6 @@ runs:
       shell: pwsh
       run: |
         rclone copy --transfers 20 --drive-shared-with-me --drive-service-account-file ${{ github.workspace }}/sa-drive.json :drive:old_builds old_builds
-
-    - name: Log into gcloud
-      shell: pwsh
-      env:
-        ACCOUNT_NAME: ${{ inputs.kmsServiceAccountName }}
-      run: |
-        gcloud auth activate-service-account ${ACCOUNT_NAME} --key-file=${{ github.workspace }}/sa-kms.json
 
     - name: Run bouf
       shell: pwsh
