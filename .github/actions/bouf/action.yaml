@@ -73,7 +73,7 @@ runs:
 
     - name: Install pandoc
       shell: pwsh
-      run: choco install pandoc
+      run: choco install pandoc --no-progress -y
 
     - name: Restore service accounts
       shell: bash
