@@ -71,6 +71,10 @@ runs:
     - name: 'Set up Cloud SDK'
       uses: 'google-github-actions/setup-gcloud@v1'
 
+    - name: Install pandoc
+      shell: pwsh
+      run: choco install pandoc
+
     - name: Restore service accounts
       shell: bash
       env:
