@@ -68,16 +68,8 @@ runs:
       run: |
         msiexec /i gcng\kmscng-0.9-windows-amd64\kmscng.msi /qn /norestart
 
-    - name: Download Google Cloud CLI
-      shell: bash
-      run: |
-        mkdir gcloud-cli && cd gcloud-cli
-        curl -O -L https://dl.google.com/dl/cloudsdk/channels/rapid/GoogleCloudSDKInstaller.exe
-
-    - name: Install Google Cloud CLI
-      shell: cmd
-      run: |
-        gcloud-cli\GoogleCloudSDKInstaller.exe /S /allusers
+    - name: 'Set up Cloud SDK'
+      uses: 'google-github-actions/setup-gcloud@v1'
 
     - name: Restore service accounts
       shell: bash
