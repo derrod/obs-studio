@@ -196,7 +196,7 @@ jobs:
 
   create-windows-update:
     name: Create Windows Update 🥩
-    if: github.repository_owner == 'obsproject' && github.ref_type == 'tag'
+    if: github.ref_type == 'tag'
     runs-on: windows-2022
     needs: build-project
     permissions:
