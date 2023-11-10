@@ -91,10 +91,9 @@ runs:
     - name: Download Old Builds
       shell: pwsh
       env:
-        RCLONE_DRIVE_ENV_AUTH: 'true'
-        RCLONE_DRIVE_SHARED_WITH_ME: 'true'
+        RCLONE_GCS_ENV_AUTH: 'true'
       run: |
-        rclone copy --transfers 40 :drive:old_builds "${{ github.workspace }}/old_builds"
+        rclone copy --transfers 100 --fast-list :gcs:obs-builds "${{ github.workspace }}/old_builds"
 
     - name: Run bouf
       shell: pwsh
@@ -112,6 +111,14 @@ runs:
            "-o",           "${{ github.workspace }}/output"
         )
         Invoke-External "${{ github.workspace }}\bouf\bin\bouf.exe" @boufArgs
+
+    - name: Upload new builds
+      shell: pwsh
+      env:
+        RCLONE_GCS_ENV_AUTH: 'true'
+        RCLONE_GCS_BUCKET_POLICY_ONLY: 'true'
+      run: |
+        rclone copy --transfers 100 --fast-list "${{ github.workspace }}/old_builds" :gcs:obs-builds
 
     - name: Cleanup bouf Output Directory
       shell: pwsh
