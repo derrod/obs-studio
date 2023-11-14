@@ -321,6 +321,10 @@ jobs:
     name: Windows 🪟
     runs-on: windows-2022
     needs: check-event
+    strategy:
+      fail-fast: false
+      matrix:
+        config: [ '${{ needs.check-event.outputs.config }}', 'Debug' ]
     defaults:
       run:
         shell: pwsh
@@ -335,7 +339,7 @@ jobs:
         if: github.event_name == 'pull_request'
         with:
           path: ${{ github.workspace }}/.ccache
-          key: ${{ runner.os }}-ccache-x86_64-${{ needs.check-event.outputs.config }}
+          key: ${{ runner.os }}-ccache-x86_64-${{ matrix.config }}
           restore-keys: |
             ${{ runner.os }}-ccache-x86_64-
 
@@ -353,16 +357,18 @@ jobs:
           GPU_PRIORITY_VAL: ${{ secrets.GPU_PRIORITY_VAL }}
         with:
           target: x64
-          config: ${{ needs.check-event.outputs.config }}
+          config: ${{ matrix.config }}
 
       - name: Package OBS Studio 📀
+        if: matrix.config != 'Debug'
         uses: ./.github/actions/package-obs
         with:
           target: x64
-          config: ${{ needs.check-event.outputs.config }}
+          config: ${{ matrix.config }}
           package: ${{ fromJSON(needs.check-event.outputs.package) }}
 
       - name: Upload Artifacts 📡
+        if: matrix.config != 'Debug'
         uses: actions/upload-artifact@v3
         with:
           name: obs-studio-windows-x64-${{ needs.check-event.outputs.commitHash }}
