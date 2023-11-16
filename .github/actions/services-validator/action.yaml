@@ -82,6 +82,29 @@ runs:
         key: service-check-${{ github.run_id }}
         restore-keys: service-check-
 
+    - name: Install Cloudflare WARP
+      if: fromJSON(inputs.runServiceChecks)
+      shell: bash
+      run: |
+        : Install WARP
+        curl https://pkg.cloudflareclient.com/pubkey.gpg | sudo gpg --yes --dearmor --output /usr/share/keyrings/cloudflare-warp-archive-keyring.gpg
+        sudo tee /etc/apt/sources.list.d/cloudflare-client.list <<EOF
+        deb [arch=amd64 signed-by=/usr/share/keyrings/cloudflare-warp-archive-keyring.gpg] https://pkg.cloudflareclient.com/ $(lsb_release -cs) main
+        EOF
+        sudo apt-get update
+        sudo apt-get install -y cloudflare-warp
+
+    - name: Start WARP
+      if: fromJSON(inputs.runServiceChecks)
+      shell: bash
+      run: |
+        : Connect to WARP VPN
+        warp-cli --accept-tos register
+        warp-cli --accept-tos connect
+        warp-cli --accept-tos enable-always-on
+        sleep 1 && echo "Cloudflare trace:"
+        curl -si https://cloudflare.com/cdn-cgi/trace
+
     - name: Check for defunct services 📉
       id: services-check
       if: fromJSON(inputs.runServiceChecks)
