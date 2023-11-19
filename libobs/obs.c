@@ -22,6 +22,7 @@
 
 #include "obs.h"
 #include "obs-internal.h"
+#include "obs-scene.h"
 
 struct obs_core *obs = NULL;
 
@@ -740,6 +741,24 @@ struct obs_core_video_mix *obs_create_video_mix(struct obs_video_info *ovi)
 	return video;
 }
 
+static bool update_transform_sceneitem_cb(obs_scene_t *scene,
+					  obs_sceneitem_t *item, void *param)
+{
+	UNUSED_PARAMETER(param);
+	UNUSED_PARAMETER(scene);
+	os_atomic_set_bool(&item->update_transform, true);
+	return true;
+}
+
+static bool update_transform_scene_cb(void *param, obs_source_t *source)
+{
+	UNUSED_PARAMETER(param);
+
+	obs_scene_t *scene = obs_scene_from_source(source);
+	obs_scene_enum_items(scene, update_transform_sceneitem_cb, NULL);
+	return true;
+}
+
 static int obs_init_video(struct obs_video_info *ovi)
 {
 	struct obs_core_video *video = &obs->video;
@@ -771,6 +790,9 @@ static int obs_init_video(struct obs_video_info *ovi)
 		return OBS_VIDEO_FAIL;
 
 	video->thread_initialized = true;
+
+	// HACK: Force all sceneitems to update their transforms
+	obs_enum_scenes(update_transform_scene_cb, NULL);
 
 	return OBS_VIDEO_SUCCESS;
 }

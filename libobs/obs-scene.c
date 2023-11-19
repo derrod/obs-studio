@@ -351,6 +351,20 @@ void add_alignment(struct vec2 *v, uint32_t align, int cx, int cy)
 		v->y += (float)(cy / 2);
 }
 
+static inline void vec2_copy_from_absolute(struct vec2 *dst,
+					   const struct vec2 *v)
+{
+	dst->x = v->x / (float)obs->video.main_mix->ovi.base_width;
+	dst->y = v->y / (float)obs->video.main_mix->ovi.base_height;
+}
+
+static inline void vec2_copy_from_relative(struct vec2 *dst,
+					   const struct vec2 *v)
+{
+	dst->x = v->x * (float)obs->video.main_mix->ovi.base_width;
+	dst->y = v->y * (float)obs->video.main_mix->ovi.base_height;
+}
+
 static void calculate_bounds_data(struct obs_scene_item *item,
 				  struct vec2 *origin, struct vec2 *scale,
 				  uint32_t *cx, uint32_t *cy)
@@ -430,6 +444,7 @@ static void update_item_transform(struct obs_scene_item *item, bool update_tex)
 	struct vec2 base_origin;
 	struct vec2 origin;
 	struct vec2 scale;
+	struct vec2 pos_abs;
 	struct calldata params;
 	uint8_t stack[128];
 
@@ -459,6 +474,7 @@ static void update_item_transform(struct obs_scene_item *item, bool update_tex)
 		cy = (uint32_t)((float)cy * scale.y);
 	}
 
+	vec2_copy_from_relative(&pos_abs, &item->pos);
 	add_alignment(&origin, item->align, (int)cx, (int)cy);
 
 	matrix4_identity(&item->draw_transform);
@@ -469,7 +485,7 @@ static void update_item_transform(struct obs_scene_item *item, bool update_tex)
 	matrix4_rotate_aa4f(&item->draw_transform, &item->draw_transform, 0.0f,
 			    0.0f, 1.0f, RAD(item->rot));
 	matrix4_translate3f(&item->draw_transform, &item->draw_transform,
-			    item->pos.x, item->pos.y, 0.0f);
+			    pos_abs.x, pos_abs.y, 0.0f);
 
 	item->output_scale = scale;
 
@@ -494,7 +510,7 @@ static void update_item_transform(struct obs_scene_item *item, bool update_tex)
 	matrix4_rotate_aa4f(&item->box_transform, &item->box_transform, 0.0f,
 			    0.0f, 1.0f, RAD(item->rot));
 	matrix4_translate3f(&item->box_transform, &item->box_transform,
-			    item->pos.x, item->pos.y, 0.0f);
+			    pos_abs.x, pos_abs.y, 0.0f);
 
 	/* ----------------------- */
 
@@ -2517,7 +2533,7 @@ bool obs_sceneitem_selected(const obs_sceneitem_t *item)
 void obs_sceneitem_set_pos(obs_sceneitem_t *item, const struct vec2 *pos)
 {
 	if (item) {
-		vec2_copy(&item->pos, pos);
+		vec2_copy_from_absolute(&item->pos, pos);
 		do_update_transform(item);
 	}
 }
@@ -2697,7 +2713,7 @@ void obs_sceneitem_set_bounds(obs_sceneitem_t *item, const struct vec2 *bounds)
 void obs_sceneitem_get_pos(const obs_sceneitem_t *item, struct vec2 *pos)
 {
 	if (item)
-		vec2_copy(pos, &item->pos);
+		vec2_copy_from_relative(pos, &item->pos);
 }
 
 float obs_sceneitem_get_rot(const obs_sceneitem_t *item)
@@ -2736,7 +2752,7 @@ void obs_sceneitem_get_info(const obs_sceneitem_t *item,
 			    struct obs_transform_info *info)
 {
 	if (item && info) {
-		info->pos = item->pos;
+		vec2_copy_from_relative(&info->pos, &item->pos);
 		info->rot = item->rot;
 		info->scale = item->scale;
 		info->alignment = item->align;
@@ -2750,7 +2766,7 @@ void obs_sceneitem_set_info(obs_sceneitem_t *item,
 			    const struct obs_transform_info *info)
 {
 	if (item && info) {
-		item->pos = info->pos;
+		vec2_copy_from_absolute(&item->pos, &info->pos);
 		item->rot = info->rot;
 		if (isfinite(info->scale.x) && isfinite(info->scale.y)) {
 			item->scale = info->scale;
