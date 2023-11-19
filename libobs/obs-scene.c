@@ -372,12 +372,15 @@ static void calculate_bounds_data(struct obs_scene_item *item,
 	float width = (float)(*cx) * fabsf(scale->x);
 	float height = (float)(*cy) * fabsf(scale->y);
 	float item_aspect = width / height;
-	float bounds_aspect = item->bounds.x / item->bounds.y;
 	uint32_t bounds_type = item->bounds_type;
 	float width_diff, height_diff;
 
+	struct vec2 bounds_abs;
+	vec2_copy_from_relative(&bounds_abs, &item->bounds);
+	float bounds_aspect = bounds_abs.x / bounds_abs.y;
+
 	if (item->bounds_type == OBS_BOUNDS_MAX_ONLY)
-		if (width > item->bounds.x || height > item->bounds.y)
+		if (width > bounds_abs.x || height > bounds_abs.y)
 			bounds_type = OBS_BOUNDS_SCALE_INNER;
 
 	if (bounds_type == OBS_BOUNDS_SCALE_INNER ||
@@ -388,30 +391,29 @@ static void calculate_bounds_data(struct obs_scene_item *item,
 		if (item->bounds_type == OBS_BOUNDS_SCALE_OUTER)
 			use_width = !use_width;
 
-		mul = use_width ? item->bounds.x / width
-				: item->bounds.y / height;
+		mul = use_width ? bounds_abs.x / width : bounds_abs.y / height;
 
 		vec2_mulf(scale, scale, mul);
 
 	} else if (bounds_type == OBS_BOUNDS_SCALE_TO_WIDTH) {
-		vec2_mulf(scale, scale, item->bounds.x / width);
+		vec2_mulf(scale, scale, bounds_abs.x / width);
 
 	} else if (bounds_type == OBS_BOUNDS_SCALE_TO_HEIGHT) {
-		vec2_mulf(scale, scale, item->bounds.y / height);
+		vec2_mulf(scale, scale, bounds_abs.y / height);
 
 	} else if (bounds_type == OBS_BOUNDS_STRETCH) {
-		scale->x = copysignf(item->bounds.x / (float)(*cx), scale->x);
-		scale->y = copysignf(item->bounds.y / (float)(*cy), scale->y);
+		scale->x = copysignf(bounds_abs.x / (float)(*cx), scale->x);
+		scale->y = copysignf(bounds_abs.y / (float)(*cy), scale->y);
 	}
 
 	width = (float)(*cx) * scale->x;
 	height = (float)(*cy) * scale->y;
 
 	/* Disregards flip when calculating size diff */
-	width_diff = item->bounds.x - fabsf(width);
-	height_diff = item->bounds.y - fabsf(height);
-	*cx = (uint32_t)item->bounds.x;
-	*cy = (uint32_t)item->bounds.y;
+	width_diff = bounds_abs.x - fabsf(width);
+	height_diff = bounds_abs.y - fabsf(height);
+	*cx = (uint32_t)bounds_abs.x;
+	*cy = (uint32_t)bounds_abs.y;
 
 	add_alignment(origin, item->bounds_align, (int)-width_diff,
 		      (int)-height_diff);
@@ -499,7 +501,7 @@ static void update_item_transform(struct obs_scene_item *item, bool update_tex)
 	/* ----------------------- */
 
 	if (item->bounds_type != OBS_BOUNDS_NONE) {
-		vec2_copy(&scale, &item->bounds);
+		vec2_copy_from_relative(&scale, &item->bounds);
 	} else {
 		scale.x = (float)width * item->scale.x * scale_mul.x;
 		scale.y = (float)height * item->scale.y * scale_mul.y;
@@ -2716,7 +2718,7 @@ void obs_sceneitem_set_bounds_alignment(obs_sceneitem_t *item,
 void obs_sceneitem_set_bounds(obs_sceneitem_t *item, const struct vec2 *bounds)
 {
 	if (item) {
-		item->bounds = *bounds;
+		vec2_copy_from_absolute(&item->bounds, bounds);
 		do_update_transform(item);
 	}
 }
@@ -2756,7 +2758,7 @@ uint32_t obs_sceneitem_get_bounds_alignment(const obs_sceneitem_t *item)
 void obs_sceneitem_get_bounds(const obs_sceneitem_t *item, struct vec2 *bounds)
 {
 	if (item)
-		*bounds = item->bounds;
+		vec2_copy_from_relative(bounds, &item->bounds);
 }
 
 void obs_sceneitem_get_info(const obs_sceneitem_t *item,
@@ -2769,7 +2771,7 @@ void obs_sceneitem_get_info(const obs_sceneitem_t *item,
 		info->alignment = item->align;
 		info->bounds_type = item->bounds_type;
 		info->bounds_alignment = item->bounds_align;
-		info->bounds = item->bounds;
+		vec2_copy_from_relative(&info->bounds, &item->bounds);
 	}
 }
 
@@ -2785,7 +2787,7 @@ void obs_sceneitem_set_info(obs_sceneitem_t *item,
 		item->align = info->alignment;
 		item->bounds_type = info->bounds_type;
 		item->bounds_align = info->bounds_alignment;
-		item->bounds = info->bounds;
+		vec2_copy_from_absolute(&item->bounds, &info->bounds);
 		do_update_transform(item);
 	}
 }
