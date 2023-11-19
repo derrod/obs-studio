@@ -2562,7 +2562,8 @@ void obs_sceneitem_set_rot(obs_sceneitem_t *item, float rot)
 void obs_sceneitem_set_scale(obs_sceneitem_t *item, const struct vec2 *scale)
 {
 	if (item) {
-		vec2_copy(&item->scale, scale);
+		vec2_mul(&item->scale, scale, &item->scale_ref);
+		vec2_copy_from_absolute(&item->scale, &item->scale);
 		do_update_transform(item);
 	}
 }
@@ -2736,8 +2737,10 @@ float obs_sceneitem_get_rot(const obs_sceneitem_t *item)
 
 void obs_sceneitem_get_scale(const obs_sceneitem_t *item, struct vec2 *scale)
 {
-	if (item)
-		vec2_copy(scale, &item->scale);
+	if (item) {
+		vec2_copy_from_relative(scale, &item->scale);
+		vec2_div(scale, scale, &item->scale_ref);
+	}
 }
 
 uint32_t obs_sceneitem_get_alignment(const obs_sceneitem_t *item)
@@ -2767,7 +2770,7 @@ void obs_sceneitem_get_info(const obs_sceneitem_t *item,
 	if (item && info) {
 		vec2_copy_from_relative(&info->pos, &item->pos);
 		info->rot = item->rot;
-		info->scale = item->scale;
+		obs_sceneitem_get_scale(item, &info->scale);
 		info->alignment = item->align;
 		info->bounds_type = item->bounds_type;
 		info->bounds_alignment = item->bounds_align;
@@ -2782,7 +2785,8 @@ void obs_sceneitem_set_info(obs_sceneitem_t *item,
 		vec2_copy_from_absolute(&item->pos, &info->pos);
 		item->rot = info->rot;
 		if (isfinite(info->scale.x) && isfinite(info->scale.y)) {
-			item->scale = info->scale;
+			vec2_mul(&item->scale, &info->scale, &item->scale_ref);
+			vec2_copy_from_absolute(&item->scale, &item->scale);
 		}
 		item->align = info->alignment;
 		item->bounds_type = info->bounds_type;
