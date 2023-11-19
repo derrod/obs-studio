@@ -445,6 +445,7 @@ static void update_item_transform(struct obs_scene_item *item, bool update_tex)
 	struct vec2 origin;
 	struct vec2 scale;
 	struct vec2 pos_abs;
+	struct vec2 scale_mul;
 	struct calldata params;
 	uint8_t stack[128];
 
@@ -465,11 +466,17 @@ static void update_item_transform(struct obs_scene_item *item, bool update_tex)
 	vec2_zero(&base_origin);
 	vec2_zero(&origin);
 
+	/* HACK: Calculate scale factor, this can probably be done more elegantly. */
+	vec2_set(&scale_mul, 1.0f, 1.0f);
+	vec2_copy_from_relative(&scale_mul, &scale_mul);
+	vec2_div(&scale_mul, &scale_mul, &item->scale_ref);
+
 	/* ----------------------- */
 
 	if (item->bounds_type != OBS_BOUNDS_NONE) {
 		calculate_bounds_data(item, &origin, &scale, &cx, &cy);
 	} else {
+		vec2_mul(&scale, &scale, &scale_mul);
 		cx = (uint32_t)((float)cx * scale.x);
 		cy = (uint32_t)((float)cy * scale.y);
 	}
@@ -494,8 +501,8 @@ static void update_item_transform(struct obs_scene_item *item, bool update_tex)
 	if (item->bounds_type != OBS_BOUNDS_NONE) {
 		vec2_copy(&scale, &item->bounds);
 	} else {
-		scale.x = (float)width * item->scale.x;
-		scale.y = (float)height * item->scale.y;
+		scale.x = (float)width * item->scale.x * scale_mul.x;
+		scale.y = (float)height * item->scale.y * scale_mul.y;
 	}
 
 	item->box_scale = scale;
@@ -1033,6 +1040,7 @@ static void scene_load_item(struct obs_scene *scene, obs_data_t *item_data)
 	lock = obs_data_get_bool(item_data, "locked");
 	obs_data_get_vec2(item_data, "pos", &item->pos);
 	obs_data_get_vec2(item_data, "scale", &item->scale);
+	obs_data_get_vec2(item_data, "scale_ref", &item->scale_ref);
 
 	obs_data_release(item->private_settings);
 	item->private_settings =
@@ -1172,6 +1180,7 @@ static void scene_save_item(obs_data_array_t *array,
 	obs_data_set_double(item_data, "rot", rot);
 	obs_data_set_vec2(item_data, "pos", &pos);
 	obs_data_set_vec2(item_data, "scale", &scale);
+	obs_data_set_vec2(item_data, "scale_ref", &item->scale_ref);
 	obs_data_set_int(item_data, "align", (int)item->align);
 	obs_data_set_int(item_data, "bounds_type", (int)item->bounds_type);
 	obs_data_set_int(item_data, "bounds_align", (int)item->bounds_align);
@@ -2157,6 +2166,8 @@ static obs_sceneitem_t *obs_scene_add_internal(obs_scene_t *scene,
 	item->toggle_visibility = OBS_INVALID_HOTKEY_PAIR_ID;
 	os_atomic_set_long(&item->active_refs, 1);
 	vec2_set(&item->scale, 1.0f, 1.0f);
+	vec2_set(&item->scale_ref, (float)obs->video.main_mix->ovi.base_width,
+		 (float)obs->video.main_mix->ovi.base_height);
 	matrix4_identity(&item->draw_transform);
 	matrix4_identity(&item->box_transform);
 
