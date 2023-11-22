@@ -115,7 +115,18 @@ static inline void set_render_size(uint32_t width, uint32_t height)
 	gs_enable_depth_test(false);
 	gs_set_cull_mode(GS_NEITHER);
 
-	gs_ortho(0.0f, (float)width, 0.0f, (float)height, -100.0f, 100.0f);
+	float right, bottom;
+	/* Normalise largest side to [-1, 1] and smaller side
+	 * to [-x, x] with x = (1 / aspect ratio) */
+	if (height <= width) {
+		bottom = (float)height / (float)width;
+		right = 1.0f;
+	} else {
+		bottom = 1.0f;
+		right = (float)width / (float)height;
+	}
+
+	gs_ortho(-right, right, -bottom, bottom, -100.0f, 100.0f);
 	gs_set_viewport(0, 0, width, height);
 }
 
