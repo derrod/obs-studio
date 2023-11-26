@@ -33,7 +33,7 @@ permissions:
 jobs:
   services-validation:
     name: Validate Services 🕵️
-    if: github.repository_owner == 'obsproject' && inputs.job == 'services'
+    if: inputs.job == 'services'
     runs-on: macos-13
     permissions:
       checks: write

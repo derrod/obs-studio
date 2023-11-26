@@ -351,10 +351,16 @@ async def main():
         servers = os.environ["API_SERVERS"].split(",")
         if not servers:
             raise ValueError("No checker servers!")
-        # mask server hostnames as secrets
+        # Mask everything except the region code
+        prefix = suffix = ""
         for server in servers:
-            domain = '.'.join(server.split('.')[-2:])
-            print(f"::add-mask::{domain}")
+            prefix = server[: server.index(".") + 1]
+            print(f"::add-mask::{prefix}")
+            suffix = server[server.index(".", len(prefix)) :]
+            print(f"::add-mask::{suffix}")
+
+        # add fake server to test stuff
+        servers.append(f"{prefix}nop{suffix}")
     except Exception as e:
         print(f"❌ Failed getting required environment variables: {e}")
         return 1
