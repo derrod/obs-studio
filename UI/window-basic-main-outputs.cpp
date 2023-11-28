@@ -1857,6 +1857,8 @@ inline void AdvancedOutput::SetupRecording()
 		}
 
 		obs_encoder_set_scaled_size(videoRecording, cx, cy);
+		obs_encoder_set_gpu_scale_type(videoRecording,
+					       OBS_SCALE_AREA);
 		obs_output_set_video_encoder(fileOutput, videoRecording);
 		if (replayBuffer)
 			obs_output_set_video_encoder(replayBuffer,
