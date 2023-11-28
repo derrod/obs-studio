@@ -875,7 +875,7 @@ static void nv_greenscreen_filter_render(void *data, gs_effect_t *effect)
 
 		if (draw) {
 			draw_greenscreen(filter);
-			filter->processed_frame = true;
+			//filter->processed_frame = true;
 		}
 	} else {
 		obs_source_skip_video_filter(filter->context);
