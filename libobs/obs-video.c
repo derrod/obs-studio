@@ -976,10 +976,12 @@ static inline void output_frame(struct obs_core_video_mix *video)
 
 static inline void output_frames(void)
 {
+	blog(LOG_DEBUG, "=== frame start ===");
 	pthread_mutex_lock(&obs->video.mixes_mutex);
 	for (size_t i = 0, num = obs->video.mixes.num; i < num; i++) {
 		struct obs_core_video_mix *mix = obs->video.mixes.array[i];
 		if (mix->view) {
+			blog(LOG_DEBUG, "starting mix: %d", i);
 			output_frame(mix);
 		} else {
 			obs->video.mixes.array[i] = NULL;

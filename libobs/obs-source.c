@@ -2980,6 +2980,8 @@ void obs_source_video_render(obs_source_t *source)
 
 	source = obs_source_get_ref(source);
 	if (source) {
+		blog(LOG_DEBUG, "\t- rendering: %s",
+		     obs_source_get_name(source));
 		render_video(source);
 		obs_source_release(source);
 	}
