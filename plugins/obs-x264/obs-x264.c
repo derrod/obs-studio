@@ -408,7 +408,8 @@ static void create_roi_map(struct obs_x264 *obsx264, const double center_boost)
 	vec2_set(&center, (float)mb_width / 2.0f, (float)mb_height / 2.0f);
 
 	/* Set up radial map based on distance to center */
-	const float cutoff = (float)mb_height / 4.0f;
+	const float cutoff_inner = (float)mb_height / 3.0f;
+	const float cutoff_outer = (float)mb_height / 1.5f;
 
 	if (obsx264->roi_offsets)
 		bfree(obsx264->roi_offsets);
@@ -421,12 +422,17 @@ static void create_roi_map(struct obs_x264 *obsx264, const double center_boost)
 			float distance = vec2_dist(&center, &mb_pos);
 
 			float offset;
-			if (distance > cutoff)
-				offset = 0.0f;
+
+			if (distance > cutoff_outer)
+				offset = -(float)center_boost *
+					 (distance - cutoff_outer) /
+					 cutoff_outer;
 			else if (distance <= 1.0f)
 				offset = (float)center_boost;
+			else if (distance < cutoff_inner)
+				offset = (float)center_boost / (distance / 2);
 			else
-				offset = (float)center_boost / distance;
+				offset = 0.0f;
 
 			obsx264->roi_offsets[mb_y * mb_width + mb_x] = offset;
 		}
