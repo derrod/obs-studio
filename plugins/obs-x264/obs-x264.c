@@ -61,6 +61,8 @@ struct obs_x264 {
 	size_t sei_size;
 
 	os_performance_token_t *performance_token;
+
+	float *roi_offsets;
 };
 
 /* ------------------------------------------------------------------------- */
@@ -79,6 +81,7 @@ static void clear_data(struct obs_x264 *obsx264)
 		x264_encoder_close(obsx264->context);
 		bfree(obsx264->sei);
 		bfree(obsx264->extra_data);
+		bfree(obsx264->roi_offsets);
 
 		obsx264->context = NULL;
 		obsx264->sei = NULL;
@@ -115,6 +118,8 @@ static void obs_x264_defaults(obs_data_t *settings)
 	obs_data_set_default_string(settings, "tune", "");
 	obs_data_set_default_string(settings, "x264opts", "");
 	obs_data_set_default_bool(settings, "repeat_headers", false);
+	obs_data_set_default_bool(settings, "use_roi", false);
+	obs_data_set_default_double(settings, "roi_offset", -10.0);
 }
 
 static inline void add_strings(obs_property_t *list, const char *const *strings)
@@ -137,6 +142,8 @@ static inline void add_strings(obs_property_t *list, const char *const *strings)
 #define TEXT_TUNE obs_module_text("Tune")
 #define TEXT_NONE obs_module_text("None")
 #define TEXT_X264_OPTS obs_module_text("EncoderOptions")
+#define TEXT_ROI obs_module_text("ROI")
+#define TEXT_ROI_OFFSET obs_module_text("ROIOffset")
 
 static bool use_bufsize_modified(obs_properties_t *ppts, obs_property_t *p,
 				 obs_data_t *settings)
@@ -167,6 +174,16 @@ static bool rate_control_modified(obs_properties_t *ppts, obs_property_t *p,
 	obs_property_set_visible(p, !rc_crf);
 	p = obs_properties_get(ppts, "buffer_size");
 	obs_property_set_visible(p, !rc_crf && use_bufsize);
+	return true;
+}
+
+static bool use_roi_modified(obs_properties_t *ppts, obs_property_t *p,
+			     obs_data_t *settings)
+{
+	bool use_roi = obs_data_get_bool(settings, "use_roi");
+
+	p = obs_properties_get(ppts, "roi_offset");
+	obs_property_set_visible(p, use_roi);
 	return true;
 }
 
@@ -233,6 +250,11 @@ static obs_properties_t *obs_x264_props(void *unused)
 	headers = obs_properties_add_bool(props, "repeat_headers",
 					  "repeat_headers");
 	obs_property_set_visible(headers, false);
+
+	p = obs_properties_add_bool(props, "use_roi", TEXT_ROI);
+	obs_property_set_modified_callback(p, use_roi_modified);
+	obs_properties_add_float(props, "roi_offset", TEXT_ROI_OFFSET, -51.0,
+				 51.0, 0.5);
 
 	return props;
 }
@@ -370,6 +392,47 @@ static inline int get_x264_cs_val(const char *const name,
 	return 0;
 }
 
+static void create_roi_map(struct obs_x264 *obsx264, const double center_boost)
+{
+	/* H.264 macroblocks are always 16x16 */
+	static const uint32_t mb_size = 16;
+
+	uint32_t cx = obs_encoder_get_width(obsx264->encoder);
+	uint32_t cy = obs_encoder_get_height(obsx264->encoder);
+
+	/* Calculate number of macroblocks to minimum multiple of 16 that can contain dimension */
+	uint32_t mb_width = (cx + mb_size - 1) / mb_size;
+	uint32_t mb_height = (cy + mb_size - 1) / mb_size;
+
+	struct vec2 center;
+	vec2_set(&center, (float)mb_width / 2.0f, (float)mb_height / 2.0f);
+
+	/* Set up radial map based on distance to center */
+	const float cutoff = (float)mb_height / 4.0f;
+
+	if (obsx264->roi_offsets)
+		bfree(obsx264->roi_offsets);
+	obsx264->roi_offsets = bmalloc(sizeof(float) * mb_width * mb_height);
+
+	for (uint32_t mb_y = 0; mb_y < mb_height; mb_y++) {
+		for (uint32_t mb_x = 0; mb_x < mb_width; mb_x++) {
+			struct vec2 mb_pos = {.x = (float)mb_x,
+					      .y = (float)mb_y};
+			float distance = vec2_dist(&center, &mb_pos);
+
+			float offset;
+			if (distance > cutoff)
+				offset = 0.0f;
+			else if (distance <= 1.0f)
+				offset = (float)center_boost;
+			else
+				offset = (float)center_boost / distance;
+
+			obsx264->roi_offsets[mb_y * mb_width + mb_x] = offset;
+		}
+	}
+}
+
 static void obs_x264_video_info(void *data, struct video_scale_info *info);
 
 enum rate_control {
@@ -404,6 +467,8 @@ static void update_params(struct obs_x264 *obsx264, obs_data_t *settings,
 	int bf = (int)obs_data_get_int(settings, "bf");
 	bool use_bufsize = obs_data_get_bool(settings, "use_bufsize");
 	bool cbr_override = obs_data_get_bool(settings, "cbr");
+	bool use_roi = obs_data_get_bool(settings, "use_roi");
+	double roi_offset = obs_data_get_double(settings, "roi_offset");
 	enum rate_control rc;
 
 #ifdef ENABLE_VFR
@@ -533,6 +598,13 @@ static void update_params(struct obs_x264 *obsx264, obs_data_t *settings,
 	for (size_t i = 0; i < options->count; ++i)
 		set_param(obsx264, options->options[i]);
 
+	if (use_roi) {
+		create_roi_map(obsx264, roi_offset);
+	} else {
+		bfree(obsx264->roi_offsets);
+		obsx264->roi_offsets = NULL;
+	}
+
 	if (!update) {
 		info("settings:\n"
 		     "\trate_control: %s\n"
@@ -543,11 +615,13 @@ static void update_params(struct obs_x264 *obsx264, obs_data_t *settings,
 		     "\tfps_den:      %d\n"
 		     "\twidth:        %d\n"
 		     "\theight:       %d\n"
-		     "\tkeyint:       %d\n",
+		     "\tkeyint:       %d\n"
+		     "\troi offset:   %.01f\n",
 		     rate_control, obsx264->params.rc.i_vbv_max_bitrate,
 		     obsx264->params.rc.i_vbv_buffer_size,
 		     (int)obsx264->params.rc.f_rf_constant, voi->fps_num,
-		     voi->fps_den, width, height, obsx264->params.i_keyint_max);
+		     voi->fps_den, width, height, obsx264->params.i_keyint_max,
+		     use_roi ? roi_offset : 0.0);
 	}
 }
 
@@ -773,6 +847,9 @@ static inline void init_pic_data(struct obs_x264 *obsx264, x264_picture_t *pic,
 		pic->img.i_stride[i] = (int)frame->linesize[i];
 		pic->img.plane[i] = frame->data[i];
 	}
+
+	if (obsx264->roi_offsets)
+		pic->prop.quant_offsets = obsx264->roi_offsets;
 }
 
 static bool obs_x264_encode(void *data, struct encoder_frame *frame,
