@@ -61,6 +61,9 @@ struct obs_x264 {
 	size_t sei_size;
 
 	os_performance_token_t *performance_token;
+
+	struct region_of_interest roi;
+	float *quant_offsets;
 };
 
 /* ------------------------------------------------------------------------- */
@@ -79,6 +82,7 @@ static void clear_data(struct obs_x264 *obsx264)
 		x264_encoder_close(obsx264->context);
 		bfree(obsx264->sei);
 		bfree(obsx264->extra_data);
+		bfree(obsx264->quant_offsets);
 
 		obsx264->context = NULL;
 		obsx264->sei = NULL;
@@ -775,6 +779,56 @@ static inline void init_pic_data(struct obs_x264 *obsx264, x264_picture_t *pic,
 	}
 }
 
+static inline bool region_identical(const struct region_of_interest *a,
+				    const struct region_of_interest *b)
+{
+	return a->top == b->top && a->bottom == b->bottom &&
+	       a->left == b->left && a->right == b->right &&
+	       a->priority == b->priority;
+}
+
+static void add_roi(struct obs_x264 *obsx264, x264_picture_t *pic)
+{
+	static const uint32_t mb_size = 16;
+
+	struct region_of_interest *roi = obs_encoder_get_roi(obsx264->encoder);
+	if (!roi)
+		return;
+
+	if (obsx264->quant_offsets && region_identical(roi, &obsx264->roi)) {
+		pic->prop.quant_offsets = obsx264->quant_offsets;
+		return;
+	}
+
+	uint32_t width = obs_encoder_get_width(obsx264->encoder);
+	uint32_t height = obs_encoder_get_height(obsx264->encoder);
+	uint32_t mb_width = (width + mb_size - 1) / mb_size;
+	uint32_t mb_height = (height + mb_size - 1) / mb_size;
+
+	uint32_t roi_left = roi->left / mb_size;
+	uint32_t roi_top = roi->top / mb_size;
+	uint32_t roi_right = (roi->right + mb_size - 1) / mb_size;
+	uint32_t roi_bottom = (roi->bottom + mb_size - 1) / mb_size;
+	float quant_offset = -51.0f * roi->priority;
+
+	float *map = brealloc(obsx264->quant_offsets,
+			      sizeof(float) * mb_width * mb_height);
+
+	for (uint32_t mb_y = 0; mb_y < mb_height; mb_y++) {
+		for (uint32_t mb_x = 0; mb_x < mb_width; mb_x++) {
+			bool emphasize = mb_x >= roi_left && mb_x < roi_right &&
+					 mb_y >= roi_top && mb_y < roi_bottom;
+
+			map[mb_y * mb_width + mb_x] = emphasize ? quant_offset
+								: 0.0f;
+		}
+	}
+
+	pic->prop.quant_offsets = map;
+	obsx264->quant_offsets = map;
+	obsx264->roi = *roi;
+}
+
 static bool obs_x264_encode(void *data, struct encoder_frame *frame,
 			    struct encoder_packet *packet,
 			    bool *received_packet)
@@ -788,8 +842,10 @@ static bool obs_x264_encode(void *data, struct encoder_frame *frame,
 	if (!frame || !packet || !received_packet)
 		return false;
 
-	if (frame)
+	if (frame) {
 		init_pic_data(obsx264, &pic, frame);
+		add_roi(obsx264, &pic);
+	}
 
 	ret = x264_encoder_encode(obsx264->context, &nals, &nal_count,
 				  (frame ? &pic : NULL), &pic_out);
@@ -863,5 +919,5 @@ struct obs_encoder_info obs_x264_encoder = {
 	.get_extra_data = obs_x264_extra_data,
 	.get_sei_data = obs_x264_sei,
 	.get_video_info = obs_x264_video_info,
-	.caps = OBS_ENCODER_CAP_DYN_BITRATE,
+	.caps = OBS_ENCODER_CAP_DYN_BITRATE | OBS_ENCODER_CAP_ROI,
 };
