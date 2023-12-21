@@ -2457,6 +2457,17 @@ EXPORT void obs_encoder_set_gpu_scale_type(obs_encoder_t *encoder,
 EXPORT bool obs_encoder_set_frame_rate_divisor(obs_encoder_t *encoder,
 					       uint32_t divisor);
 
+/**
+ * Set region of interest (ROI) for an encoder. This allows prioritising
+ * quality of a region of the frame.
+ * Pass in NULL to reset.
+ *
+ * Returns false if the encoder does not support ROI or region is invalid.
+ */
+EXPORT bool obs_encoder_set_roi(obs_encoder_t *encoder,
+				struct region_of_interest *roi);
+EXPORT struct region_of_interest *obs_encoder_get_roi(obs_encoder_t *encoder);
+
 /** For video encoders, returns true if pre-encode scaling is enabled */
 EXPORT bool obs_encoder_scaling_enabled(const obs_encoder_t *encoder);
 

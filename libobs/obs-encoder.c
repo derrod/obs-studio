@@ -1874,3 +1874,33 @@ uint64_t obs_encoder_get_pause_offset(const obs_encoder_t *encoder)
 {
 	return encoder ? encoder->pause.ts_offset : 0;
 }
+
+bool obs_encoder_set_roi(obs_encoder_t *encoder, struct region_of_interest *roi)
+{
+	if (!(encoder->info.caps & OBS_ENCODER_CAP_ROI))
+		return false;
+	/* NULL resets ROI */
+	if (!roi) {
+		memset(&encoder->roi, 0, sizeof(struct region_of_interest));
+		return true;
+	}
+	/* Area smaller than the smallest possible block (16x16) */
+	if (roi->bottom - roi->top < 16 || roi->right - roi->left < 16)
+		return false;
+	if (roi->priority < -1.0f || roi->priority > 1.0f)
+		return false;
+
+	memcpy(&encoder->roi, roi, sizeof(struct region_of_interest));
+	return true;
+}
+
+struct region_of_interest *obs_encoder_get_roi(obs_encoder_t *encoder)
+{
+	/* No ROI specified */
+	if (encoder->roi.priority == 0.0f)
+		return NULL;
+	if (encoder->roi.bottom == 0 || encoder->roi.right == 0)
+		return NULL;
+
+	return &encoder->roi;
+}
