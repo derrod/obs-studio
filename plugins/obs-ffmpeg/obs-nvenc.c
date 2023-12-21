@@ -683,12 +683,20 @@ static bool init_encoder_base(struct nvenc_data *enc, obs_data_t *settings,
 	config->rcParams.multiPass = nv_multipass;
 
 	/* Region of interest */
+	bool roi_enabled = !!obs_encoder_get_roi(enc->encoder);
+	/* This check does not appear to work correctly for anything but H.264,
+	 * but any GPU that supports HEVC and AV1 encoder should support it. */
 	bool roi_supported =
+		enc->codec != CODEC_H264 ||
 		nv_get_cap(enc, NV_ENC_CAPS_SUPPORT_EMPHASIS_LEVEL_MAP);
-	if (roi_supported && obs_encoder_get_roi(enc->encoder)) {
-		config->rcParams.qpMapMode = enc->codec == CODEC_H264
-						     ? NV_ENC_QP_MAP_EMPHASIS
-						     : NV_ENC_QP_MAP_DELTA;
+
+	if (roi_supported && roi_enabled) {
+		if (enc->codec == CODEC_H264) {
+			config->rcParams.qpMapMode = NV_ENC_QP_MAP_EMPHASIS;
+		} else {
+			config->rcParams.qpMapMode = NV_ENC_QP_MAP_DELTA;
+		}
+
 		if (psycho_aq) {
 			warn("ROI enabled, disabling AQ");
 			config->rcParams.enableAQ = false;
@@ -697,6 +705,8 @@ static bool init_encoder_base(struct nvenc_data *enc, obs_data_t *settings,
 			psycho_aq = false;
 		}
 	} else {
+		if (roi_enabled)
+			warn("ROI enabled, but unsupported");
 		config->rcParams.qpMapMode = NV_ENC_QP_MAP_DISABLED;
 	}
 
@@ -1462,11 +1472,18 @@ static void add_roi(struct nvenc_data *enc,
 	uint32_t roi_bottom = (roi->bottom + mb_size - 1) / mb_size;
 
 	int8_t qp_val;
+	int8_t neg_qp_val = 0;
 	/* H.264 uses emphasis map, HEVC/AV1 use QP deltas */
-	if (enc->codec == CODEC_H264) {
+	if (enc->codec == CODEC_H264 &&
+	    enc->config.rcParams.qpMapMode == NV_ENC_QP_MAP_EMPHASIS) {
 		qp_val = priorty_to_level(roi->priority);
+		// neg_qp_val = NV_ENC_EMPHASIS_MAP_LEVEL_0;
+	} else if (enc->codec == CODEC_AV1) {
+		qp_val = (int8_t)(-128.0f * roi->priority);
+		// neg_qp_val = (int8_t)(127.0f * roi->priority);
 	} else {
 		qp_val = (int8_t)(-51.0f * roi->priority);
+		// neg_qp_val = -qp_val;
 	}
 
 	for (uint32_t mb_y = 0; mb_y < mb_height; mb_y++) {
@@ -1475,7 +1492,7 @@ static void add_roi(struct nvenc_data *enc,
 					 mb_y >= roi_top && mb_y < roi_bottom;
 
 			enc->roi_map[mb_y * mb_width + mb_x] =
-				emphasize ? qp_val : 0;
+				emphasize ? qp_val : neg_qp_val;
 		}
 	}
 
