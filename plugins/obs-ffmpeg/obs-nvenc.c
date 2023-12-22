@@ -1471,19 +1471,25 @@ static void add_roi(struct nvenc_data *enc,
 	uint32_t roi_right = (roi->right + mb_size - 1) / mb_size;
 	uint32_t roi_bottom = (roi->bottom + mb_size - 1) / mb_size;
 
+	/* NVENC will overshoot the target bit-rate if priority is high, so also
+	 * reduce priority of everything else a little bit to compensate. */
+	uint32_t roi_size = (roi_right - roi_left) * (roi_bottom - roi_top);
+	float neg_priority_mul =
+		(float)roi_size / (float)(mb_width * mb_height);
+
 	int8_t qp_val;
-	int8_t neg_qp_val = 0;
+	int8_t neg_qp_val;
 	/* H.264 uses emphasis map, HEVC/AV1 use QP deltas */
 	if (enc->codec == CODEC_H264 &&
 	    enc->config.rcParams.qpMapMode == NV_ENC_QP_MAP_EMPHASIS) {
 		qp_val = priorty_to_level(roi->priority);
-		// neg_qp_val = NV_ENC_EMPHASIS_MAP_LEVEL_0;
+		neg_qp_val = NV_ENC_EMPHASIS_MAP_LEVEL_0;
 	} else if (enc->codec == CODEC_AV1) {
 		qp_val = (int8_t)(-128.0f * roi->priority);
-		// neg_qp_val = (int8_t)(127.0f * roi->priority);
+		neg_qp_val = (int8_t)(127.0f * neg_priority_mul);
 	} else {
 		qp_val = (int8_t)(-51.0f * roi->priority);
-		// neg_qp_val = -qp_val;
+		neg_qp_val = (int8_t)(51.0f * neg_priority_mul);
 	}
 
 	for (uint32_t mb_y = 0; mb_y < mb_height; mb_y++) {
