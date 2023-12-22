@@ -620,6 +620,12 @@ obs_properties_t *nvenc_properties_internal(enum codec_type codec, bool ffmpeg)
 		p = obs_properties_add_bool(props, "repeat_headers",
 					    "repeat_headers");
 		obs_property_set_visible(p, false);
+
+		if (codec == CODEC_H264) {
+			obs_properties_add_bool(
+				props, "roi_emphasis",
+				obs_module_text("NVENC.ROIEmphasis"));
+		}
 	}
 	p = obs_properties_add_bool(
 		props, "psycho_aq",

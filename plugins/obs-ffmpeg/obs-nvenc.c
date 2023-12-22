@@ -453,6 +453,7 @@ static bool init_encoder_base(struct nvenc_data *enc, obs_data_t *settings,
 	const char *multipass = obs_data_get_string(settings, "multipass");
 	const char *profile = obs_data_get_string(settings, "profile");
 	bool lookahead = obs_data_get_bool(settings, "lookahead");
+	bool roi_emphasis = obs_data_get_bool(settings, "roi_emphasis");
 	bool vbr = astrcmpi(rc, "VBR") == 0;
 	bool psycho_aq = !compatibility &&
 			 obs_data_get_bool(settings, "psycho_aq");
@@ -691,7 +692,7 @@ static bool init_encoder_base(struct nvenc_data *enc, obs_data_t *settings,
 		nv_get_cap(enc, NV_ENC_CAPS_SUPPORT_EMPHASIS_LEVEL_MAP);
 
 	if (roi_supported && roi_enabled) {
-		if (enc->codec == CODEC_H264) {
+		if (enc->codec == CODEC_H264 && roi_emphasis) {
 			config->rcParams.qpMapMode = NV_ENC_QP_MAP_EMPHASIS;
 		} else {
 			config->rcParams.qpMapMode = NV_ENC_QP_MAP_DELTA;
