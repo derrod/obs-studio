@@ -1589,8 +1589,11 @@ static bool nvenc_encode_tex(void *data, uint32_t handle, int64_t pts,
 
 	/* Add emphasis map if enabled */
 	struct region_of_interest *roi = obs_encoder_get_roi(enc->encoder);
-	if (roi && enc->config.rcParams.qpMapMode != NV_ENC_QP_MAP_DISABLED)
+	if (roi && enc->config.rcParams.qpMapMode != NV_ENC_QP_MAP_DISABLED) {
+		// required for H.264 / HEVC
+		params.version = NV_ENC_PIC_PARAMS_VER;
 		add_roi(enc, roi, &params);
+	}
 
 	err = nv.nvEncEncodePicture(enc->session, &params);
 	if (err != NV_ENC_SUCCESS && err != NV_ENC_ERR_NEED_MORE_INPUT) {
