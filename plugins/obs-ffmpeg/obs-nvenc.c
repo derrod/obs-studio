@@ -687,12 +687,9 @@ static bool init_encoder_base(struct nvenc_data *enc, obs_data_t *settings,
 	bool roi_enabled = !!obs_encoder_get_roi(enc->encoder);
 	/* This check does not appear to work correctly for anything but H.264,
 	 * but any GPU that supports HEVC and AV1 encoder should support it. */
-	bool roi_supported =
-		enc->codec != CODEC_H264 ||
-		nv_get_cap(enc, NV_ENC_CAPS_SUPPORT_EMPHASIS_LEVEL_MAP);
-
-	if (roi_supported && roi_enabled) {
-		if (enc->codec == CODEC_H264 && roi_emphasis) {
+	if (roi_enabled) {
+		if (roi_emphasis &&
+		    nv_get_cap(enc, NV_ENC_CAPS_SUPPORT_EMPHASIS_LEVEL_MAP)) {
 			config->rcParams.qpMapMode = NV_ENC_QP_MAP_EMPHASIS;
 		} else {
 			config->rcParams.qpMapMode = NV_ENC_QP_MAP_DELTA;
