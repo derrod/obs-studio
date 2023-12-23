@@ -206,6 +206,15 @@ int qsv_encoder_headers(qsv_t *pContext, uint8_t **pSPS, uint8_t **pPPS,
 	return 0;
 }
 
+void qsv_setup_roi(qsv_t *pContext, struct region_of_interest *roi)
+{
+	QSV_Encoder_Internal *pEncoder = (QSV_Encoder_Internal *)pContext;
+
+	/* QP value is range 0..51 */
+	mfxI16 delta = (mfxI16)(-51.0f * roi->priority);
+	pEncoder->SetupROI(roi->left, roi->top, roi->right, roi->bottom, delta);
+}
+
 int qsv_encoder_encode(qsv_t *pContext, uint64_t ts, uint8_t *pDataY,
 		       uint8_t *pDataUV, uint32_t strideY, uint32_t strideUV,
 		       mfxBitstream **pBS)

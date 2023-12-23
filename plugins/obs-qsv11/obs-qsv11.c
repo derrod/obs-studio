@@ -99,6 +99,8 @@ struct obs_qsv {
 	size_t sei_size;
 
 	os_performance_token_t *performance_token;
+
+	struct region_of_interest roi;
 };
 
 /* ------------------------------------------------------------------------- */
@@ -1377,6 +1379,14 @@ static void parse_packet_hevc(struct obs_qsv *obsqsv,
 	g_bFirst = false;
 }
 
+static inline bool region_identical(const struct region_of_interest *a,
+				    const struct region_of_interest *b)
+{
+	return a->top == b->top && a->bottom == b->bottom &&
+	       a->left == b->left && a->right == b->right &&
+	       a->priority == b->priority;
+}
+
 static bool obs_qsv_encode(void *data, struct encoder_frame *frame,
 			   struct encoder_packet *packet, bool *received_packet)
 {
@@ -1395,6 +1405,12 @@ static bool obs_qsv_encode(void *data, struct encoder_frame *frame,
 	int ret;
 
 	mfxU64 qsvPTS = ts_obs_to_mfx(frame->pts, voi);
+
+	struct region_of_interest *roi = obs_encoder_get_roi(obsqsv->encoder);
+	if (roi && !region_identical(roi, &obsqsv->roi)) {
+		qsv_setup_roi(obsqsv->context, roi);
+		obsqsv->roi = *roi;
+	}
 
 	// FIXME: remove null check from the top of this function
 	// if we actually do expect null frames to complete output.
@@ -1451,6 +1467,12 @@ static bool obs_qsv_encode_tex(void *data, uint32_t handle, int64_t pts,
 	int ret;
 
 	mfxU64 qsvPTS = ts_obs_to_mfx(pts, voi);
+
+	struct region_of_interest *roi = obs_encoder_get_roi(obsqsv->encoder);
+	if (roi && !region_identical(roi, &obsqsv->roi)) {
+		qsv_setup_roi(obsqsv->context, roi);
+		obsqsv->roi = *roi;
+	}
 
 	ret = qsv_encoder_encode_tex(obsqsv->context, qsvPTS, handle, lock_key,
 				     next_key, &pBS);
@@ -1516,7 +1538,8 @@ struct obs_encoder_info obs_qsv_encoder_tex_v2 = {
 	.get_name = obs_qsv_getname,
 	.create = obs_qsv_create_tex_h264_v2,
 	.destroy = obs_qsv_destroy,
-	.caps = OBS_ENCODER_CAP_DYN_BITRATE | OBS_ENCODER_CAP_PASS_TEXTURE,
+	.caps = OBS_ENCODER_CAP_DYN_BITRATE | OBS_ENCODER_CAP_PASS_TEXTURE |
+		OBS_ENCODER_CAP_ROI,
 	.encode_texture = obs_qsv_encode_tex,
 	.update = obs_qsv_update,
 	.get_properties = obs_qsv_props_h264_v2,
@@ -1540,7 +1563,8 @@ struct obs_encoder_info obs_qsv_encoder_v2 = {
 	.get_extra_data = obs_qsv_extra_data,
 	.get_sei_data = obs_qsv_sei,
 	.get_video_info = obs_qsv_video_info,
-	.caps = OBS_ENCODER_CAP_DYN_BITRATE | OBS_ENCODER_CAP_INTERNAL,
+	.caps = OBS_ENCODER_CAP_DYN_BITRATE | OBS_ENCODER_CAP_INTERNAL |
+		OBS_ENCODER_CAP_ROI,
 };
 
 struct obs_encoder_info obs_qsv_av1_encoder_tex = {
@@ -1550,7 +1574,8 @@ struct obs_encoder_info obs_qsv_av1_encoder_tex = {
 	.get_name = obs_qsv_getname_av1,
 	.create = obs_qsv_create_tex_av1,
 	.destroy = obs_qsv_destroy,
-	.caps = OBS_ENCODER_CAP_DYN_BITRATE | OBS_ENCODER_CAP_PASS_TEXTURE,
+	.caps = OBS_ENCODER_CAP_DYN_BITRATE | OBS_ENCODER_CAP_PASS_TEXTURE |
+		OBS_ENCODER_CAP_ROI,
 	.encode_texture = obs_qsv_encode_tex,
 	.update = obs_qsv_update,
 	.get_properties = obs_qsv_props_av1,
@@ -1572,7 +1597,8 @@ struct obs_encoder_info obs_qsv_av1_encoder = {
 	.get_defaults = obs_qsv_defaults_av1,
 	.get_extra_data = obs_qsv_extra_data,
 	.get_video_info = obs_qsv_video_plus_hdr_info,
-	.caps = OBS_ENCODER_CAP_DYN_BITRATE | OBS_ENCODER_CAP_INTERNAL,
+	.caps = OBS_ENCODER_CAP_DYN_BITRATE | OBS_ENCODER_CAP_INTERNAL |
+		OBS_ENCODER_CAP_ROI,
 };
 
 struct obs_encoder_info obs_qsv_hevc_encoder_tex = {
@@ -1582,7 +1608,8 @@ struct obs_encoder_info obs_qsv_hevc_encoder_tex = {
 	.get_name = obs_qsv_getname_hevc,
 	.create = obs_qsv_create_tex_hevc,
 	.destroy = obs_qsv_destroy,
-	.caps = OBS_ENCODER_CAP_DYN_BITRATE | OBS_ENCODER_CAP_PASS_TEXTURE,
+	.caps = OBS_ENCODER_CAP_DYN_BITRATE | OBS_ENCODER_CAP_PASS_TEXTURE |
+		OBS_ENCODER_CAP_ROI,
 	.encode_texture = obs_qsv_encode_tex,
 	.update = obs_qsv_update,
 	.get_properties = obs_qsv_props_hevc,
@@ -1604,5 +1631,6 @@ struct obs_encoder_info obs_qsv_hevc_encoder = {
 	.get_defaults = obs_qsv_defaults_hevc,
 	.get_extra_data = obs_qsv_extra_data,
 	.get_video_info = obs_qsv_video_plus_hdr_info,
-	.caps = OBS_ENCODER_CAP_DYN_BITRATE | OBS_ENCODER_CAP_INTERNAL,
+	.caps = OBS_ENCODER_CAP_DYN_BITRATE | OBS_ENCODER_CAP_INTERNAL |
+		OBS_ENCODER_CAP_ROI,
 };
