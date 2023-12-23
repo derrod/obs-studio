@@ -1759,7 +1759,7 @@ void AdvancedOutput::UpdateStreamSettings()
 inline void AdvancedOutput::UpdateRecordingSettings()
 {
 	OBSData settings = GetDataFromJsonFile("recordEncoder.json");
-	region_of_interest roi{640, 1024, 128, 512, 0.5f};
+	region_of_interest roi{640, 1024, 128, 512, 1.0f};
 	if (!obs_encoder_set_roi(videoRecording, &roi))
 		blog(LOG_WARNING, "setting ROI failed????");
 	obs_encoder_update(videoRecording, settings);
