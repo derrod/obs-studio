@@ -95,6 +95,7 @@ struct amf_base {
 	AMFBufferPtr packet_data;
 	AMFRate amf_frame_rate;
 	AMFBufferPtr header;
+	AMFSurfacePtr roi_map;
 
 	std::deque<AMFDataPtr> queued_packets;
 
@@ -115,10 +116,13 @@ struct amf_base {
 	bool full_range;
 	bool bframes_supported = false;
 	bool first_update = true;
+	bool roi_supported = false;
 
 	inline amf_base(bool fallback) : fallback(fallback) {}
 	virtual ~amf_base() = default;
 	virtual void init() = 0;
+
+	region_of_interest roi;
 };
 
 using d3dtex_t = ComPtr<ID3D11Texture2D>;
@@ -580,17 +584,97 @@ static void convert_to_encoder_packet(amf_base *enc, AMFDataPtr &data,
 #define SEC_TO_NSEC 1000000000ULL
 #endif
 
+static inline bool region_identical(const region_of_interest *a,
+				    const region_of_interest *b)
+{
+	return a->top == b->top && a->bottom == b->bottom &&
+	       a->left == b->left && a->right == b->right &&
+	       a->priority == b->priority;
+}
+
+static void add_roi(amf_base *enc, AMFSurface *amf_surf,
+		    const region_of_interest *roi)
+{
+	uint32_t mb_size = 16; /* H.264 is always 16x16 */
+	if (enc->codec == amf_codec_type::HEVC ||
+	    enc->codec == amf_codec_type::AV1)
+		mb_size = 64; /* AMF HEVC & AV1 use 64x64 blocks */
+
+	uint32_t mb_width = (enc->cx + mb_size - 1) / mb_size;
+	uint32_t mb_height = (enc->cy + mb_size - 1) / mb_size;
+
+	if (!enc->roi_map) {
+		debug("Creating AMF ROI map surface...");
+		AMFContext1Ptr context1(enc->amf_context);
+		AMF_RESULT res = context1->AllocSurfaceEx(
+			AMF_MEMORY_HOST, AMF_SURFACE_GRAY32, mb_width,
+			mb_height,
+			AMF_SURFACE_USAGE_DEFAULT | AMF_SURFACE_USAGE_LINEAR,
+			AMF_MEMORY_CPU_DEFAULT, &enc->roi_map);
+
+		if (res != AMF_OK) {
+			warn("Failed allocating surface for ROI map!");
+			return;
+		}
+	}
+
+	if (!region_identical(roi, &enc->roi)) {
+		debug("Filling AMF ROI map...");
+		/* This is just following the SimpleROI example. */
+		amf_uint32 *pBuf =
+			(amf_uint32 *)enc->roi_map->GetPlaneAt(0)->GetNative();
+		amf_int32 pitch = enc->roi_map->GetPlaneAt(0)->GetHPitch();
+		memset(pBuf, 0, pitch * mb_height);
+
+		uint32_t roi_left = roi->left / mb_size;
+		uint32_t roi_top = roi->top / mb_size;
+		uint32_t roi_right = (roi->right + mb_size - 1) / mb_size;
+		uint32_t roi_bottom = (roi->bottom + mb_size - 1) / mb_size;
+
+		uint32_t priority = 0;
+		if (roi->priority > 0)
+			priority = (uint32_t)(roi->priority * 10);
+
+		for (uint32_t mb_y = 0; mb_y < mb_height; mb_y++) {
+			for (uint32_t mb_x = 0; mb_x < mb_width; mb_x++) {
+				if (mb_x >= roi_left && mb_x < roi_right &&
+				    mb_y >= roi_top && mb_y < roi_bottom)
+					pBuf[mb_y * pitch / 4 + mb_x] =
+						priority;
+			}
+		}
+
+		enc->roi = *roi;
+	}
+
+	if (enc->codec == amf_codec_type::AVC)
+		amf_surf->SetProperty(AMF_VIDEO_ENCODER_ROI_DATA, enc->roi_map);
+	else if (enc->codec == amf_codec_type::HEVC)
+		amf_surf->SetProperty(AMF_VIDEO_ENCODER_HEVC_ROI_DATA,
+				      enc->roi_map);
+	else if (enc->codec == amf_codec_type::AV1)
+		amf_surf->SetProperty(AMF_VIDEO_ENCODER_AV1_ROI_DATA,
+				      enc->roi_map);
+}
+
 static void amf_encode_base(amf_base *enc, AMFSurface *amf_surf,
 			    encoder_packet *packet, bool *received_packet)
 {
 	auto &queued_packets = enc->queued_packets;
 	uint64_t ts_start = os_gettime_ns();
 	AMF_RESULT res;
+	region_of_interest *roi;
 
 	*received_packet = false;
 
 	bool waiting = true;
 	while (waiting) {
+		/* ----------------------------------- */
+		/* add ROI data (if any)               */
+		if (enc->roi_supported &&
+		    (roi = obs_encoder_get_roi(enc->encoder)) != nullptr)
+			add_roi(enc, amf_surf, roi);
+
 		/* ----------------------------------- */
 		/* submit frame                        */
 
@@ -1377,6 +1461,8 @@ static void amf_avc_create_internal(amf_base *enc, obs_data_t *settings)
 				  &enc->max_throughput);
 		caps->GetProperty(AMF_VIDEO_ENCODER_CAP_REQUESTED_THROUGHPUT,
 				  &enc->requested_throughput);
+		caps->GetProperty(AMF_VIDEO_ENCODER_CAP_ROI,
+				  &enc->roi_supported);
 	}
 
 	const char *preset = obs_data_get_string(settings, "preset");
@@ -1507,13 +1593,15 @@ static void register_avc()
 	amf_encoder_info.get_properties = amf_avc_properties;
 	amf_encoder_info.get_extra_data = amf_extra_data;
 	amf_encoder_info.caps = OBS_ENCODER_CAP_PASS_TEXTURE |
-				OBS_ENCODER_CAP_DYN_BITRATE;
+				OBS_ENCODER_CAP_DYN_BITRATE |
+				OBS_ENCODER_CAP_ROI;
 
 	obs_register_encoder(&amf_encoder_info);
 
 	amf_encoder_info.id = "h264_fallback_amf";
 	amf_encoder_info.caps = OBS_ENCODER_CAP_INTERNAL |
-				OBS_ENCODER_CAP_DYN_BITRATE;
+				OBS_ENCODER_CAP_DYN_BITRATE |
+				OBS_ENCODER_CAP_ROI;
 	amf_encoder_info.encode_texture = nullptr;
 	amf_encoder_info.create = amf_avc_create_fallback;
 	amf_encoder_info.encode = amf_encode_fallback;
@@ -1713,6 +1801,8 @@ static void amf_hevc_create_internal(amf_base *enc, obs_data_t *settings)
 		caps->GetProperty(
 			AMF_VIDEO_ENCODER_HEVC_CAP_REQUESTED_THROUGHPUT,
 			&enc->requested_throughput);
+		caps->GetProperty(AMF_VIDEO_ENCODER_HEVC_CAP_ROI,
+				  &enc->roi_supported);
 	}
 
 	const bool is10bit = enc->amf_format == AMF_SURFACE_P010;
@@ -1861,13 +1951,15 @@ static void register_hevc()
 	amf_encoder_info.get_properties = amf_hevc_properties;
 	amf_encoder_info.get_extra_data = amf_extra_data;
 	amf_encoder_info.caps = OBS_ENCODER_CAP_PASS_TEXTURE |
-				OBS_ENCODER_CAP_DYN_BITRATE;
+				OBS_ENCODER_CAP_DYN_BITRATE |
+				OBS_ENCODER_CAP_ROI;
 
 	obs_register_encoder(&amf_encoder_info);
 
 	amf_encoder_info.id = "h265_fallback_amf";
 	amf_encoder_info.caps = OBS_ENCODER_CAP_INTERNAL |
-				OBS_ENCODER_CAP_DYN_BITRATE;
+				OBS_ENCODER_CAP_DYN_BITRATE |
+				OBS_ENCODER_CAP_ROI;
 	amf_encoder_info.encode_texture = nullptr;
 	amf_encoder_info.create = amf_hevc_create_fallback;
 	amf_encoder_info.encode = amf_encode_fallback;
@@ -2055,6 +2147,8 @@ static void amf_av1_create_internal(amf_base *enc, obs_data_t *settings)
 		caps->GetProperty(
 			AMF_VIDEO_ENCODER_AV1_CAP_REQUESTED_THROUGHPUT,
 			&enc->requested_throughput);
+		/* For some reason there's no specific CAP for AV1, but should always be supported */
+		enc->roi_supported = true;
 	}
 
 	const bool is10bit = enc->amf_format == AMF_SURFACE_P010;
@@ -2187,13 +2281,15 @@ static void register_av1()
 	amf_encoder_info.get_properties = amf_av1_properties;
 	amf_encoder_info.get_extra_data = amf_extra_data;
 	amf_encoder_info.caps = OBS_ENCODER_CAP_PASS_TEXTURE |
-				OBS_ENCODER_CAP_DYN_BITRATE;
+				OBS_ENCODER_CAP_DYN_BITRATE |
+				OBS_ENCODER_CAP_ROI;
 
 	obs_register_encoder(&amf_encoder_info);
 
 	amf_encoder_info.id = "av1_fallback_amf";
 	amf_encoder_info.caps = OBS_ENCODER_CAP_INTERNAL |
-				OBS_ENCODER_CAP_DYN_BITRATE;
+				OBS_ENCODER_CAP_DYN_BITRATE |
+				OBS_ENCODER_CAP_ROI;
 	amf_encoder_info.encode_texture = nullptr;
 	amf_encoder_info.create = amf_av1_create_fallback;
 	amf_encoder_info.encode = amf_encode_fallback;
