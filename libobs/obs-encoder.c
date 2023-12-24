@@ -52,6 +52,7 @@ static bool init_encoder(struct obs_encoder *encoder, const char *name,
 	pthread_mutex_init_value(&encoder->callbacks_mutex);
 	pthread_mutex_init_value(&encoder->outputs_mutex);
 	pthread_mutex_init_value(&encoder->pause.mutex);
+	pthread_mutex_init_value(&encoder->roi_mutex);
 
 	if (!obs_context_data_init(&encoder->context, OBS_OBJ_TYPE_ENCODER,
 				   settings, name, NULL, hotkey_data, false))
@@ -63,6 +64,8 @@ static bool init_encoder(struct obs_encoder *encoder, const char *name,
 	if (pthread_mutex_init(&encoder->outputs_mutex, NULL) != 0)
 		return false;
 	if (pthread_mutex_init(&encoder->pause.mutex, NULL) != 0)
+		return false;
+	if (pthread_mutex_init(&encoder->roi_mutex, NULL) != 0)
 		return false;
 
 	if (encoder->orig_info.get_defaults) {
@@ -377,10 +380,12 @@ static void obs_encoder_actually_destroy(obs_encoder_t *encoder)
 		if (encoder->context.data)
 			encoder->info.destroy(encoder->context.data);
 		da_free(encoder->callbacks);
+		da_free(encoder->roi);
 		pthread_mutex_destroy(&encoder->init_mutex);
 		pthread_mutex_destroy(&encoder->callbacks_mutex);
 		pthread_mutex_destroy(&encoder->outputs_mutex);
 		pthread_mutex_destroy(&encoder->pause.mutex);
+		pthread_mutex_destroy(&encoder->roi_mutex);
 		obs_context_data_free(&encoder->context);
 		if (encoder->owns_info_id)
 			bfree((void *)encoder->info.id);
@@ -1875,32 +1880,93 @@ uint64_t obs_encoder_get_pause_offset(const obs_encoder_t *encoder)
 	return encoder ? encoder->pause.ts_offset : 0;
 }
 
-bool obs_encoder_set_roi(obs_encoder_t *encoder, struct region_of_interest *roi)
+bool obs_encoder_has_roi(const obs_encoder_t *encoder)
 {
+	return encoder->roi.num > 0;
+}
+
+bool obs_encoder_add_roi(obs_encoder_t *encoder,
+			 const struct region_of_interest *roi)
+{
+	if (!roi || !encoder->media)
+		return false;
 	if (!(encoder->info.caps & OBS_ENCODER_CAP_ROI))
 		return false;
-	/* NULL resets ROI */
-	if (!roi) {
-		memset(&encoder->roi, 0, sizeof(struct region_of_interest));
-		return true;
-	}
 	/* Area smaller than the smallest possible block (16x16) */
 	if (roi->bottom - roi->top < 16 || roi->right - roi->left < 16)
 		return false;
+	/* Other invalid ROIs */
 	if (roi->priority < -1.0f || roi->priority > 1.0f)
 		return false;
 
-	memcpy(&encoder->roi, roi, sizeof(struct region_of_interest));
+	pthread_mutex_lock(&encoder->roi_mutex);
+
+	if (encoder->scaled_height && encoder->scaled_width) {
+		const uint32_t width = video_output_get_width(encoder->media);
+		const uint32_t height = video_output_get_height(encoder->media);
+
+		if (width && height) {
+			/* Scale ROI to output size */
+			const float scale_x =
+				(float)encoder->scaled_width / (float)width;
+			const float scale_y =
+				(float)encoder->scaled_height / (float)height;
+
+			const struct region_of_interest scaled_roi = {
+				.top = (uint32_t)((float)roi->top * scale_y),
+				.bottom = (uint32_t)((float)roi->bottom *
+						     scale_y),
+				.left = (uint32_t)((float)roi->left * scale_x),
+				.right =
+					(uint32_t)((float)roi->right * scale_x),
+				.priority = roi->priority,
+			};
+
+			da_push_back(encoder->roi, &scaled_roi);
+			encoder->roi_increment++;
+		}
+	} else {
+		da_push_back(encoder->roi, roi);
+		encoder->roi_increment++;
+	}
+
+	pthread_mutex_unlock(&encoder->roi_mutex);
+
 	return true;
 }
 
-struct region_of_interest *obs_encoder_get_roi(obs_encoder_t *encoder)
+void obs_encoder_remove_roi(obs_encoder_t *encoder,
+			    const struct region_of_interest *roi)
 {
-	/* No ROI specified */
-	if (encoder->roi.priority == 0.0f)
-		return NULL;
-	if (encoder->roi.bottom == 0 || encoder->roi.right == 0)
-		return NULL;
+	pthread_mutex_lock(&encoder->roi_mutex);
+	da_erase_item(encoder->roi, roi);
+	encoder->roi_increment++;
+	pthread_mutex_unlock(&encoder->roi_mutex);
+}
 
-	return &encoder->roi;
+void obs_encoder_clear_roi(obs_encoder_t *encoder)
+{
+	pthread_mutex_lock(&encoder->roi_mutex);
+	da_clear(encoder->roi);
+	encoder->roi_increment++;
+	pthread_mutex_unlock(&encoder->roi_mutex);
+}
+
+void obs_encoder_enum_roi(obs_encoder_t *encoder,
+			  void (*enum_proc)(void *,
+					    struct region_of_interest *),
+			  void *param)
+{
+	pthread_mutex_lock(&encoder->roi_mutex);
+
+	size_t idx = encoder->roi.num;
+	while (idx)
+		enum_proc(param, &encoder->roi.array[--idx]);
+
+	pthread_mutex_unlock(&encoder->roi_mutex);
+}
+
+uint32_t obs_encoder_get_roi_increment(const obs_encoder_t *encoder)
+{
+	return encoder->roi_increment;
 }

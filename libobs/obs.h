@@ -2458,15 +2458,27 @@ EXPORT bool obs_encoder_set_frame_rate_divisor(obs_encoder_t *encoder,
 					       uint32_t divisor);
 
 /**
- * Set region of interest (ROI) for an encoder. This allows prioritising
- * quality of a region of the frame.
- * Pass in NULL to reset.
+ * Adds region of interest (ROI) for an encoder. This allows prioritizing
+ * quality of regions of the frame.
+ * If regions overlap, regions added earlier take precedence.
  *
  * Returns false if the encoder does not support ROI or region is invalid.
  */
-EXPORT bool obs_encoder_set_roi(obs_encoder_t *encoder,
-				struct region_of_interest *roi);
-EXPORT struct region_of_interest *obs_encoder_get_roi(obs_encoder_t *encoder);
+EXPORT bool obs_encoder_add_roi(obs_encoder_t *encoder,
+				const struct region_of_interest *roi);
+/** For video encoders, returns true if any ROIs were set */
+EXPORT bool obs_encoder_has_roi(const obs_encoder_t *encoder);
+/** Remove specified region from encoder */
+EXPORT void obs_encoder_remove_roi(obs_encoder_t *encoder,
+				   const struct region_of_interest *roi);
+/** Clear all regions */
+EXPORT void obs_encoder_clear_roi(obs_encoder_t *encoder);
+/** Enumerate regions with callback, in order of highest to lowest index */
+EXPORT void obs_encoder_enum_roi(obs_encoder_t *encoder,
+				 void (*enum_proc)(void *,
+						   struct region_of_interest *),
+				 void *param);
+EXPORT uint32_t obs_encoder_get_roi_increment(const obs_encoder_t *encoder);
 
 /** For video encoders, returns true if pre-encode scaling is enabled */
 EXPORT bool obs_encoder_scaling_enabled(const obs_encoder_t *encoder);
