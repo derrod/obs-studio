@@ -111,6 +111,7 @@ struct amf_base {
 	uint32_t cx;
 	uint32_t cy;
 	uint32_t linesize = 0;
+	uint32_t roi_increment = 0;
 	int fps_num;
 	int fps_den;
 	bool full_range;
@@ -121,8 +122,6 @@ struct amf_base {
 	inline amf_base(bool fallback) : fallback(fallback) {}
 	virtual ~amf_base() = default;
 	virtual void init() = 0;
-
-	region_of_interest roi;
 };
 
 using d3dtex_t = ComPtr<ID3D11Texture2D>;
@@ -584,27 +583,56 @@ static void convert_to_encoder_packet(amf_base *enc, AMFDataPtr &data,
 #define SEC_TO_NSEC 1000000000ULL
 #endif
 
-static inline bool region_identical(const region_of_interest *a,
-				    const region_of_interest *b)
+struct roi_params {
+	uint32_t mb_width;
+	uint32_t mb_height;
+	amf_int32 pitch;
+	bool h264;
+	amf_uint32 *buf;
+};
+
+static void roi_cb(void *param, region_of_interest *roi)
 {
-	return a->top == b->top && a->bottom == b->bottom &&
-	       a->left == b->left && a->right == b->right &&
-	       a->priority == b->priority;
+	const roi_params *rp = static_cast<roi_params *>(param);
+
+	/* AMF does not support negative priority */
+	if (roi->priority < 0)
+		return;
+
+	const uint32_t mb_size = rp->h264 ? 16 : 64;
+	const uint32_t roi_left = roi->left / mb_size;
+	const uint32_t roi_top = roi->top / mb_size;
+	const uint32_t roi_right = (roi->right - 1) / mb_size;
+	const uint32_t roi_bottom = (roi->bottom - 1) / mb_size;
+	/* Importance value range is 0..10 */
+	const amf_uint32 priority = (amf_uint32)(10.0f * roi->priority);
+
+	for (uint32_t mb_y = 0; mb_y < rp->mb_height; mb_y++) {
+		if (mb_y < roi_top || mb_y > roi_bottom)
+			continue;
+
+		for (uint32_t mb_x = 0; mb_x < rp->mb_width; mb_x++) {
+			if (mb_x < roi_left || mb_x > roi_right)
+				continue;
+
+			rp->buf[mb_y * rp->pitch / sizeof(amf_uint32) + mb_x] =
+				priority;
+		}
+	}
 }
 
-static void add_roi(amf_base *enc, AMFSurface *amf_surf,
-		    const region_of_interest *roi)
+static void create_roi(amf_base *enc, AMFSurface *amf_surf)
 {
 	uint32_t mb_size = 16; /* H.264 is always 16x16 */
 	if (enc->codec == amf_codec_type::HEVC ||
 	    enc->codec == amf_codec_type::AV1)
 		mb_size = 64; /* AMF HEVC & AV1 use 64x64 blocks */
 
-	uint32_t mb_width = (enc->cx + mb_size - 1) / mb_size;
-	uint32_t mb_height = (enc->cy + mb_size - 1) / mb_size;
+	const uint32_t mb_width = (enc->cx + mb_size - 1) / mb_size;
+	const uint32_t mb_height = (enc->cy + mb_size - 1) / mb_size;
 
 	if (!enc->roi_map) {
-		debug("Creating AMF ROI map surface...");
+		debug("Creating AMF ROI surface...");
 		AMFContext1Ptr context1(enc->amf_context);
 		AMF_RESULT res = context1->AllocSurfaceEx(
 			AMF_MEMORY_HOST, AMF_SURFACE_GRAY32, mb_width,
@@ -618,34 +646,26 @@ static void add_roi(amf_base *enc, AMFSurface *amf_surf,
 		}
 	}
 
-	if (!region_identical(roi, &enc->roi)) {
-		debug("Filling AMF ROI map...");
-		/* This is just following the SimpleROI example. */
-		amf_uint32 *pBuf =
-			(amf_uint32 *)enc->roi_map->GetPlaneAt(0)->GetNative();
-		amf_int32 pitch = enc->roi_map->GetPlaneAt(0)->GetHPitch();
-		memset(pBuf, 0, pitch * mb_height);
+	debug("Filling AMF ROI map...");
+	/* This is just following the SimpleROI example. */
+	amf_uint32 *pBuf =
+		(amf_uint32 *)enc->roi_map->GetPlaneAt(0)->GetNative();
+	amf_int32 pitch = enc->roi_map->GetPlaneAt(0)->GetHPitch();
+	memset(pBuf, 0, pitch * mb_height);
 
-		uint32_t roi_left = roi->left / mb_size;
-		uint32_t roi_top = roi->top / mb_size;
-		uint32_t roi_right = (roi->right + mb_size - 1) / mb_size;
-		uint32_t roi_bottom = (roi->bottom + mb_size - 1) / mb_size;
+	roi_params par{mb_width, mb_height, pitch,
+		       enc->codec == amf_codec_type::AVC, pBuf};
+	obs_encoder_enum_roi(enc->encoder, roi_cb, &par);
 
-		uint32_t priority = 0;
-		if (roi->priority > 0)
-			priority = (uint32_t)(roi->priority * 10);
+	enc->roi_increment = obs_encoder_get_roi_increment(enc->encoder);
+}
 
-		for (uint32_t mb_y = 0; mb_y < mb_height; mb_y++) {
-			for (uint32_t mb_x = 0; mb_x < mb_width; mb_x++) {
-				if (mb_x >= roi_left && mb_x < roi_right &&
-				    mb_y >= roi_top && mb_y < roi_bottom)
-					pBuf[mb_y * pitch / 4 + mb_x] =
-						priority;
-			}
-		}
+static void add_roi(amf_base *enc, AMFSurface *amf_surf)
+{
+	const uint32_t increment = obs_encoder_get_roi_increment(enc->encoder);
 
-		enc->roi = *roi;
-	}
+	if (increment != enc->roi_increment || !enc->roi_increment)
+		create_roi(enc, amf_surf);
 
 	if (enc->codec == amf_codec_type::AVC)
 		amf_surf->SetProperty(AMF_VIDEO_ENCODER_ROI_DATA, enc->roi_map);
@@ -663,7 +683,6 @@ static void amf_encode_base(amf_base *enc, AMFSurface *amf_surf,
 	auto &queued_packets = enc->queued_packets;
 	uint64_t ts_start = os_gettime_ns();
 	AMF_RESULT res;
-	region_of_interest *roi;
 
 	*received_packet = false;
 
@@ -671,9 +690,8 @@ static void amf_encode_base(amf_base *enc, AMFSurface *amf_surf,
 	while (waiting) {
 		/* ----------------------------------- */
 		/* add ROI data (if any)               */
-		if (enc->roi_supported &&
-		    (roi = obs_encoder_get_roi(enc->encoder)) != nullptr)
-			add_roi(enc, amf_surf, roi);
+		if (enc->roi_supported && obs_encoder_has_roi(enc->encoder))
+			add_roi(enc, amf_surf);
 
 		/* ----------------------------------- */
 		/* submit frame                        */
