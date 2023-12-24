@@ -1857,10 +1857,12 @@ inline void AdvancedOutput::SetupRecording()
 		}
 
 		obs_encoder_set_scaled_size(videoRecording, cx, cy);
-		region_of_interest roi{640, 1024, 128, 512, 1.0f};
 		if (obs_encoder_has_roi(videoRecording))
 			obs_encoder_clear_roi(videoRecording);
-		if (!obs_encoder_add_roi(videoRecording, &roi))
+		region_of_interest roi{640, 1024, 128, 512, 1.0f};
+		region_of_interest roi2{64, 448, 1408, 1792, -1.0f};
+		if (!obs_encoder_add_roi(videoRecording, &roi) ||
+		    !obs_encoder_add_roi(videoRecording, &roi2))
 			blog(LOG_WARNING, "setting ROI failed????");
 
 		obs_output_set_video_encoder(fileOutput, videoRecording);
