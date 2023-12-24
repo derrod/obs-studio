@@ -943,25 +943,42 @@ mfxStatus QSV_Encoder_Internal::Reset(qsv_param_t *pParams,
 	return sts;
 }
 
-void QSV_Encoder_Internal::SetupROI(mfxU32 left, mfxU32 top, mfxU32 right,
-				    mfxU32 bottom, mfxI16 delta)
+void QSV_Encoder_Internal::AddROI(mfxU32 left, mfxU32 top, mfxU32 right,
+				  mfxU32 bottom, mfxI16 delta)
 {
 	info("Setting up ROI...");
+
+	if (m_roi.NumROI == 256) {
+		warn("Maximum number of ROIs hit, ignoring additional ROI!");
+		return;
+	}
+
 	m_roi.Header.BufferId = MFX_EXTBUFF_ENCODER_ROI;
 	m_roi.Header.BufferSz = sizeof(mfxExtEncoderROI);
-	m_roi.NumROI = 1;
 	m_roi.ROIMode = MFX_ROI_MODE_QP_DELTA;
+	/* The SDK will automatically align the values to block sizes so we
+	 * don't have to do any maths here. */
+	m_roi.ROI[m_roi.NumROI].Left = left;
+	m_roi.ROI[m_roi.NumROI].Top = top;
+	m_roi.ROI[m_roi.NumROI].Right = right;
+	m_roi.ROI[m_roi.NumROI].Bottom = bottom;
+	m_roi.ROI[m_roi.NumROI].DeltaQP = delta;
+	m_roi.NumROI++;
 
-	m_roi.ROI[0].Left = left;
-	m_roi.ROI[0].Top = top;
-	m_roi.ROI[0].Right = right;
-	m_roi.ROI[0].Bottom = bottom;
-	m_roi.ROI[0].DeltaQP = delta;
-
-	// This is bad but okay for now
+	/* Right now ROI is the only thing we add so this is fine */
 	if (m_extbuf.empty())
 		m_extbuf.push_back((mfxExtBuffer *)&m_roi);
 
 	m_ctrl.ExtParam = m_extbuf.data();
 	m_ctrl.NumExtParam = (mfxU16)m_extbuf.size();
+}
+
+void QSV_Encoder_Internal::ClearROI()
+{
+	info("Clearing ROI");
+
+	m_roi.NumROI = 0;
+	m_ctrl.ExtParam = nullptr;
+	m_ctrl.NumExtParam = 0;
+	m_extbuf.clear();
 }

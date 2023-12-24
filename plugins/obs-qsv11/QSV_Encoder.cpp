@@ -206,13 +206,20 @@ int qsv_encoder_headers(qsv_t *pContext, uint8_t **pSPS, uint8_t **pPPS,
 	return 0;
 }
 
-void qsv_setup_roi(qsv_t *pContext, struct region_of_interest *roi)
+void qsv_encoder_add_roi(qsv_t *pContext, const region_of_interest *roi)
 {
 	QSV_Encoder_Internal *pEncoder = (QSV_Encoder_Internal *)pContext;
 
 	/* QP value is range 0..51 */
+	// ToDo figure out if this is different for AV1
 	mfxI16 delta = (mfxI16)(-51.0f * roi->priority);
-	pEncoder->SetupROI(roi->left, roi->top, roi->right, roi->bottom, delta);
+	pEncoder->AddROI(roi->left, roi->top, roi->right, roi->bottom, delta);
+}
+
+void qsv_encoder_clear_roi(qsv_t *pContext)
+{
+	QSV_Encoder_Internal *pEncoder = (QSV_Encoder_Internal *)pContext;
+	pEncoder->ClearROI();
 }
 
 int qsv_encoder_encode(qsv_t *pContext, uint64_t ts, uint8_t *pDataY,

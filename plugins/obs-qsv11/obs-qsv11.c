@@ -100,7 +100,7 @@ struct obs_qsv {
 
 	os_performance_token_t *performance_token;
 
-	struct region_of_interest roi;
+	uint32_t roi_increment;
 };
 
 /* ------------------------------------------------------------------------- */
@@ -1379,12 +1379,35 @@ static void parse_packet_hevc(struct obs_qsv *obsqsv,
 	g_bFirst = false;
 }
 
-static inline bool region_identical(const struct region_of_interest *a,
-				    const struct region_of_interest *b)
+static void roi_cb(void *param, struct region_of_interest *roi)
 {
-	return a->top == b->top && a->bottom == b->bottom &&
-	       a->left == b->left && a->right == b->right &&
-	       a->priority == b->priority;
+	struct darray *da = param;
+	darray_push_back(sizeof(struct region_of_interest), da, roi);
+}
+
+static void obs_qsv_setup_rois(struct obs_qsv *obsqsv)
+{
+	const uint32_t increment =
+		obs_encoder_get_roi_increment(obsqsv->encoder);
+	if (obsqsv->roi_increment == increment)
+		return;
+
+	qsv_encoder_clear_roi(obsqsv->context);
+	/* Because we pass-through the ROIs more or less directly we need to
+	 * pass them in reverse order, so make a temporary copy and then use
+	 * that instead. */
+	DARRAY(struct region_of_interest) rois;
+	da_init(rois);
+
+	obs_encoder_enum_roi(obsqsv->encoder, roi_cb, &rois);
+
+	size_t idx = rois.num;
+	while (idx)
+		qsv_encoder_add_roi(obsqsv->context, &rois.array[--idx]);
+
+	da_free(rois);
+
+	obsqsv->roi_increment = increment;
 }
 
 static bool obs_qsv_encode(void *data, struct encoder_frame *frame,
@@ -1406,11 +1429,8 @@ static bool obs_qsv_encode(void *data, struct encoder_frame *frame,
 
 	mfxU64 qsvPTS = ts_obs_to_mfx(frame->pts, voi);
 
-	struct region_of_interest *roi = obs_encoder_get_roi(obsqsv->encoder);
-	if (roi && !region_identical(roi, &obsqsv->roi)) {
-		qsv_setup_roi(obsqsv->context, roi);
-		obsqsv->roi = *roi;
-	}
+	if (obs_encoder_has_roi(obsqsv->encoder))
+		obs_qsv_setup_rois(obsqsv);
 
 	// FIXME: remove null check from the top of this function
 	// if we actually do expect null frames to complete output.
@@ -1468,11 +1488,8 @@ static bool obs_qsv_encode_tex(void *data, uint32_t handle, int64_t pts,
 
 	mfxU64 qsvPTS = ts_obs_to_mfx(pts, voi);
 
-	struct region_of_interest *roi = obs_encoder_get_roi(obsqsv->encoder);
-	if (roi && !region_identical(roi, &obsqsv->roi)) {
-		qsv_setup_roi(obsqsv->context, roi);
-		obsqsv->roi = *roi;
-	}
+	if (obs_encoder_has_roi(obsqsv->encoder))
+		obs_qsv_setup_rois(obsqsv);
 
 	ret = qsv_encoder_encode_tex(obsqsv->context, qsvPTS, handle, lock_key,
 				     next_key, &pBS);

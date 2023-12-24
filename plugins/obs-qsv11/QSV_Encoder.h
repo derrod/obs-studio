@@ -160,7 +160,8 @@ int qsv_encoder_reconfig(qsv_t *, qsv_param_t *);
 void qsv_encoder_version(unsigned short *major, unsigned short *minor);
 qsv_t *qsv_encoder_open(qsv_param_t *, enum qsv_codec codec);
 bool qsv_encoder_is_dgpu(qsv_t *);
-void qsv_setup_roi(qsv_t *, struct region_of_interest *roi);
+void qsv_encoder_add_roi(qsv_t *, const struct region_of_interest *roi);
+void qsv_encoder_clear_roi(qsv_t *pContext);
 int qsv_encoder_encode(qsv_t *, uint64_t, uint8_t *, uint8_t *, uint32_t,
 		       uint32_t, mfxBitstream **pBS);
 int qsv_encoder_encode_tex(qsv_t *, uint64_t, uint32_t, uint64_t, uint64_t *,
