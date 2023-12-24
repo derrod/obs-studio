@@ -461,6 +461,8 @@ static void nvenc_defaults_base(enum codec_type codec, obs_data_t *settings)
 	obs_data_set_default_int(settings, "gpu", 0);
 	obs_data_set_default_int(settings, "bf", 2);
 	obs_data_set_default_bool(settings, "repeat_headers", false);
+	obs_data_set_default_bool(settings, "roi_emphasis", false);
+	obs_data_set_default_bool(settings, "roi_compensate", true);
 }
 
 void h264_nvenc_defaults(obs_data_t *settings)
@@ -626,6 +628,10 @@ obs_properties_t *nvenc_properties_internal(enum codec_type codec, bool ffmpeg)
 				props, "roi_emphasis",
 				obs_module_text("NVENC.ROIEmphasis"));
 		}
+
+		p = obs_properties_add_bool(props, "roi_compensate",
+					    "roi_compensate");
+		obs_property_set_visible(p, false);
 	}
 	p = obs_properties_add_bool(
 		props, "psycho_aq",

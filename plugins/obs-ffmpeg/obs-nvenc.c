@@ -123,9 +123,10 @@ struct nvenc_data {
 	uint8_t *sei;
 	size_t sei_size;
 
-	struct region_of_interest roi;
+	bool roi_compensate;
 	int8_t *roi_map;
 	size_t roi_map_size;
+	uint32_t roi_increment;
 };
 
 /* ------------------------------------------------------------------------- */
@@ -454,6 +455,7 @@ static bool init_encoder_base(struct nvenc_data *enc, obs_data_t *settings,
 	const char *profile = obs_data_get_string(settings, "profile");
 	bool lookahead = obs_data_get_bool(settings, "lookahead");
 	bool roi_emphasis = obs_data_get_bool(settings, "roi_emphasis");
+	bool roi_compensate = obs_data_get_bool(settings, "roi_compensate");
 	bool vbr = astrcmpi(rc, "VBR") == 0;
 	bool psycho_aq = !compatibility &&
 			 obs_data_get_bool(settings, "psycho_aq");
@@ -683,17 +685,17 @@ static bool init_encoder_base(struct nvenc_data *enc, obs_data_t *settings,
 	config->rcParams.vbvBufferSize = bitrate * 1000;
 	config->rcParams.multiPass = nv_multipass;
 
-	/* Region of interest */
-	bool roi_enabled = !!obs_encoder_get_roi(enc->encoder);
-	/* This check does not appear to work correctly for anything but H.264,
-	 * but any GPU that supports HEVC and AV1 encoder should support it. */
-	if (roi_enabled) {
+	/* -------------------------- */
+	/* Region of interest         */
+	if (obs_encoder_has_roi(enc->encoder)) {
 		if (roi_emphasis &&
 		    nv_get_cap(enc, NV_ENC_CAPS_SUPPORT_EMPHASIS_LEVEL_MAP)) {
 			config->rcParams.qpMapMode = NV_ENC_QP_MAP_EMPHASIS;
 		} else {
 			config->rcParams.qpMapMode = NV_ENC_QP_MAP_DELTA;
 		}
+
+		enc->roi_compensate = roi_compensate;
 
 		if (psycho_aq) {
 			warn("ROI enabled, disabling AQ");
@@ -703,8 +705,6 @@ static bool init_encoder_base(struct nvenc_data *enc, obs_data_t *settings,
 			psycho_aq = false;
 		}
 	} else {
-		if (roi_enabled)
-			warn("ROI enabled, but unsupported");
 		config->rcParams.qpMapMode = NV_ENC_QP_MAP_DISABLED;
 	}
 
@@ -1406,14 +1406,6 @@ static bool get_encoded_packet(struct nvenc_data *enc, bool finalize)
 	return true;
 }
 
-static inline bool region_identical(const struct region_of_interest *a,
-				    const struct region_of_interest *b)
-{
-	return a->top == b->top && a->bottom == b->bottom &&
-	       a->left == b->left && a->right == b->right &&
-	       a->priority == b->priority;
-}
-
 static inline int8_t priorty_to_level(const float priority)
 {
 	if (priority > 0.8)
@@ -1430,15 +1422,58 @@ static inline int8_t priorty_to_level(const float priority)
 	return NV_ENC_EMPHASIS_MAP_LEVEL_0;
 }
 
-static void add_roi(struct nvenc_data *enc,
-		    const struct region_of_interest *roi,
-		    NV_ENC_PIC_PARAMS *params)
+struct roi_params {
+	uint32_t mb_width;
+	uint32_t mb_height;
+	uint32_t mb_size;
+	bool emphasis_mode;
+	bool av1;
+	int8_t *map;
+};
+
+static void roi_cb(void *param, struct region_of_interest *roi)
 {
-	if (enc->roi_map && region_identical(roi, &enc->roi)) {
+	const struct roi_params *rp = param;
+
+	int8_t qp_val;
+	/* H.264 uses emphasis map, HEVC/AV1 use QP deltas */
+	if (rp->emphasis_mode) {
+		qp_val = priorty_to_level(roi->priority);
+	} else if (rp->av1) {
+		qp_val = (int8_t)(-128.0f * roi->priority);
+	} else {
+		qp_val = (int8_t)(-51.0f * roi->priority);
+	}
+
+	const uint32_t roi_left = roi->left / rp->mb_size;
+	const uint32_t roi_top = roi->top / rp->mb_size;
+	const uint32_t roi_right = (roi->right - 1) / rp->mb_size;
+	const uint32_t roi_bottom = (roi->bottom - 1) / rp->mb_size;
+
+	for (uint32_t mb_y = 0; mb_y < rp->mb_height; mb_y++) {
+		if (mb_y < roi_top || mb_y > roi_bottom)
+			continue;
+
+		for (uint32_t mb_x = 0; mb_x < rp->mb_width; mb_x++) {
+			if (mb_x < roi_left || mb_x > roi_right)
+				continue;
+
+			rp->map[mb_y * rp->mb_width + mb_x] = qp_val;
+		}
+	}
+}
+
+static void add_roi(struct nvenc_data *enc, NV_ENC_PIC_PARAMS *params)
+{
+	const uint32_t increment = obs_encoder_get_roi_increment(enc->encoder);
+
+	if (enc->roi_map && enc->roi_increment == increment) {
 		params->qpDeltaMap = enc->roi_map;
 		params->qpDeltaMapSize = (uint32_t)enc->roi_map_size;
 		return;
 	}
+
+	blog(LOG_DEBUG, "Creating NVENC ROI map...");
 
 	uint32_t mb_size;
 	switch (enc->codec) {
@@ -1454,68 +1489,80 @@ static void add_roi(struct nvenc_data *enc,
 		/* AV1 can be 64x64 or 128x128, but NVENC is always 64x64 */
 		mb_size = 64;
 		break;
+	default:
+		warn("ROI enabled but codec not known!");
+		return;
 	}
 
-	uint32_t mb_width = (enc->cx + mb_size - 1) / mb_size;
-	uint32_t mb_height = (enc->cy + mb_size - 1) / mb_size;
+	const uint32_t mb_width = (enc->cx + mb_size - 1) / mb_size;
+	const uint32_t mb_height = (enc->cy + mb_size - 1) / mb_size;
+	const size_t map_size = mb_width * mb_height * sizeof(int8_t);
 
-	blog(LOG_DEBUG, "Creating NVENC ROI map...");
-	enc->roi = *roi;
-	enc->roi_map = brealloc(enc->roi_map, mb_width * mb_height);
-	enc->roi_map_size = mb_width * mb_height;
-
-	uint32_t roi_left = roi->left / mb_size;
-	uint32_t roi_top = roi->top / mb_size;
-	uint32_t roi_right = (roi->right + mb_size - 1) / mb_size;
-	uint32_t roi_bottom = (roi->bottom + mb_size - 1) / mb_size;
-
-	/* NVENC will overshoot the target bit-rate if priority is high, so also
-	 * reduce priority of everything else a little bit to compensate. */
-	uint32_t roi_size = (roi_right - roi_left) * (roi_bottom - roi_top);
-	float neg_priority_mul =
-		(float)roi_size / (float)(mb_width * mb_height);
-
-	int8_t qp_val;
-	int8_t neg_qp_val;
-	/* H.264 uses emphasis map, HEVC/AV1 use QP deltas */
-	if (enc->codec == CODEC_H264 &&
-	    enc->config.rcParams.qpMapMode == NV_ENC_QP_MAP_EMPHASIS) {
-		qp_val = priorty_to_level(roi->priority);
-		neg_qp_val = NV_ENC_EMPHASIS_MAP_LEVEL_0;
-	} else if (enc->codec == CODEC_AV1) {
-		qp_val = (int8_t)(-128.0f * roi->priority);
-		neg_qp_val = (int8_t)(127.0f * neg_priority_mul);
-	} else {
-		qp_val = (int8_t)(-51.0f * roi->priority);
-		neg_qp_val = (int8_t)(51.0f * neg_priority_mul);
+	if (map_size != enc->roi_map_size) {
+		enc->roi_map = brealloc(enc->roi_map, map_size);
+		enc->roi_map_size = map_size;
 	}
 
-	for (uint32_t mb_y = 0; mb_y < mb_height; mb_y++) {
-		for (uint32_t mb_x = 0; mb_x < mb_width; mb_x++) {
-			bool emphasize = mb_x >= roi_left && mb_x < roi_right &&
-					 mb_y >= roi_top && mb_y < roi_bottom;
+	memset(enc->roi_map, 0, enc->roi_map_size);
 
-			enc->roi_map[mb_y * mb_width + mb_x] =
-				emphasize ? qp_val : neg_qp_val;
+	struct roi_params par = {
+		.mb_width = mb_width,
+		.mb_height = mb_height,
+		.mb_size = mb_size,
+		.av1 = enc->codec == CODEC_AV1,
+		.emphasis_mode = enc->config.rcParams.qpMapMode ==
+				 NV_ENC_QP_MAP_EMPHASIS,
+		.map = enc->roi_map,
+	};
+
+	obs_encoder_enum_roi(enc->encoder, roi_cb, &par);
+
+	if (enc->roi_compensate && !par.emphasis_mode) {
+		/* NVENC will overshoot the target bit-rate if priority is high, so also
+	         * reduce priority of everything else a little bit to compensate.
+	         * This is disabled if any negative priority zones already exist. */
+
+		uint32_t zeroes = 0;
+		bool negative_zones = false;
+		for (size_t idx = 0; idx < map_size; idx++) {
+			if (enc->roi_map[idx] < 0) {
+				negative_zones = true;
+				break;
+			}
+			zeroes += enc->roi_map[idx] == 0;
+		}
+
+		if (!negative_zones) {
+			float mul =
+				(float)(map_size - zeroes) / (float)map_size;
+			int8_t qp_delta =
+				(int8_t)((par.av1 ? 128.0f : 51.0f) * mul);
+
+			for (size_t idx = 0; idx < map_size; idx++) {
+				if (enc->roi_map[idx])
+					continue;
+				enc->roi_map[idx] = qp_delta;
+			}
 		}
 	}
 
+	enc->roi_increment = increment;
 	params->qpDeltaMap = enc->roi_map;
-	params->qpDeltaMapSize = (uint32_t)enc->roi_map_size;
+	params->qpDeltaMapSize = (uint32_t)map_size;
 
 	blog(LOG_DEBUG, "ROI Map:");
 	for (size_t off = 0; off < enc->roi_map_size; off += mb_width) {
-		struct dstr map = {0};
-		dstr_reserve(&map, mb_width * 12);
-		dstr_cat(&map, "\t | ");
+		struct dstr str = {0};
+		dstr_reserve(&str, mb_width * 12);
+		dstr_cat(&str, "\t | ");
 		for (size_t h_idx = 0; h_idx < mb_width; h_idx++) {
-			dstr_catf(&map, "%d", enc->roi_map[off + h_idx]);
+			dstr_catf(&str, "%d", enc->roi_map[off + h_idx]);
 			if (h_idx < mb_width - 1)
-				dstr_cat(&map, ", ");
+				dstr_cat(&str, ", ");
 		}
-		dstr_cat(&map, " |");
-		blog(LOG_DEBUG, map.array);
-		dstr_free(&map);
+		dstr_cat(&str, " |");
+		blog(LOG_DEBUG, str.array);
+		dstr_free(&str);
 	}
 }
 
@@ -1592,11 +1639,10 @@ static bool nvenc_encode_tex(void *data, uint32_t handle, int64_t pts,
 	params.outputBitstream = bs->ptr;
 
 	/* Add emphasis map if enabled */
-	struct region_of_interest *roi = obs_encoder_get_roi(enc->encoder);
-	if (roi && enc->config.rcParams.qpMapMode != NV_ENC_QP_MAP_DISABLED) {
-		// required for H.264 / HEVC
+	if (enc->config.rcParams.qpMapMode != NV_ENC_QP_MAP_DISABLED &&
+	    obs_encoder_has_roi(enc->encoder)) {
 		params.version = NV_ENC_PIC_PARAMS_VER;
-		add_roi(enc, roi, &params);
+		add_roi(enc, &params);
 	}
 
 	err = nv.nvEncEncodePicture(enc->session, &params);
