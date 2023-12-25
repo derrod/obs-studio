@@ -172,6 +172,7 @@ bool ffmpeg_video_encoder_init(struct ffmpeg_video_encoder *enc, void *parent,
 
 	if (!enc->avcodec) {
 		struct dstr error_message;
+		dstr_init(&error_message);
 		dstr_printf(&error_message, "Couldn't find encoder: %s",
 			    enc_lib);
 		obs_encoder_set_last_error(encoder, error_message.array);
