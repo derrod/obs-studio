@@ -1856,6 +1856,46 @@ inline void AdvancedOutput::SetupRecording()
 			}
 		}
 
+		obs_encoder_clear_roi(videoRecording);
+		region_of_interest roi;
+		/*
+		// Add cross
+		roi = {472, 472 + 136, 0, 1920, 0.25f};
+		obs_encoder_add_roi(videoRecording, &roi);
+		roi = {0, 1080, 892, 892 + 136, 0.25f};
+		obs_encoder_add_roi(videoRecording, &roi);
+		// Add PiPs
+		roi = {640, 1024, 128, 512, 1.0f};
+		obs_encoder_add_roi(videoRecording, &roi);
+		roi = {64, 448, 1408, 1792, -1.0f};
+		obs_encoder_add_roi(videoRecording, &roi);
+		// Set negative priority for entire frame
+		roi = {0, 1080, 0, 1920, -0.25f};
+		//obs_encoder_add_roi(videoRecording, &roi);
+		*/
+		double prio_max = 0.25;
+		double prio_min = -0.25;
+		double step = (prio_max - prio_min) / 14.0;
+		double prio_val = prio_max;
+
+		for (int y = 0; y < 3; y++) {
+			for (int x = 0; x < 5; x++) {
+				roi.top = y * 384;
+				roi.bottom = roi.top + 384;
+				roi.left = x * 384;
+				roi.right = roi.left + 384;
+				roi.priority = prio_val;
+				blog(LOG_DEBUG, "adding roi: %d %d %d %d %f",
+				     roi.top, roi.bottom, roi.left, roi.right,
+				     roi.priority);
+				obs_encoder_add_roi(videoRecording, &roi);
+
+				prio_val -= step;
+				if (prio_val < prio_min)
+					prio_val = prio_min;
+			}
+		}
+
 		obs_encoder_set_scaled_size(videoRecording, cx, cy);
 		obs_output_set_video_encoder(fileOutput, videoRecording);
 		if (replayBuffer)
