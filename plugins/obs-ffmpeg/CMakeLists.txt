@@ -23,6 +23,7 @@ target_sources(
           $<$<PLATFORM_ID:Linux,FreeBSD,OpenBSD>:obs-ffmpeg-vaapi.c>
           $<$<PLATFORM_ID:Linux,FreeBSD,OpenBSD>:vaapi-utils.c>
           $<$<PLATFORM_ID:Linux,FreeBSD,OpenBSD>:vaapi-utils.h>
+          $<$<PLATFORM_ID:Windows>:obs-ffmpeg-mediafoundation.c>
           $<$<PLATFORM_ID:Windows>:obs-nvenc-helpers.c>
           $<$<PLATFORM_ID:Windows>:obs-nvenc.c>
           $<$<PLATFORM_ID:Windows>:obs-nvenc.h>

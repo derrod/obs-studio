@@ -101,6 +101,7 @@ if(OS_WINDOWS)
     obs-ffmpeg
     PRIVATE texture-amf.cpp
             texture-amf-opts.hpp
+            obs-ffmpeg-mediafoundation.c
             obs-nvenc.c
             obs-nvenc.h
             obs-nvenc-helpers.c
