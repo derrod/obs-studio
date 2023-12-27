@@ -19,6 +19,8 @@ Q_DECLARE_METATYPE(RoiData)
 class RoiEditor : public QDialog {
 	Q_OBJECT
 
+	enum Direction { Up, Down };
+
 public:
 	std::unique_ptr<Ui_ROIEditor> ui;
 	RoiEditor(QWidget *parent);
@@ -38,8 +40,8 @@ public slots:
 private slots:
 	void on_actionAddRoi_triggered();
 	void on_actionRemoveRoi_triggered();
-	// void on_actionRoiUp_triggered();
-	// void on_actionRoiDown_triggered();
+	void on_actionRoiUp_triggered();
+	void on_actionRoiDown_triggered();
 
 	void resizeEvent(QResizeEvent *event);
 
@@ -52,6 +54,7 @@ private:
 	void RegionsFromData(std::vector<region_of_interest> &rois,
 			     const std::string &uuid);
 	void PropertiesChanges();
+	void MoveRoiItem(Direction direction);
 
 	static void SceneItemTransform(void *param, calldata_t *data);
 	static void SceneItemVisibility(void *param, calldata_t *data,
