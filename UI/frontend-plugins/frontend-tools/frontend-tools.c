@@ -19,6 +19,9 @@ void InitScripts();
 void FreeScripts();
 #endif
 
+void InitRoiEditor();
+void FreeRoiEditor();
+
 bool obs_module_load(void)
 {
 #if defined(_WIN32)
@@ -26,6 +29,7 @@ bool obs_module_load(void)
 #endif
 	InitSceneSwitcher();
 	InitOutputTimer();
+	InitRoiEditor();
 #if defined(ENABLE_SCRIPTING)
 	InitScripts();
 #endif
@@ -39,6 +43,7 @@ void obs_module_unload(void)
 #endif
 	FreeSceneSwitcher();
 	FreeOutputTimer();
+	FreeRoiEditor();
 #if defined(ENABLE_SCRIPTING)
 	FreeScripts();
 #endif
