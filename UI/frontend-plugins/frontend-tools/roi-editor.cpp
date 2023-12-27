@@ -449,6 +449,7 @@ void RoiEditor::SceneSelectionChanged()
 
 void RoiEditor::LoadRoisFromOBSData(obs_data_t *obj)
 {
+	ui->enableRoi->setChecked(obs_data_get_bool(obj, "enabled"));
 	OBSDataAutoRelease scenes = obs_data_get_obj(obj, "scenes");
 	obs_data_item *item = obs_data_first(scenes);
 
@@ -484,6 +485,7 @@ void RoiEditor::SaveRoisToOBSData(obs_data_t *obj)
 	}
 
 	obs_data_set_obj(obj, "scenes", scenes);
+	obs_data_set_bool(obj, "enabled", ui->enableRoi->isChecked());
 }
 
 void RoiEditor::UpdateEncoderRois()
