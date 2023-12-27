@@ -490,8 +490,6 @@ void RoiEditor::SaveRoisToOBSData(obs_data_t *obj)
 
 void RoiEditor::UpdateEncoderRois()
 {
-	ProfileScope("RoiEditor::UpdateEncoderRois");
-
 	OBSSourceAutoRelease scene = obs_frontend_get_current_scene();
 	const string uuid = obs_source_get_uuid(scene);
 
