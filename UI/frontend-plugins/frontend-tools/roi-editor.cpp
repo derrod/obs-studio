@@ -583,6 +583,35 @@ void RoiEditor::on_actionRemoveRoi_triggered()
 	delete item;
 }
 
+void RoiEditor::MoveRoiItem(Direction direction)
+{
+	int idx = ui->roiList->currentRow();
+	if (idx == -1)
+		return;
+	if (idx == 0 && direction == Up)
+		return;
+	if (idx == ui->roiList->count() - 1 && direction == Down)
+		return;
+
+	QSignalBlocker sb(ui->roiList);
+
+	QListWidgetItem *item = ui->roiList->takeItem(idx);
+
+	int offset = direction == Up ? -1 : 1;
+	ui->roiList->insertItem(idx + offset, item);
+	ui->roiList->setCurrentRow(idx + offset);
+	item->setSelected(true);
+}
+
+void RoiEditor::on_actionRoiUp_triggered()
+{
+	MoveRoiItem(Direction::Up);
+}
+void RoiEditor::on_actionRoiDown_triggered()
+{
+	MoveRoiItem(Direction::Down);
+}
+
 void RoiEditor::resizeEvent(QResizeEvent *event)
 {
 	RebuildPreview();
