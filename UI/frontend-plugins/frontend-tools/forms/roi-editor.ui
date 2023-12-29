@@ -498,7 +498,7 @@
     <string>Del</string>
    </property>
    <property name="shortcutContext">
-    <enum>Qt::ShortcutContext::WidgetWithChildrenShortcut</enum>
+    <enum>Qt::ShortcutContext::WindowShortcut</enum>
    </property>
    <property name="themeID" stdset="0">
     <string notr="true">removeIconSmall</string>
