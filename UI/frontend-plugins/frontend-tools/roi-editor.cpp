@@ -141,11 +141,11 @@ void RoiEditor::RefreshSceneItems(bool keep_selection)
 	if (!source)
 		return;
 
-	QVariant current;
-
+	int64_t scene_item_id = 0;
 	if (keep_selection) {
 		ui->roiPropSceneItem->blockSignals(true);
-		current = ui->roiPropSceneItem->currentData();
+		scene_item_id =
+			ui->roiPropSceneItem->currentData().toLongLong();
 	}
 
 	ui->roiPropSceneItem->clear();
@@ -161,7 +161,7 @@ void RoiEditor::RefreshSceneItems(bool keep_selection)
 		ui->roiPropSceneItem);
 
 	if (keep_selection) {
-		int idx = ui->roiPropSceneItem->findData(current);
+		int idx = ui->roiPropSceneItem->findData(scene_item_id);
 		if (idx != -1)
 			ui->roiPropSceneItem->setCurrentIndex(idx);
 		ui->roiPropSceneItem->blockSignals(false);
