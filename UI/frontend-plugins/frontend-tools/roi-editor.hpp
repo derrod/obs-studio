@@ -97,10 +97,7 @@ public:
 		CenterFocus,
 	};
 
-	RoiListItem(int type)
-		: QListWidgetItem(nullptr, type)
-	{
-	}
+	RoiListItem(int type) : QListWidgetItem(nullptr, type) {}
 
 	QVariant data(int role) const override;
 	void setData(int role, const QVariant &value) override;
