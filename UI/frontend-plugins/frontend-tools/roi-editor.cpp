@@ -781,6 +781,9 @@ void RoiEditor::on_actionRemoveRoi_triggered()
 	RoiListItem *item = currentItem;
 	currentItem = nullptr;
 	delete item;
+
+	RegionItemsToData();
+	RebuildPreview(true);
 }
 
 void RoiEditor::MoveRoiItem(Direction direction)
