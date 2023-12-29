@@ -55,7 +55,7 @@ private slots:
 
 	void ItemSelected(QListWidgetItem *item, QListWidgetItem *);
 
-	void RefreshSceneItems(bool keep_selection = true);
+	void RefreshSceneItems(bool signal = true);
 	void RebuildPreview(bool rebuildData = false);
 	void AddRegionItem(int type);
 

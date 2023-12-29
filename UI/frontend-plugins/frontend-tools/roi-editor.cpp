@@ -133,9 +133,9 @@ void RoiEditor::PropertiesChanges()
 	UpdateEncoderRois();
 }
 
-void RoiEditor::RefreshSceneItems(bool keep_selection)
+void RoiEditor::RefreshSceneItems(bool signal)
 {
-	if (!currentItem)
+	if (!currentItem && signal)
 		return;
 
 	auto sceneVar = ui->sceneSelect->currentData();
@@ -147,7 +147,7 @@ void RoiEditor::RefreshSceneItems(bool keep_selection)
 		return;
 
 	int64_t scene_item_id = 0;
-	if (keep_selection) {
+	if (signal) {
 		ui->roiPropSceneItem->blockSignals(true);
 		scene_item_id =
 			ui->roiPropSceneItem->currentData().toLongLong();
@@ -165,7 +165,7 @@ void RoiEditor::RefreshSceneItems(bool keep_selection)
 		},
 		ui->roiPropSceneItem);
 
-	if (keep_selection) {
+	if (signal) {
 		int idx = ui->roiPropSceneItem->findData(scene_item_id);
 		if (idx != -1)
 			ui->roiPropSceneItem->setCurrentIndex(idx);
