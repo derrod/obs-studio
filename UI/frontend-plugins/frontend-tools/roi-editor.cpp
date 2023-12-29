@@ -93,6 +93,8 @@ void RoiEditor::ShowHideDialog()
 		RebuildPreview(true);
 	} else {
 		setVisible(false);
+		// ToDo should probably clear the entire list?
+		currentItem = nullptr;
 	}
 }
 
