@@ -57,6 +57,7 @@ private slots:
 
 	void RefreshSceneItems(bool keep_selection = true);
 	void RebuildPreview(bool rebuildData = false);
+	void AddRegionItem(int type);
 
 private:
 	void RefreshSceneList();
@@ -99,8 +100,8 @@ public:
 		CenterFocus,
 	};
 
-	RoiListItem(QListWidget *parent, int type)
-		: QListWidgetItem(parent, type)
+	RoiListItem(int type)
+		: QListWidgetItem(nullptr, type)
 	{
 	}
 

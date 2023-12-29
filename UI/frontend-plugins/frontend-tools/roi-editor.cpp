@@ -648,7 +648,7 @@ void RoiEditor::RefreshRoiList()
 			(float)obs_data_get_double(roi, "priority"),
 		};
 
-		RoiListItem *item = new RoiListItem(ui->roiList, type);
+		RoiListItem *item = new RoiListItem(type);
 		ui->roiList->addItem(item);
 		item->setData(ROIData, QVariant::fromValue<RoiData>(data));
 	}
@@ -716,51 +716,42 @@ void RoiEditor::UpdateEncoderRois()
 	}
 }
 
+void RoiEditor::AddRegionItem(int type)
+{
+	auto item = new RoiListItem(type);
+	RoiData roi = {};
+	roi.height = 100;
+	roi.width = 100;
+	roi.enabled = true;
+	item->setData(ROIData, QVariant::fromValue<RoiData>(roi));
+
+	ui->roiList->insertItem(0, item);
+	ui->roiList->setCurrentItem(item);
+
+	RegionItemsToData();
+	RebuildPreview(true);
+}
+
 void RoiEditor::on_actionAddRoi_triggered()
 {
 	auto popup = QMenu(obs_module_text("ROI.AddMenu"), this);
 
 	QAction *addSceneItemRoi =
 		new QAction(obs_module_text("ROI.AddMenu.SceneItem"), this);
-	connect(addSceneItemRoi, &QAction::triggered, [this] {
-		auto item =
-			new RoiListItem(ui->roiList, RoiListItem::SceneItem);
-		ui->roiList->addItem(item);
-		RoiData roi = {};
-		roi.enabled = true;
-		item->setData(ROIData, QVariant::fromValue<RoiData>(roi));
-		RegionItemsToData();
-		RebuildPreview(true);
-	});
-	popup.insertAction(nullptr, addSceneItemRoi);
-
 	QAction *addManualRoi =
 		new QAction(obs_module_text("ROI.AddMenu.Manual"), this);
-	connect(addManualRoi, &QAction::triggered, [this] {
-		auto item = new RoiListItem(ui->roiList, RoiListItem::Manual);
-		ui->roiList->addItem(item);
-		RoiData roi = {};
-		roi.height = 100;
-		roi.width = 100;
-		roi.enabled = true;
-		item->setData(ROIData, QVariant::fromValue<RoiData>(roi));
-		RegionItemsToData();
-		RebuildPreview(true);
-	});
-	popup.insertAction(addSceneItemRoi, addManualRoi);
-
 	QAction *addCenterRoi =
 		new QAction(obs_module_text("ROI.AddMenu.CenterFocus"), this);
-	connect(addCenterRoi, &QAction::triggered, [this] {
-		auto item =
-			new RoiListItem(ui->roiList, RoiListItem::CenterFocus);
-		ui->roiList->addItem(item);
-		RoiData roi = {};
-		roi.enabled = true;
-		item->setData(ROIData, QVariant::fromValue<RoiData>(roi));
-		RegionItemsToData();
-		RebuildPreview(true);
-	});
+
+	connect(addSceneItemRoi, &QAction::triggered,
+		[this] { AddRegionItem(RoiListItem::SceneItem); });
+	connect(addManualRoi, &QAction::triggered,
+		[this] { AddRegionItem(RoiListItem::Manual); });
+	connect(addCenterRoi, &QAction::triggered,
+		[this] { AddRegionItem(RoiListItem::CenterFocus); });
+
+	popup.insertAction(nullptr, addSceneItemRoi);
+	popup.insertAction(addSceneItemRoi, addManualRoi);
 	popup.insertAction(addManualRoi, addCenterRoi);
 
 	popup.exec(QCursor::pos());
