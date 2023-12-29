@@ -607,7 +607,10 @@ void RoiEditor::SceneItemVisibility(void *param, calldata_t *, bool)
 void RoiEditor::ItemRemovedOrAdded(void *param, calldata_t *)
 {
 	RoiEditor *window = reinterpret_cast<RoiEditor *>(param);
-	QMetaObject::invokeMethod(window, "RefreshSceneItems");
+	// The "item_remove" signal comes in before the item is actually removed,
+	// so defer the refresh to avoid getting the list from libobs before it is updated.
+	QMetaObject::invokeMethod(window, "RefreshSceneItems",
+				  Qt::QueuedConnection);
 }
 
 void RoiEditor::ConnectSceneSignals()
