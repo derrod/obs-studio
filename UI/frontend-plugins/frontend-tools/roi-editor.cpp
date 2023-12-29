@@ -170,8 +170,10 @@ void RoiEditor::RefreshSceneItems(bool keep_selection)
 
 void RoiEditor::ItemSelected(QListWidgetItem *item, QListWidgetItem *)
 {
-	currentItem = dynamic_cast<RoiListItem *>(item);
-	if (!currentItem) {
+	currentItem = nullptr;
+
+	auto new_item = dynamic_cast<RoiListItem *>(item);
+	if (!new_item) {
 		ui->roiPropertiesGroupBox->setVisible(false);
 		return;
 	}
@@ -191,8 +193,6 @@ void RoiEditor::ItemSelected(QListWidgetItem *item, QListWidgetItem *)
 	// Type specific properties
 	if (item->type() == RoiListItem::SceneItem) {
 		sceneitem = true;
-		QSignalBlocker sb(ui->roiPropSceneItem);
-
 		RefreshSceneItems(false);
 
 		int idx = ui->roiPropSceneItem->findData(data.scene_item_id);
@@ -242,6 +242,9 @@ void RoiEditor::ItemSelected(QListWidgetItem *item, QListWidgetItem *)
 	ui->roiPropStepsOuterLabel->setVisible(center);
 	ui->roiPropStepsInnerSb->setVisible(center);
 	ui->roiPropStepsOuterSb->setVisible(center);
+
+	/* Only set after loading so any signals to PropertiesChanged are no-ops */
+	currentItem = new_item;
 }
 
 void RoiEditor::RefreshSceneList()
