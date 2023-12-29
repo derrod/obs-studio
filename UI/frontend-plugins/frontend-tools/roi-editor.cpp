@@ -799,10 +799,14 @@ void RoiEditor::MoveRoiItem(Direction direction)
 void RoiEditor::on_actionRoiUp_triggered()
 {
 	MoveRoiItem(Direction::Up);
+	RebuildPreview(true);
+	UpdateEncoderRois();
 }
 void RoiEditor::on_actionRoiDown_triggered()
 {
 	MoveRoiItem(Direction::Down);
+	RebuildPreview(true);
+	UpdateEncoderRois();
 }
 
 void RoiEditor::resizeEvent(QResizeEvent *event)
