@@ -79,7 +79,7 @@ private:
 		roi_data;
 
 	// All signals are added/cleared at once, so just store them in a vector somewhere
-	std::vector<OBSSignal> obsSignals;
+	std::vector<OBSSignal> sceneSignals;
 
 	QGraphicsScene *previewScene;
 	QPixmap previewPixmap;
