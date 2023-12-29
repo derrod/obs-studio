@@ -22,7 +22,7 @@ RoiEditor *roi_edit;
 RoiEditor::RoiEditor(QWidget *parent)
 	: QDialog(parent),
 	  ui(new Ui_ROIEditor),
-	  previewScene(new QGraphicsScene)
+	  previewScene(new QGraphicsScene(this))
 {
 	ui->setupUi(this);
 
