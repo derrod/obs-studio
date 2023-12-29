@@ -78,11 +78,8 @@ private:
 	std::unordered_map<std::string, std::vector<OBSDataAutoRelease>>
 		roi_data;
 
-	OBSSignal transformSignal;
-	OBSSignal visibilitySignal;
-	OBSSignal itemAddedSignal;
-	OBSSignal itemRemovedSignal;
-	OBSSignal sceneRefreshSignal;
+	// All signals are added/cleared at once, so just store them in a vector somewhere
+	std::vector<OBSSignal> obsSignals;
 
 	QGraphicsScene *previewScene;
 	QPixmap previewPixmap;

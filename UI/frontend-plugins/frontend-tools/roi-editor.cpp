@@ -615,16 +615,21 @@ void RoiEditor::ItemRemovedOrAdded(void *param, calldata_t *)
 
 void RoiEditor::ConnectSceneSignals()
 {
+	obsSignals.clear();
+
 	OBSSourceAutoRelease source = obs_frontend_get_current_scene();
 	signal_handler_t *signal = obs_source_get_signal_handler(source);
-	transformSignal.Connect(signal, "item_transform", SceneItemTransform,
+	if (!signal)
+		return;
+
+	obsSignals.emplace_back(signal, "item_transform", SceneItemTransform,
 				this);
-	visibilitySignal.Connect(signal, "item_visible", SceneItemTransform,
-				 this);
-	itemAddedSignal.Connect(signal, "item_add", ItemRemovedOrAdded, this);
-	itemRemovedSignal.Connect(signal, "item_remove", ItemRemovedOrAdded,
-				  this);
-	sceneRefreshSignal.Connect(signal, "refresh", ItemRemovedOrAdded, this);
+	obsSignals.emplace_back(signal, "item_visible", SceneItemTransform,
+				this);
+	obsSignals.emplace_back(signal, "item_add", ItemRemovedOrAdded, this);
+	obsSignals.emplace_back(signal, "item_remove", ItemRemovedOrAdded,
+				this);
+	obsSignals.emplace_back(signal, "refresh", ItemRemovedOrAdded, this);
 }
 
 void RoiEditor::RefreshRoiList()
