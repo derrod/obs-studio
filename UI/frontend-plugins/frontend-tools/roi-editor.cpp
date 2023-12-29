@@ -16,6 +16,9 @@ using namespace std;
 
 RoiEditor *roi_edit;
 
+/// ToDo cleanup this whole refresh mess, just rebuild data always when necessary,
+/// and then update preview if visible, always run encoder update.
+
 RoiEditor::RoiEditor(QWidget *parent)
 	: QDialog(parent),
 	  ui(new Ui_ROIEditor),
