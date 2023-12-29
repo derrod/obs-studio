@@ -1,5 +1,4 @@
 #pragma once
-#pragma once
 
 #include "ui_roi-editor.h"
 
@@ -9,9 +8,21 @@ class RoiListItem;
 class QCloseEvent;
 
 struct RoiData {
+	/* Scene item type*/
 	std::string scene_uuid;
 	int64_t scene_item_id;
+	/* Manual type */
 	uint32_t posX, posY, width, height;
+	/* Center focus type */
+	int64_t inner_radius;
+	int64_t inner_steps;
+	bool inner_aspect;
+	int64_t outer_radius;
+	int64_t outer_steps;
+	float outer_priority;
+	bool outer_aspect;
+	/* Shared attributes */
+	bool enabled;
 	float priority;
 };
 Q_DECLARE_METATYPE(RoiData)
@@ -29,26 +40,27 @@ public:
 
 public slots:
 	void ShowHideDialog();
-	void ItemSelected(QListWidgetItem *item, QListWidgetItem *);
 	void LoadRoisFromOBSData(obs_data_t *obj);
 	void SaveRoisToOBSData(obs_data_t *obj);
-	void UpdateEncoderRois();
 	void ConnectSceneSignals();
+	void UpdateEncoderRois();
 
-	// ToDo event listeners for output start to apply ROI
-	// ToDo events for scene item and active scene changes (movement/visibility)
 private slots:
 	void on_actionAddRoi_triggered();
 	void on_actionRemoveRoi_triggered();
 	void on_actionRoiUp_triggered();
 	void on_actionRoiDown_triggered();
 
-	void resizeEvent(QResizeEvent *event);
+	void resizeEvent(QResizeEvent *event) override;
+
+	void ItemSelected(QListWidgetItem *item, QListWidgetItem *);
+
+	void RefreshSceneItems(bool keep_selection = true);
+	void RebuildPreview(bool rebuildData = false);
 
 private:
 	void RefreshSceneList();
 	void RefreshRoiList();
-	void RebuildPreview(bool rebuilData = false);
 	void SceneSelectionChanged();
 	void RegionItemsToData();
 	void RegionsFromData(std::vector<region_of_interest> &rois,
@@ -59,6 +71,7 @@ private:
 	static void SceneItemTransform(void *param, calldata_t *data);
 	static void SceneItemVisibility(void *param, calldata_t *data,
 					bool visible);
+	static void ItemRemovedOrAdded(void *param, calldata_t *data);
 
 	// key is scene UUID
 	std::unordered_map<std::string, std::vector<OBSDataAutoRelease>>
@@ -66,16 +79,16 @@ private:
 
 	OBSSignal transformSignal;
 	OBSSignal visibilitySignal;
+	OBSSignal itemAddedSignal;
+	OBSSignal itemRemovedSignal;
+	OBSSignal sceneRefreshSignal;
 
 	QGraphicsScene *previewScene;
 	QPixmap previewPixmap;
 	RoiListItem *currentItem = nullptr;
 };
 
-enum ROIDataRoles {
-	ROIData = Qt::UserRole,
-	CenterFocusData,
-};
+enum ROIDataRoles { ROIData = Qt::UserRole };
 
 class RoiListItem : public QListWidgetItem {
 

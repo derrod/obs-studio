@@ -54,9 +54,25 @@ RoiEditor::RoiEditor(QWidget *parent)
 		&RoiEditor::PropertiesChanges);
 	connect(ui->roiPropSizeY, &QSpinBox::valueChanged, this,
 		&RoiEditor::PropertiesChanges);
-	connect(ui->prioritySlider, &QSlider::valueChanged, this,
+	connect(ui->roiPropPrioritySlider, &QSlider::valueChanged, this,
 		&RoiEditor::PropertiesChanges);
 	connect(ui->roiPropSceneItem, &QComboBox::currentIndexChanged, this,
+		&RoiEditor::PropertiesChanges);
+	connect(ui->roiPropEnabled, &QCheckBox::stateChanged, this,
+		&RoiEditor::PropertiesChanges);
+	connect(ui->roiPropOuterPrioritySlider, &QSlider::valueChanged, this,
+		&RoiEditor::PropertiesChanges);
+	connect(ui->roiPropStepsInnerSb, &QSpinBox::valueChanged, this,
+		&RoiEditor::PropertiesChanges);
+	connect(ui->roiPropStepsOuterSb, &QSpinBox::valueChanged, this,
+		&RoiEditor::PropertiesChanges);
+	connect(ui->roiPropRadiusInnerSb, &QSpinBox::valueChanged, this,
+		&RoiEditor::PropertiesChanges);
+	connect(ui->roiPropRadiusOuterSb, &QSpinBox::valueChanged, this,
+		&RoiEditor::PropertiesChanges);
+	connect(ui->roiPropRadiusOuterAspect, &QCheckBox::stateChanged, this,
+		&RoiEditor::PropertiesChanges);
+	connect(ui->roiPropRadiusInnerAspect, &QCheckBox::stateChanged, this,
 		&RoiEditor::PropertiesChanges);
 }
 
@@ -82,26 +98,74 @@ void RoiEditor::PropertiesChanges()
 	if (!currentItem)
 		return;
 
-	auto sceneVar = ui->sceneSelect->currentData();
-
 	RoiData data = {};
-	data.priority = (float)ui->prioritySlider->value() / 100.0f;
-	data.scene_uuid = sceneVar.toString().toStdString();
+	data.priority = (float)ui->roiPropPrioritySlider->value() / 100.0f;
+	data.enabled = ui->roiPropEnabled->isChecked();
 
 	if (currentItem->type() == RoiListItem::SceneItem) {
+		auto sceneVar = ui->sceneSelect->currentData();
+		data.scene_uuid = sceneVar.toString().toStdString();
 		data.scene_item_id =
 			ui->roiPropSceneItem->currentData().toLongLong();
-	} else {
+	} else if (currentItem->type() == RoiListItem::Manual) {
 		data.posX = ui->roiPropPosX->value();
 		data.posY = ui->roiPropPosY->value();
 		data.width = ui->roiPropSizeX->value();
 		data.height = ui->roiPropSizeY->value();
-		blog(LOG_DEBUG, "Data changed: %d %d %d %d", data.posX,
-		     data.posY, data.width, data.height);
+	} else if (currentItem->type() == RoiListItem::CenterFocus) {
+		data.inner_radius = ui->roiPropRadiusInnerSb->value();
+		data.inner_aspect = ui->roiPropRadiusInnerAspect->isChecked();
+		data.outer_radius = ui->roiPropRadiusOuterSb->value();
+		data.outer_aspect = ui->roiPropRadiusOuterAspect->isChecked();
+		data.inner_steps = ui->roiPropStepsInnerSb->value();
+		data.outer_steps = ui->roiPropStepsOuterSb->value();
+		data.outer_priority =
+			(float)ui->roiPropOuterPrioritySlider->value() / 100.0f;
 	}
 
 	currentItem->setData(ROIData, QVariant::fromValue<RoiData>(data));
 	RebuildPreview(true);
+	UpdateEncoderRois();
+}
+
+void RoiEditor::RefreshSceneItems(bool keep_selection)
+{
+	if (!currentItem)
+		return;
+
+	auto sceneVar = ui->sceneSelect->currentData();
+	const string scene_uuid = sceneVar.toString().toStdString();
+	OBSSourceAutoRelease source =
+		obs_get_source_by_uuid(scene_uuid.c_str());
+
+	if (!source)
+		return;
+
+	QVariant current;
+
+	if (keep_selection) {
+		ui->roiPropSceneItem->blockSignals(true);
+		current = ui->roiPropSceneItem->currentData();
+	}
+
+	ui->roiPropSceneItem->clear();
+	obs_scene_enum_items(
+		obs_scene_from_source(source),
+		[](obs_scene_t *, obs_sceneitem_t *item, void *param) -> bool {
+			auto cb = static_cast<QComboBox *>(param);
+			cb->addItem(obs_source_get_name(
+					    obs_sceneitem_get_source(item)),
+				    obs_sceneitem_get_id(item));
+			return true;
+		},
+		ui->roiPropSceneItem);
+
+	if (keep_selection) {
+		int idx = ui->roiPropSceneItem->findData(current);
+		if (idx != -1)
+			ui->roiPropSceneItem->setCurrentIndex(idx);
+		ui->roiPropSceneItem->blockSignals(false);
+	}
 }
 
 void RoiEditor::ItemSelected(QListWidgetItem *item, QListWidgetItem *)
@@ -114,11 +178,6 @@ void RoiEditor::ItemSelected(QListWidgetItem *item, QListWidgetItem *)
 
 	ui->roiPropertiesGroupBox->setVisible(true);
 
-	auto sceneVar = ui->sceneSelect->currentData();
-	const string scene_uuid = sceneVar.toString().toStdString();
-	OBSSourceAutoRelease source =
-		obs_get_source_by_uuid(scene_uuid.c_str());
-
 	bool manual = false;
 	bool sceneitem = false;
 	bool center = false;
@@ -126,56 +185,63 @@ void RoiEditor::ItemSelected(QListWidgetItem *item, QListWidgetItem *)
 	QVariant var = item->data(ROIData);
 	RoiData data = var.value<RoiData>();
 
+	ui->roiPropEnabled->setChecked(data.enabled);
+	ui->roiPropPrioritySlider->setValue((int)(100 * data.priority));
+
+	// Type specific properties
 	if (item->type() == RoiListItem::SceneItem) {
 		sceneitem = true;
 		QSignalBlocker sb(ui->roiPropSceneItem);
-		ui->roiPropSceneItem->clear();
 
-		if (source) {
-			obs_scene_enum_items(
-				obs_scene_from_source(source),
-				[](obs_scene_t *, obs_sceneitem_t *item,
-				   void *param) -> bool {
-					auto cb =
-						static_cast<QComboBox *>(param);
-					cb->addItem(
-						obs_source_get_name(
-							obs_sceneitem_get_source(
-								item)),
-						obs_sceneitem_get_id(item));
-					return true;
-				},
-				ui->roiPropSceneItem);
-		}
+		RefreshSceneItems(false);
 
 		int idx = ui->roiPropSceneItem->findData(data.scene_item_id);
 		if (idx != -1)
 			ui->roiPropSceneItem->setCurrentIndex(idx);
 
-		ui->prioritySlider->setValue((int)(100 * data.priority));
 	} else if (item->type() == RoiListItem::Manual) {
 		manual = true;
 		ui->roiPropPosX->setValue(data.posX);
 		ui->roiPropPosY->setValue(data.posY);
 		ui->roiPropSizeX->setValue(data.width);
 		ui->roiPropSizeY->setValue(data.height);
-		ui->prioritySlider->setValue((int)(100 * data.priority));
+	} else if (item->type() == RoiListItem::CenterFocus) {
+		center = true;
+
+		ui->roiPropOuterPrioritySlider->setValue(
+			(int)(100 * data.outer_priority));
+		ui->roiPropRadiusInnerSb->setValue(data.inner_radius);
+		ui->roiPropRadiusInnerAspect->setChecked(data.inner_aspect);
+		ui->roiPropRadiusOuterSb->setValue(data.outer_radius);
+		ui->roiPropRadiusOuterAspect->setChecked(data.outer_aspect);
+		ui->roiPropStepsInnerSb->setValue(data.inner_steps);
+		ui->roiPropStepsOuterSb->setValue(data.outer_steps);
 	}
 
 	ui->roiPropPosX->setVisible(manual);
 	ui->roiPropPosY->setVisible(manual);
 	ui->roiPropPosLabel->setVisible(manual);
-
 	ui->roiPropSizeLabel->setVisible(manual);
 	ui->roiPropSizeX->setVisible(manual);
 	ui->roiPropSizeY->setVisible(manual);
 
 	ui->roiPropSceneItem->setVisible(sceneitem);
 	ui->roiPropSceneItemLabel->setVisible(sceneitem);
-	ui->priorityLabel->setVisible(!center);
-	ui->prioritySlider->setVisible(!center);
 
-	// ToDo CenterFocus
+	ui->roiPropOuterPriorityLabel->setVisible(center);
+	ui->roiPropOuterPrioritySlider->setVisible(center);
+	ui->roiPropOuterPrioritySpinbox->setVisible(center);
+	ui->roiPropRadiusInnerLabel->setVisible(center);
+	ui->roiPropRadiusInnerSb->setVisible(center);
+	ui->roiPropRadiusInnerAspect->setVisible(center);
+	ui->roiPropRadiusOuterAspect->setVisible(center);
+	ui->roiPropRadiusOuterLabel->setVisible(center);
+	ui->roiPropRadiusOuterSb->setVisible(center);
+	ui->roiPropStepsLabel->setVisible(center);
+	ui->roiPropStepsInnerLabel->setVisible(center);
+	ui->roiPropStepsOuterLabel->setVisible(center);
+	ui->roiPropStepsInnerSb->setVisible(center);
+	ui->roiPropStepsOuterSb->setVisible(center);
 }
 
 void RoiEditor::RefreshSceneList()
@@ -186,6 +252,10 @@ void RoiEditor::RefreshSceneList()
 	obs_enum_scenes(
 		[](void *param, obs_source_t *src) -> bool {
 			auto cb = static_cast<QComboBox *>(param);
+			// screw groups
+			if (obs_source_is_group(src))
+				return true;
+
 			cb->addItem(obs_source_get_name(src),
 				    obs_source_get_uuid(src));
 			return true;
@@ -196,6 +266,59 @@ void RoiEditor::RefreshSceneList()
 		QSignalBlocker sb(ui->sceneSelect);
 		int idx = ui->sceneSelect->findData(var);
 		ui->sceneSelect->setCurrentIndex(idx);
+	}
+}
+
+/// Builds the list of actual regions of interest that will be passed to OBS
+void RoiEditor::RegionItemsToData()
+{
+	auto var = ui->sceneSelect->currentData();
+	if (!var.isValid())
+		return;
+
+	const string scene_uuid = var.toString().toStdString();
+	roi_data[scene_uuid].clear();
+
+	int count = ui->roiList->count();
+	for (int idx = 0; idx < count; idx++) {
+		auto item = dynamic_cast<RoiListItem *>(ui->roiList->item(idx));
+		if (!item)
+			continue;
+
+		auto var = item->data(ROIData);
+		auto roi = var.value<RoiData>();
+
+		obs_data_t *data = obs_data_create();
+		obs_data_set_double(data, "priority", roi.priority);
+		obs_data_set_bool(data, "enabled", roi.enabled);
+		obs_data_set_int(data, "type", item->type());
+
+		if (item->type() == RoiListItem::SceneItem) {
+			obs_data_set_int(data, "scene_item_id",
+					 roi.scene_item_id);
+		} else if (item->type() == RoiListItem::Manual) {
+			obs_data_set_int(data, "x", roi.posX);
+			obs_data_set_int(data, "y", roi.posY);
+			obs_data_set_int(data, "width", roi.width);
+			obs_data_set_int(data, "height", roi.height);
+		} else if (item->type() == RoiListItem::CenterFocus) {
+			obs_data_set_int(data, "center_radius_inner",
+					 roi.inner_radius);
+			obs_data_set_int(data, "center_radius_outer",
+					 roi.outer_radius);
+			obs_data_set_bool(data, "center_aspect_inner",
+					  roi.inner_aspect);
+			obs_data_set_bool(data, "center_aspect_outer",
+					  roi.outer_aspect);
+			obs_data_set_int(data, "center_steps_inner",
+					 roi.inner_steps);
+			obs_data_set_int(data, "center_steps_outer",
+					 roi.outer_steps);
+			obs_data_set_double(data, "center_priority_outer",
+					    roi.outer_priority);
+		}
+
+		roi_data[scene_uuid].emplace_back(data);
 	}
 }
 
@@ -232,44 +355,106 @@ static region_of_interest GetItemROI(obs_sceneitem_t *item, float priority)
 	return roi;
 }
 
-/// Builds the list of actual regions of interest that will be passed to OBS
-void RoiEditor::RegionItemsToData()
+static constexpr int64_t kMinBlockSize = 16; // Use H.264 as a baseline
+
+static void BuildInnerRegions(vector<region_of_interest> &rois, float priority,
+			      int64_t steps, int64_t radius,
+			      bool correct_aspect, uint32_t width,
+			      uint32_t height)
 {
-	auto var = ui->sceneSelect->currentData();
-	if (!var.isValid())
+	if (!radius || height < radius || width < radius ||
+	    radius < kMinBlockSize / 2 || priority == 0.0 || !steps)
+		return;
+	int64_t interval = radius / steps;
+
+	/* Clamp interval size and step count to the smallest block size */
+	if (interval < kMinBlockSize / 2) {
+		interval = kMinBlockSize / 2;
+		steps = std::max(radius / interval, 1LL);
+	}
+
+	double priority_interval = priority / (double)steps;
+	double aspect = 1.0;
+	if (correct_aspect)
+		aspect = (double)width / (double)height;
+
+	uint32_t middle_x = width / 2;
+	uint32_t middle_y = height / 2;
+
+	for (int i = 1; i <= steps; i++) {
+		region_of_interest roi = {
+			(uint32_t)(middle_y - interval * i),
+			(uint32_t)(middle_y + interval * i),
+			(uint32_t)(middle_x - interval * i * aspect),
+			(uint32_t)(middle_x + interval * i * aspect),
+			(float)(priority - priority_interval * (i - 1))};
+		rois.push_back(roi);
+	}
+}
+
+static void BuildOuterRegions(vector<region_of_interest> &rois, float priority,
+			      int64_t steps, int64_t radius,
+			      bool correct_aspect, uint32_t width,
+			      uint32_t height)
+{
+	if (!radius || height / 2 < radius || width / 2 < radius ||
+	    radius < kMinBlockSize || priority == 0.0 || !steps)
 		return;
 
-	const string scene_uuid = var.toString().toStdString();
-	roi_data[scene_uuid].clear();
-
-	int count = ui->roiList->count();
-	for (int idx = 0; idx < count; idx++) {
-		auto item = dynamic_cast<RoiListItem *>(ui->roiList->item(idx));
-		if (!item)
-			continue;
-
-		if (item->type() == RoiListItem::SceneItem ||
-		    item->type() == RoiListItem::Manual) {
-			auto var = item->data(ROIData);
-			auto roi = var.value<RoiData>();
-
-			obs_data_t *data = obs_data_create();
-			obs_data_set_double(data, "priority", roi.priority);
-
-			if (item->type() == RoiListItem::SceneItem) {
-				obs_data_set_int(data, "scene_item_id",
-						 roi.scene_item_id);
-			} else {
-				obs_data_set_int(data, "x", roi.posX);
-				obs_data_set_int(data, "y", roi.posY);
-				obs_data_set_int(data, "width", roi.width);
-				obs_data_set_int(data, "height", roi.height);
-			}
-
-			roi_data[scene_uuid].emplace_back(data);
-		}
-		// ToDo RoiListItem::CenterFocus / MultiROIData
+	/* Clamp interval size and step count to the smallest block size */
+	int64_t interval = radius / steps;
+	if (interval < kMinBlockSize) {
+		interval = kMinBlockSize;
+		steps = std::max(radius / interval, 1LL);
 	}
+
+	double priority_interval = priority / (double)steps;
+	double aspect = 1.0;
+	if (correct_aspect)
+		aspect = (double)width / (double)height;
+
+	/* Add neutral baseline */
+	region_of_interest neutral = {
+		(uint32_t)radius, (uint32_t)(height - radius),
+		(uint32_t)((double)radius * aspect),
+		(uint32_t)(width - (double)radius * aspect), 0.0f};
+	rois.push_back(neutral);
+
+	for (int i = 1; steps > 1 && i < steps; i++) {
+		region_of_interest roi = {
+			(uint32_t)(radius - interval * i),
+			(uint32_t)(height - radius + interval * i),
+			(uint32_t)((double)(radius - interval * i) * aspect),
+			(uint32_t)(width -
+				   (double)(radius - interval * i) * aspect),
+			(float)(priority_interval * i)};
+		rois.push_back(roi);
+	}
+
+	/* Ensure last region always goes to frame edges */
+	region_of_interest final = {0, height, 0, width, (float)priority};
+	rois.push_back(final);
+}
+
+static void BuildCenterFocusROI(vector<region_of_interest> &rois,
+				obs_data_t *data, uint32_t width,
+				uint32_t height)
+{
+	int64_t inner_radius = obs_data_get_int(data, "center_radius_inner");
+	bool aspect_inner = obs_data_get_bool(data, "center_aspect_inner");
+	int64_t outer_radius = obs_data_get_int(data, "center_radius_outer");
+	bool aspect_outer = obs_data_get_bool(data, "center_aspect_outer");
+	int64_t steps_inner = obs_data_get_int(data, "center_steps_inner");
+	int64_t steps_outer = obs_data_get_int(data, "center_steps_outer");
+	double priority_outer =
+		obs_data_get_double(data, "center_priority_outer");
+	double priority = obs_data_get_double(data, "priority");
+
+	/* Inner regions (if any) */
+	BuildInnerRegions(rois, priority, steps_inner, inner_radius,
+			  aspect_inner, width, height);
+	BuildOuterRegions(rois, priority_outer, steps_outer, outer_radius,
+			  aspect_outer, width, height);
 }
 
 void RoiEditor::RegionsFromData(vector<region_of_interest> &rois,
@@ -279,13 +464,21 @@ void RoiEditor::RegionsFromData(vector<region_of_interest> &rois,
 	if (regions.empty())
 		return;
 	OBSSourceAutoRelease source = obs_get_source_by_uuid(uuid.c_str());
+	if (!source)
+		return;
 
 	for (obs_data_t *data : regions) {
 		float priority = obs_data_get_double(data, "priority");
 
-		if (obs_data_has_user_value(data, "scene_item_id")) {
+		if (!obs_data_get_bool(data, "enabled"))
+			continue;
+
+		auto type = (RoiListItem::RoiItemType)obs_data_get_int(data,
+								       "type");
+
+		if (type == RoiListItem::SceneItem) {
 			/* Scene Item ROI */
-			uint64_t id = obs_data_get_int(data, "scene_item_id");
+			int64_t id = obs_data_get_int(data, "scene_item_id");
 			OBSSceneItem sceneItem = obs_scene_find_sceneitem_by_id(
 				obs_scene_from_source(source), id);
 
@@ -295,7 +488,7 @@ void RoiEditor::RegionsFromData(vector<region_of_interest> &rois,
 					rois.push_back(roi);
 			}
 
-		} else if (obs_data_has_user_value(data, "x")) {
+		} else if (type == RoiListItem::Manual) {
 			/* Fixed ROI */
 			uint32_t left = (uint32_t)obs_data_get_int(data, "x");
 			uint32_t top = (uint32_t)obs_data_get_int(data, "y");
@@ -311,9 +504,11 @@ void RoiEditor::RegionsFromData(vector<region_of_interest> &rois,
 			region_of_interest roi{top, bottom, left, right,
 					       priority};
 			rois.push_back(roi);
-		} else if (obs_data_has_user_value(data, "radius")) {
+		} else if (type == RoiListItem::CenterFocus) {
 			/* Center-focus ROI */
-			// ToDo
+			uint32_t cx = obs_source_get_width(source);
+			uint32_t cy = obs_source_get_height(source);
+			BuildCenterFocusROI(rois, data, cx, cy);
 		}
 	}
 }
@@ -363,11 +558,13 @@ void RoiEditor::RebuildPreview(bool rebuildData)
 	obs_video_info ovi;
 	obs_get_video_info(&ovi);
 
-	uint32_t blocks_w = (ovi.base_width + (blockSize - 1)) / blockSize;
-	uint32_t blocks_h = (ovi.base_height + (blockSize - 1)) / blockSize;
+	QSize dimensions((ovi.base_width + (blockSize - 1)) / blockSize,
+			 (ovi.base_height + (blockSize - 1)) / blockSize);
 
-	// Draw new pixmap
-	previewPixmap = QPixmap(blocks_w, blocks_h);
+	// Resize pixmap if necessary
+	if (previewPixmap.size() != dimensions)
+		previewPixmap = QPixmap(dimensions);
+
 	previewPixmap.fill(Qt::black);
 	QPainter paint(&previewPixmap);
 	paint.setPen(Qt::PenStyle::NoPen);
@@ -380,7 +577,6 @@ void RoiEditor::RebuildPreview(bool rebuildData)
 	previewScene->clear();
 	previewScene->addPixmap(previewPixmap);
 	previewScene->setSceneRect(previewPixmap.rect());
-
 	ui->preview->setScene(previewScene);
 	ui->preview->fitInView(ui->preview->scene()->sceneRect(),
 			       Qt::KeepAspectRatio);
@@ -389,15 +585,21 @@ void RoiEditor::RebuildPreview(bool rebuildData)
 void RoiEditor::SceneItemTransform(void *param, calldata_t *)
 {
 	RoiEditor *window = reinterpret_cast<RoiEditor *>(param);
-	window->RebuildPreview();
-	window->UpdateEncoderRois();
+	QMetaObject::invokeMethod(window, "RebuildPreview");
+	QMetaObject::invokeMethod(window, "UpdateEncoderRois");
 }
 
 void RoiEditor::SceneItemVisibility(void *param, calldata_t *, bool)
 {
 	RoiEditor *window = reinterpret_cast<RoiEditor *>(param);
-	window->RebuildPreview();
-	window->UpdateEncoderRois();
+	QMetaObject::invokeMethod(window, "RebuildPreview");
+	QMetaObject::invokeMethod(window, "UpdateEncoderRois");
+}
+
+void RoiEditor::ItemRemovedOrAdded(void *param, calldata_t *)
+{
+	RoiEditor *window = reinterpret_cast<RoiEditor *>(param);
+	QMetaObject::invokeMethod(window, "RefreshSceneItems");
 }
 
 void RoiEditor::ConnectSceneSignals()
@@ -408,6 +610,10 @@ void RoiEditor::ConnectSceneSignals()
 				this);
 	visibilitySignal.Connect(signal, "item_visible", SceneItemTransform,
 				 this);
+	itemAddedSignal.Connect(signal, "item_add", ItemRemovedOrAdded, this);
+	itemRemovedSignal.Connect(signal, "item_remove", ItemRemovedOrAdded,
+				  this);
+	sceneRefreshSignal.Connect(signal, "refresh", ItemRemovedOrAdded, this);
 }
 
 void RoiEditor::RefreshRoiList()
@@ -420,9 +626,8 @@ void RoiEditor::RefreshRoiList()
 
 	const string scene_uuid = var.toString().toStdString();
 	for (obs_data_t *roi : roi_data[scene_uuid]) {
-		int type = obs_data_has_user_value(roi, "scene_item_id")
-				   ? RoiListItem::SceneItem
-				   : RoiListItem::Manual;
+		auto type =
+			(RoiListItem::RoiItemType)obs_data_get_int(roi, "type");
 
 		RoiData data = {
 			scene_uuid,
@@ -431,6 +636,15 @@ void RoiEditor::RefreshRoiList()
 			(uint32_t)obs_data_get_int(roi, "y"),
 			(uint32_t)obs_data_get_int(roi, "width"),
 			(uint32_t)obs_data_get_int(roi, "height"),
+			obs_data_get_int(roi, "center_radius_inner"),
+			obs_data_get_int(roi, "center_steps_inner"),
+			obs_data_get_bool(roi, "center_aspect_inner"),
+			obs_data_get_int(roi, "center_radius_outer"),
+			obs_data_get_int(roi, "center_steps_outer"),
+			(float)obs_data_get_double(roi,
+						   "center_priority_outer"),
+			obs_data_get_bool(roi, "center_aspect_outer"),
+			obs_data_get_bool(roi, "enabled"),
 			(float)obs_data_get_double(roi, "priority"),
 		};
 
@@ -447,50 +661,12 @@ void RoiEditor::SceneSelectionChanged()
 	// ToDo refresh list of actual items
 }
 
-void RoiEditor::LoadRoisFromOBSData(obs_data_t *obj)
-{
-	ui->enableRoi->setChecked(obs_data_get_bool(obj, "enabled"));
-	OBSDataAutoRelease scenes = obs_data_get_obj(obj, "scenes");
-	obs_data_item *item = obs_data_first(scenes);
-
-	roi_data.clear();
-
-	while (item) {
-		const char *uuid = obs_data_item_get_name(item);
-
-		OBSDataArrayAutoRelease arr = obs_data_item_get_array(item);
-		size_t count = obs_data_array_count(arr);
-
-		for (size_t idx = 0; idx < count; idx++) {
-			roi_data[uuid].emplace_back(
-				obs_data_array_item(arr, idx));
-		}
-
-		obs_data_item_next(&item);
-	}
-}
-
-void RoiEditor::SaveRoisToOBSData(obs_data_t *obj)
-{
-	OBSDataAutoRelease scenes = obs_data_create();
-
-	for (const auto &item : roi_data) {
-		obs_data_array_t *scene = obs_data_array_create();
-
-		for (const auto &roi : item.second)
-			obs_data_array_push_back(scene, roi);
-
-		obs_data_set_array(scenes, item.first.c_str(), scene);
-		obs_data_array_release(scene);
-	}
-
-	obs_data_set_obj(obj, "scenes", scenes);
-	obs_data_set_bool(obj, "enabled", ui->enableRoi->isChecked());
-}
-
 void RoiEditor::UpdateEncoderRois()
 {
 	OBSSourceAutoRelease scene = obs_frontend_get_current_scene();
+	if (!scene)
+		return;
+
 	const string uuid = obs_source_get_uuid(scene);
 
 	std::vector<OBSEncoder> encoders;
@@ -515,7 +691,6 @@ void RoiEditor::UpdateEncoderRois()
 		return;
 
 	// Clear any ROIs that might exist
-	blog(LOG_DEBUG, "Clearing ROIs...");
 	for (obs_encoder_t *enc : encoders)
 		obs_encoder_clear_roi(enc);
 
@@ -543,30 +718,50 @@ void RoiEditor::UpdateEncoderRois()
 
 void RoiEditor::on_actionAddRoi_triggered()
 {
-	auto popup = QMenu(obs_module_text("AddROI"), this);
+	auto popup = QMenu(obs_module_text("ROI.AddMenu"), this);
 
 	QAction *addSceneItemRoi =
-		new QAction(obs_module_text("ROI.AddSceneItem"), this);
+		new QAction(obs_module_text("ROI.AddMenu.SceneItem"), this);
 	connect(addSceneItemRoi, &QAction::triggered, [this] {
 		auto item =
 			new RoiListItem(ui->roiList, RoiListItem::SceneItem);
 		ui->roiList->addItem(item);
 		RoiData roi = {};
+		roi.enabled = true;
 		item->setData(ROIData, QVariant::fromValue<RoiData>(roi));
 		RegionItemsToData();
+		RebuildPreview(true);
 	});
 	popup.insertAction(nullptr, addSceneItemRoi);
 
 	QAction *addManualRoi =
-		new QAction(obs_module_text("ROI.AddManual"), this);
+		new QAction(obs_module_text("ROI.AddMenu.Manual"), this);
 	connect(addManualRoi, &QAction::triggered, [this] {
 		auto item = new RoiListItem(ui->roiList, RoiListItem::Manual);
 		ui->roiList->addItem(item);
-		RoiData roi = {"", 0, 0, 0, 100, 100, 0.0f};
+		RoiData roi = {};
+		roi.height = 100;
+		roi.width = 100;
+		roi.enabled = true;
 		item->setData(ROIData, QVariant::fromValue<RoiData>(roi));
 		RegionItemsToData();
+		RebuildPreview(true);
 	});
 	popup.insertAction(addSceneItemRoi, addManualRoi);
+
+	QAction *addCenterRoi =
+		new QAction(obs_module_text("ROI.AddMenu.CenterFocus"), this);
+	connect(addCenterRoi, &QAction::triggered, [this] {
+		auto item =
+			new RoiListItem(ui->roiList, RoiListItem::CenterFocus);
+		ui->roiList->addItem(item);
+		RoiData roi = {};
+		roi.enabled = true;
+		item->setData(ROIData, QVariant::fromValue<RoiData>(roi));
+		RegionItemsToData();
+		RebuildPreview(true);
+	});
+	popup.insertAction(addManualRoi, addCenterRoi);
 
 	popup.exec(QCursor::pos());
 }
@@ -616,6 +811,47 @@ void RoiEditor::resizeEvent(QResizeEvent *event)
 	QDialog::resizeEvent(event);
 }
 
+void RoiEditor::LoadRoisFromOBSData(obs_data_t *obj)
+{
+	ui->enableRoi->setChecked(obs_data_get_bool(obj, "enabled"));
+	OBSDataAutoRelease scenes = obs_data_get_obj(obj, "scenes");
+	obs_data_item *item = obs_data_first(scenes);
+
+	roi_data.clear();
+
+	while (item) {
+		const char *uuid = obs_data_item_get_name(item);
+
+		OBSDataArrayAutoRelease arr = obs_data_item_get_array(item);
+		size_t count = obs_data_array_count(arr);
+
+		for (size_t idx = 0; idx < count; idx++) {
+			roi_data[uuid].emplace_back(
+				obs_data_array_item(arr, idx));
+		}
+
+		obs_data_item_next(&item);
+	}
+}
+
+void RoiEditor::SaveRoisToOBSData(obs_data_t *obj)
+{
+	OBSDataAutoRelease scenes = obs_data_create();
+
+	for (const auto &item : roi_data) {
+		obs_data_array_t *scene = obs_data_array_create();
+
+		for (const auto &roi : item.second)
+			obs_data_array_push_back(scene, roi);
+
+		obs_data_set_array(scenes, item.first.c_str(), scene);
+		obs_data_array_release(scene);
+	}
+
+	obs_data_set_obj(obj, "scenes", scenes);
+	obs_data_set_bool(obj, "enabled", ui->enableRoi->isChecked());
+}
+
 /*
  * RoiListItem
  */
@@ -632,14 +868,23 @@ void RoiListItem::setData(int role, const QVariant &value)
 	if (role == ROIData) {
 		roi = value.value<RoiData>();
 
+		QString desc;
+
+		// This needs to be prettier at some point
+		if (!roi.enabled) {
+			desc += "[";
+			desc += obs_module_text("ROI.Item.DisabledPrefix");
+			desc += "] ";
+		}
+
 		if (type() == Manual) {
-			setText(QString(obs_module_text("ROI.ManualRegion"))
+			desc += QString(obs_module_text(
+						"ROI.Item.ManualRegion"))
 					.arg(roi.width)
 					.arg(roi.height)
 					.arg(roi.posX)
-					.arg(roi.posY));
-		} else {
-			// ToDo get scene item name?
+					.arg(roi.posY);
+		} else if (type() == SceneItem) {
 			OBSSourceAutoRelease source =
 				obs_get_source_by_uuid(roi.scene_uuid.c_str());
 			obs_scene_item *sceneItem =
@@ -649,11 +894,14 @@ void RoiListItem::setData(int role, const QVariant &value)
 			const char *name = obs_source_get_name(
 				obs_sceneitem_get_source(sceneItem));
 
-			setText(QString(obs_module_text("ROI.SceneItem"))
+			desc += QString(obs_module_text("ROI.Item.SceneItem"))
 					.arg(name)
-					.arg(roi.scene_item_id));
+					.arg(roi.scene_item_id);
+		} else {
+			desc += obs_module_text("ROI.Item.CenterFocus");
 		}
 
+		setText(desc);
 		return;
 	}
 
@@ -696,10 +944,11 @@ static void OBSEvent(obs_frontend_event event, void *)
 
 extern "C" void FreeRoiEditor() {}
 
+// ToDo websocket vendor request
 extern "C" void InitRoiEditor()
 {
 	QAction *action = (QAction *)obs_frontend_add_tools_menu_qaction(
-		obs_module_text("ROI.Editor"));
+		obs_module_text("ROIEditor"));
 
 	obs_frontend_push_ui_translation(obs_module_get_string);
 
@@ -707,7 +956,7 @@ extern "C" void InitRoiEditor()
 
 	roi_edit = new RoiEditor(window);
 
-	auto cb = []() {
+	auto cb = [] {
 		roi_edit->ShowHideDialog();
 	};
 
