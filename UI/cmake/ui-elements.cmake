@@ -5,6 +5,7 @@ target_sources(
   obs-ui-support
   INTERFACE # cmake-format: sortable
             clickable-label.hpp
+            display-helpers.hpp
             double-slider.cpp
             double-slider.hpp
             horizontal-scroll-area.cpp
@@ -14,6 +15,8 @@ target_sources(
             properties-view.cpp
             properties-view.hpp
             properties-view.moc.hpp
+            qt-display.cpp
+            qt-display.hpp
             qt-wrappers.cpp
             qt-wrappers.hpp
             slider-ignorewheel.cpp
