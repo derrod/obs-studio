@@ -98,6 +98,7 @@ private:
 	// Rendering stuff
 	std::mutex roi_mutex;
 	std::vector<region_of_interest> rois;
+	OBSWeakSourceAutoRelease previewSource;
 
 	bool rebuild_texture = false;
 	uint32_t texOpacity;

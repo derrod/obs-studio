@@ -583,6 +583,17 @@ void RoiEditor::RebuildPreview(bool rebuildData)
 	RegionsFromData(rois, scene_uuid);
 	roi_mutex.unlock();
 
+	OBSSourceAutoRelease program = obs_frontend_get_current_scene();
+	const char *program_uuid = obs_source_get_uuid(program);
+
+	if (scene_uuid != program_uuid) {
+		OBSSourceAutoRelease selected =
+			obs_get_source_by_uuid(scene_uuid.c_str());
+		previewSource = obs_source_get_weak_source(selected);
+	} else {
+		previewSource = nullptr;
+	}
+
 	texBlockSize = blockSize;
 	texOpacity = ui->previewOpacity->value();
 	rebuild_texture = true;
@@ -721,8 +732,16 @@ void RoiEditor::DrawPreview(void *data, uint32_t cx, uint32_t cy)
 	gs_set_viewport(viewport_x, viewport_y, viewport_width,
 			viewport_height);
 
-	if (editor->texOpacity < 100)
-		obs_render_main_texture_src_color_only();
+	if (editor->texOpacity < 100) {
+		if (editor->previewSource) {
+			OBSSourceAutoRelease source =
+				obs_weak_source_get_source(
+					editor->previewSource);
+			obs_source_video_render(source);
+		} else {
+			obs_render_main_texture_src_color_only();
+		}
+	}
 
 	/* Draw map texture if we have it */
 	if (editor->texRender) {
