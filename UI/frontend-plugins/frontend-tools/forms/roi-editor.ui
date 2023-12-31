@@ -414,32 +414,57 @@
         </widget>
        </item>
        <item>
-        <widget class="QGraphicsView" name="preview">
+        <widget class="OBSQTDisplay" name="preview" native="true">
          <property name="sizePolicy">
-          <sizepolicy hsizetype="MinimumExpanding" vsizetype="MinimumExpanding">
+          <sizepolicy hsizetype="Expanding" vsizetype="Expanding">
            <horstretch>0</horstretch>
-           <verstretch>0</verstretch>
+           <verstretch>1</verstretch>
           </sizepolicy>
          </property>
-         <property name="acceptDrops">
-          <bool>false</bool>
-         </property>
-         <property name="verticalScrollBarPolicy">
-          <enum>Qt::ScrollBarPolicy::ScrollBarAlwaysOff</enum>
-         </property>
-         <property name="horizontalScrollBarPolicy">
-          <enum>Qt::ScrollBarPolicy::ScrollBarAlwaysOff</enum>
-         </property>
-         <property name="interactive">
-          <bool>false</bool>
-         </property>
-         <property name="renderHints">
-          <set>QPainter::RenderHint::LosslessImageRendering</set>
-         </property>
-         <property name="optimizationFlags">
-          <set>QGraphicsView::OptimizationFlag::DontAdjustForAntialiasing</set>
+         <property name="minimumSize">
+          <size>
+           <width>640</width>
+           <height>0</height>
+          </size>
          </property>
         </widget>
+       </item>
+       <item>
+        <layout class="QHBoxLayout" name="horizontalLayout">
+         <item>
+          <widget class="QLabel" name="label_5">
+           <property name="text">
+            <string>ROI.Preview.Opacity</string>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QSlider" name="previewOpacity">
+           <property name="maximum">
+            <number>100</number>
+           </property>
+           <property name="value">
+            <number>50</number>
+           </property>
+           <property name="orientation">
+            <enum>Qt::Orientation::Horizontal</enum>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QSpinBox" name="previewOpacitySb">
+           <property name="suffix">
+            <string notr="true"> %</string>
+           </property>
+           <property name="maximum">
+            <number>100</number>
+           </property>
+           <property name="value">
+            <number>50</number>
+           </property>
+          </widget>
+         </item>
+        </layout>
        </item>
        <item>
         <widget class="QLabel" name="label_3">
@@ -532,6 +557,14 @@
    </property>
   </action>
  </widget>
+ <customwidgets>
+  <customwidget>
+   <class>OBSQTDisplay</class>
+   <extends>QWidget</extends>
+   <header>qt-display.hpp</header>
+   <container>1</container>
+  </customwidget>
+ </customwidgets>
  <resources/>
  <connections>
   <connection>
@@ -594,6 +627,38 @@
     </hint>
     <hint type="destinationlabel">
      <x>356</x>
+     <y>539</y>
+    </hint>
+   </hints>
+  </connection>
+  <connection>
+   <sender>previewOpacity</sender>
+   <signal>valueChanged(int)</signal>
+   <receiver>previewOpacitySb</receiver>
+   <slot>setValue(int)</slot>
+   <hints>
+    <hint type="sourcelabel">
+     <x>946</x>
+     <y>539</y>
+    </hint>
+    <hint type="destinationlabel">
+     <x>1211</x>
+     <y>539</y>
+    </hint>
+   </hints>
+  </connection>
+  <connection>
+   <sender>previewOpacitySb</sender>
+   <signal>valueChanged(int)</signal>
+   <receiver>previewOpacity</receiver>
+   <slot>setValue(int)</slot>
+   <hints>
+    <hint type="sourcelabel">
+     <x>1211</x>
+     <y>539</y>
+    </hint>
+    <hint type="destinationlabel">
+     <x>946</x>
      <y>539</y>
     </hint>
    </hints>

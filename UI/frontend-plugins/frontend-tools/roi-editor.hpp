@@ -1,5 +1,7 @@
 #pragma once
 
+#include <mutex>
+
 #include "ui_roi-editor.h"
 
 #include <obs.hpp>
@@ -35,6 +37,14 @@ class RoiEditor : public QDialog {
 public:
 	std::unique_ptr<Ui_ROIEditor> ui;
 	RoiEditor(QWidget *parent);
+	~RoiEditor()
+	{
+		obs_enter_graphics();
+		gs_texrender_destroy(texRender);
+		gs_samplerstate_destroy(pointSampler);
+		gs_vertexbuffer_destroy(rectFill);
+		obs_leave_graphics();
+	}
 
 	void closeEvent(QCloseEvent *event) override;
 
@@ -68,21 +78,36 @@ private:
 			     const std::string &uuid);
 	void PropertiesChanges();
 	void MoveRoiItem(Direction direction);
+	void CreateDisplay(bool recreate = false);
 
 	static void SceneItemTransform(void *param, calldata_t *data);
 	static void SceneItemVisibility(void *param, calldata_t *data,
 					bool visible);
 	static void ItemRemovedOrAdded(void *param, calldata_t *data);
+	static void DrawPreview(void *data, uint32_t cx, uint32_t cy);
+	static void CreatePreviewTexture(RoiEditor *editor, uint32_t cx,
+					 uint32_t cy);
+
+	// All signals are added/cleared at once, so just store them in a vector somewhere
+	std::vector<OBSSignal> sceneSignals;
 
 	// key is scene UUID
 	std::unordered_map<std::string, std::vector<OBSDataAutoRelease>>
 		roi_data;
 
-	// All signals are added/cleared at once, so just store them in a vector somewhere
-	std::vector<OBSSignal> sceneSignals;
+	// Rendering stuff
+	std::mutex roi_mutex;
+	std::vector<region_of_interest> rois;
 
-	QGraphicsScene *previewScene;
-	QPixmap previewPixmap;
+	bool rebuild_texture = false;
+	uint32_t texOpacity;
+	uint32_t texBlockSize;
+
+	gs_texrender_t *texRender = nullptr;
+	gs_samplerstate_t *pointSampler = nullptr;
+	gs_vertbuffer_t *rectFill = nullptr;
+
+	// Qt stuff
 	RoiListItem *currentItem = nullptr;
 };
 

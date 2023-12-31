@@ -1,5 +1,6 @@
 #include "roi-editor.hpp"
 
+#include "display-helpers.hpp"
 #include "qt-wrappers.hpp"
 
 #include <obs-module.h>
@@ -19,10 +20,7 @@ RoiEditor *roi_edit;
 /// ToDo cleanup this whole refresh mess, just rebuild data always when necessary,
 /// and then update preview if visible, always run encoder update.
 
-RoiEditor::RoiEditor(QWidget *parent)
-	: QDialog(parent),
-	  ui(new Ui_ROIEditor),
-	  previewScene(new QGraphicsScene(this))
+RoiEditor::RoiEditor(QWidget *parent) : QDialog(parent), ui(new Ui_ROIEditor)
 {
 	ui->setupUi(this);
 
@@ -43,6 +41,8 @@ RoiEditor::RoiEditor(QWidget *parent)
 		&RoiEditor::ItemSelected);
 
 	connect(ui->roiBlockSize, &QComboBox::currentIndexChanged, this,
+		&RoiEditor::RebuildPreview);
+	connect(ui->previewOpacity, &QSlider::valueChanged, this,
 		&RoiEditor::RebuildPreview);
 	connect(ui->sceneSelect, &QComboBox::currentIndexChanged, this,
 		&RoiEditor::SceneSelectionChanged);
@@ -77,6 +77,36 @@ RoiEditor::RoiEditor(QWidget *parent)
 		&RoiEditor::PropertiesChanges);
 	connect(ui->roiPropRadiusInnerAspect, &QCheckBox::stateChanged, this,
 		&RoiEditor::PropertiesChanges);
+
+	CreateDisplay();
+}
+
+void RoiEditor::CreateDisplay(bool recreate)
+{
+	// Need to recreate the display because once it's destroyed there's no way to un-destroy it.
+	if (recreate) {
+		int idx = ui->previewLazout->indexOf(ui->preview);
+		delete ui->preview;
+
+		/* Copied from auto-generated MOC code */
+		ui->preview = new OBSQTDisplay(this);
+		ui->preview->setObjectName("preview");
+		QSizePolicy sizePolicy(QSizePolicy::Expanding,
+				       QSizePolicy::Expanding);
+		sizePolicy.setHorizontalStretch(0);
+		sizePolicy.setVerticalStretch(1);
+		sizePolicy.setHeightForWidth(
+			ui->preview->sizePolicy().hasHeightForWidth());
+		ui->preview->setSizePolicy(sizePolicy);
+
+		ui->previewLazout->insertWidget(idx, ui->preview);
+	}
+
+	auto addDrawCallback = [this]() {
+		obs_display_add_draw_callback(ui->preview->GetDisplay(),
+					      RoiEditor::DrawPreview, this);
+	};
+	connect(ui->preview, &OBSQTDisplay::DisplayCreated, addDrawCallback);
 }
 
 void RoiEditor::closeEvent(QCloseEvent *)
@@ -88,13 +118,12 @@ void RoiEditor::ShowHideDialog()
 {
 	if (!isVisible()) {
 		setVisible(true);
+		CreateDisplay(true);
 		RefreshSceneList();
 		RefreshRoiList();
 		RebuildPreview(true);
 	} else {
-		setVisible(false);
-		// ToDo should probably clear the entire list?
-		currentItem = nullptr;
+		close();
 	}
 }
 
@@ -534,30 +563,6 @@ void RoiEditor::RegionsFromData(vector<region_of_interest> &rois,
 	}
 }
 
-static void DrawROI(QPainter *painter, const region_of_interest *roi,
-		    const uint32_t blockSize)
-{
-	const uint32_t roi_left = roi->left / blockSize;
-	const uint32_t roi_top = roi->top / blockSize;
-	const uint32_t roi_right = (roi->right - 1) / blockSize;
-	const uint32_t roi_bottom = (roi->bottom - 1) / blockSize;
-
-	QPoint tl(roi_left, roi_top);
-	QPoint br(roi_right, roi_bottom);
-	QRect rect(tl, br);
-	QColor colour(Qt::black);
-
-	if (roi->priority > 0.0f)
-		colour.setGreenF(roi->priority);
-	else if (roi->priority < 0.0f)
-		colour.setRedF(-roi->priority);
-
-	colour.setBlueF(std::max(0.5f - std::abs(roi->priority), 0.0f));
-
-	painter->setBrush(colour);
-	painter->drawRect(rect);
-}
-
 void RoiEditor::RebuildPreview(bool rebuildData)
 {
 	if (!isVisible())
@@ -573,34 +578,180 @@ void RoiEditor::RebuildPreview(bool rebuildData)
 	if (rebuildData)
 		RegionItemsToData();
 
-	vector<region_of_interest> rois;
+	roi_mutex.lock();
+	rois.clear();
 	RegionsFromData(rois, scene_uuid);
+	roi_mutex.unlock();
+
+	texBlockSize = blockSize;
+	texOpacity = ui->previewOpacity->value();
+	rebuild_texture = true;
+}
+
+static void DrawROI(const region_of_interest &roi, gs_vertbuffer_t *rectFill,
+		    const float opacity, const uint32_t blockSize)
+{
+	const uint32_t roi_left = roi.left / blockSize;
+	const uint32_t roi_top = roi.top / blockSize;
+	const uint32_t roi_right = (roi.right + blockSize - 1) / blockSize;
+	const uint32_t roi_bottom = (roi.bottom + blockSize - 1) / blockSize;
+
+	float red = roi.priority < 0.0f ? -roi.priority : 0.0f;
+	float green = roi.priority > 0.0f ? roi.priority : 0.0f;
+	float blue = std::max(0.5f - std::abs(roi.priority), 0.0f);
+
+	vec4 fillColor;
+	vec4_set(&fillColor, red, green, blue, opacity);
+
+	gs_effect_t *eff = gs_get_effect();
+	gs_eparam_t *colParam = gs_effect_get_param_by_name(eff, "color");
+
+	gs_matrix_push();
+	gs_matrix_identity();
+
+	gs_matrix_translate3f(roi_left, roi_top, 0.0f);
+	gs_matrix_scale3f(roi_right - roi_left, roi_bottom - roi_top, 1.0f);
+
+	gs_effect_set_vec4(colParam, &fillColor);
+	gs_load_vertexbuffer(rectFill);
+	gs_draw(GS_TRISTRIP, 0, 0);
+
+	gs_matrix_pop();
+}
+
+void RoiEditor::CreatePreviewTexture(RoiEditor *editor, uint32_t cx,
+				     uint32_t cy)
+{
+	if (!editor->texRender)
+		editor->texRender = gs_texrender_create(GS_RGBA, GS_ZS_NONE);
+
+	if (!editor->rectFill) {
+		gs_render_start(true);
+
+		gs_vertex2f(0.0f, 0.0f);
+		gs_vertex2f(1.0f, 0.0f);
+		gs_vertex2f(0.0f, 1.0f);
+		gs_vertex2f(1.0f, 1.0f);
+
+		editor->rectFill = gs_render_save();
+	}
+
+	const uint32_t block_width =
+		(cx + (editor->texBlockSize - 1)) / editor->texBlockSize;
+	const uint32_t block_height =
+		(cy + (editor->texBlockSize - 1)) / editor->texBlockSize;
+	const float opacity = (float)editor->texOpacity / 100.0f;
+
+	gs_texrender_reset(editor->texRender);
+
+	if (gs_texrender_begin(editor->texRender, block_width, block_height)) {
+		vec4 clear_color;
+		vec4_zero(&clear_color);
+		// Set background to black if opacity is 100%
+		if (opacity == 1.0f)
+			clear_color.w = 1.0f;
+
+		gs_clear(GS_CLEAR_COLOR, &clear_color, 0.0f, 0);
+
+		gs_ortho(0.0f, (float)block_width, 0.0f, (float)block_height,
+			 -100.0f, 100.0f);
+
+		gs_effect_t *solid = obs_get_base_effect(OBS_EFFECT_SOLID);
+		gs_technique_t *tech = gs_effect_get_technique(solid, "Solid");
+
+		gs_blend_state_push();
+		gs_enable_blending(false);
+
+		gs_technique_begin(tech);
+		gs_technique_begin_pass(tech, 0);
+
+		editor->roi_mutex.lock();
+		// Regions have to be drawn back to front
+		for (auto it = editor->rois.rbegin(); it != editor->rois.rend();
+		     ++it) {
+			const region_of_interest &roi = *it;
+			DrawROI(roi, editor->rectFill, opacity,
+				editor->texBlockSize);
+		}
+		editor->roi_mutex.unlock();
+
+		gs_load_vertexbuffer(nullptr);
+		gs_technique_end_pass(tech);
+		gs_technique_end(tech);
+
+		gs_blend_state_pop();
+
+		gs_texrender_end(editor->texRender);
+	}
+
+	editor->rebuild_texture = false;
+}
+
+void RoiEditor::DrawPreview(void *data, uint32_t cx, uint32_t cy)
+{
+	RoiEditor *editor = static_cast<RoiEditor *>(data);
 
 	obs_video_info ovi;
 	obs_get_video_info(&ovi);
 
-	QSize dimensions((ovi.base_width + (blockSize - 1)) / blockSize,
-			 (ovi.base_height + (blockSize - 1)) / blockSize);
+	int viewport_x, viewport_y;
+	float scale;
 
-	// Resize pixmap if necessary
-	if (previewPixmap.size() != dimensions)
-		previewPixmap = QPixmap(dimensions);
+	GetScaleAndCenterPos(ovi.base_width, ovi.base_height, cx, cy,
+			     viewport_x, viewport_y, scale);
 
-	previewPixmap.fill(Qt::black);
-	QPainter paint(&previewPixmap);
-	paint.setPen(Qt::PenStyle::NoPen);
+	int viewport_width = int(scale * float(ovi.base_width));
+	int viewport_height = int(scale * float(ovi.base_height));
 
-	for (auto it = rois.rbegin(); it != rois.rend(); ++it) {
-		const region_of_interest &roi = *it;
-		DrawROI(&paint, &roi, blockSize);
+	/* Rebuild preview texture if necessary */
+	if (editor->rebuild_texture)
+		CreatePreviewTexture(editor, ovi.base_width, ovi.base_height);
+
+	if (!editor->pointSampler) {
+		gs_sampler_info point_sampler = {};
+		point_sampler.max_anisotropy = 1;
+		editor->pointSampler = gs_samplerstate_create(&point_sampler);
 	}
 
-	previewScene->clear();
-	previewScene->addPixmap(previewPixmap);
-	previewScene->setSceneRect(previewPixmap.rect());
-	ui->preview->setScene(previewScene);
-	ui->preview->fitInView(ui->preview->scene()->sceneRect(),
-			       Qt::KeepAspectRatio);
+	gs_viewport_push();
+	gs_projection_push();
+
+	gs_ortho(0.0f, float(ovi.base_width), 0.0f, float(ovi.base_height),
+		 -100.0f, 100.0f);
+	gs_set_viewport(viewport_x, viewport_y, viewport_width,
+			viewport_height);
+
+	if (editor->texOpacity < 100)
+		obs_render_main_texture_src_color_only();
+
+	/* Draw map texture if we have it */
+	if (editor->texRender) {
+		const bool previous = gs_framebuffer_srgb_enabled();
+		gs_enable_framebuffer_srgb(true);
+
+		gs_effect_t *effect = obs_get_base_effect(OBS_EFFECT_DEFAULT);
+		gs_eparam_t *param =
+			gs_effect_get_param_by_name(effect, "image");
+		gs_texture_t *tex = gs_texrender_get_texture(editor->texRender);
+
+		gs_effect_set_next_sampler(param, editor->pointSampler);
+		gs_effect_set_texture_srgb(param, tex);
+
+		const float texScale = (float)editor->texBlockSize;
+
+		gs_matrix_push();
+		gs_matrix_scale3f(texScale, texScale, 1.0f);
+
+		while (gs_effect_loop(effect, "Draw"))
+			gs_draw_sprite(tex, 0, 0, 0);
+
+		gs_matrix_pop();
+
+		gs_enable_framebuffer_srgb(previous);
+	}
+
+	gs_projection_pop();
+	gs_viewport_pop();
 }
 
 void RoiEditor::SceneItemTransform(void *param, calldata_t *)
