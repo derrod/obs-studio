@@ -375,10 +375,16 @@ static void BuildInnerRegions(vector<region_of_interest> &rois, float priority,
 		return;
 	int64_t interval = radius / steps;
 
-	/* Clamp interval size and step count to the smallest block size */
-	if (interval < kMinBlockSize / 2) {
-		interval = kMinBlockSize / 2;
+	if (interval < kMinBlockSize) {
+		/* Clamp interval size and step count to the smallest block size */
+		interval = kMinBlockSize;
 		steps = std::max(radius / interval, 1LL);
+	} else if (interval % kMinBlockSize) {
+		/* Round interval to nearest multiple of kMinBlockSize */
+		interval =
+			(int64_t)round((float)interval / float(kMinBlockSize)) *
+			kMinBlockSize;
+		steps = std::max((radius + kMinBlockSize) / interval, 1LL);
 	}
 
 	double priority_interval = priority / (double)steps;
@@ -409,11 +415,18 @@ static void BuildOuterRegions(vector<region_of_interest> &rois, float priority,
 	    radius < kMinBlockSize || priority == 0.0 || !steps)
 		return;
 
-	/* Clamp interval size and step count to the smallest block size */
 	int64_t interval = radius / steps;
+
 	if (interval < kMinBlockSize) {
+		/* Clamp interval size and step count to the smallest block size */
 		interval = kMinBlockSize;
 		steps = std::max(radius / interval, 1LL);
+	} else if (interval % kMinBlockSize) {
+		/* Round interval to nearest multiple of kMinBlockSize */
+		interval =
+			(int64_t)round((float)interval / float(kMinBlockSize)) *
+			kMinBlockSize;
+		steps = std::max((radius + kMinBlockSize) / interval, 1LL);
 	}
 
 	double priority_interval = priority / (double)steps;
