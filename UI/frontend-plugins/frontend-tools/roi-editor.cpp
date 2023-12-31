@@ -879,10 +879,10 @@ void RoiEditor::UpdateEncoderRois()
 	if (!roi_data.count(uuid))
 		return;
 
-	std::vector<region_of_interest> rois;
-	RegionsFromData(rois, uuid);
+	std::vector<region_of_interest> regions;
+	RegionsFromData(regions, uuid);
 
-	if (rois.empty())
+	if (regions.empty())
 		return;
 
 	for (obs_encoder_t *enc : encoders) {
@@ -891,7 +891,7 @@ void RoiEditor::UpdateEncoderRois()
 			continue;
 		blog(LOG_DEBUG, "Adding ROI to encoder: %s",
 		     obs_encoder_get_name(enc));
-		for (const region_of_interest &roi : rois)
+		for (const region_of_interest &roi : regions)
 			obs_encoder_add_roi(enc, &roi);
 	}
 }
