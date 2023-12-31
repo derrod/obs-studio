@@ -599,8 +599,9 @@ void RoiEditor::RebuildPreview(bool rebuildData)
 	rebuild_texture = true;
 }
 
-static void DrawROI(const region_of_interest &roi, gs_vertbuffer_t *rectFill,
-		    const float opacity, const uint32_t blockSize)
+static void DrawROI(const region_of_interest &roi, const float opacity,
+		    gs_effect_t *effect, gs_eparam_t *colour_param,
+		    const uint32_t blockSize)
 {
 	const uint32_t roi_left = roi.left / blockSize;
 	const uint32_t roi_top = roi.top / blockSize;
@@ -614,17 +615,13 @@ static void DrawROI(const region_of_interest &roi, gs_vertbuffer_t *rectFill,
 	vec4 fillColor;
 	vec4_set(&fillColor, red, green, blue, opacity);
 
-	gs_effect_t *eff = gs_get_effect();
-	gs_eparam_t *colParam = gs_effect_get_param_by_name(eff, "color");
-
 	gs_matrix_push();
 	gs_matrix_identity();
 
 	gs_matrix_translate3f(roi_left, roi_top, 0.0f);
 	gs_matrix_scale3f(roi_right - roi_left, roi_bottom - roi_top, 1.0f);
 
-	gs_effect_set_vec4(colParam, &fillColor);
-	gs_load_vertexbuffer(rectFill);
+	gs_effect_set_vec4(colour_param, &fillColor);
 	gs_draw(GS_TRISTRIP, 0, 0);
 
 	gs_matrix_pop();
@@ -667,21 +664,24 @@ void RoiEditor::CreatePreviewTexture(RoiEditor *editor, uint32_t cx,
 		gs_ortho(0.0f, (float)block_width, 0.0f, (float)block_height,
 			 -100.0f, 100.0f);
 
-		gs_effect_t *solid = obs_get_base_effect(OBS_EFFECT_SOLID);
-		gs_technique_t *tech = gs_effect_get_technique(solid, "Solid");
+		gs_effect_t *effect = obs_get_base_effect(OBS_EFFECT_SOLID);
+		gs_technique_t *tech = gs_effect_get_technique(effect, "Solid");
+		gs_eparam_t *colour_param =
+			gs_effect_get_param_by_name(effect, "color");
 
 		gs_blend_state_push();
 		gs_enable_blending(false);
 
 		gs_technique_begin(tech);
 		gs_technique_begin_pass(tech, 0);
+		gs_load_vertexbuffer(editor->rectFill);
 
 		editor->roi_mutex.lock();
 		// Regions have to be drawn back to front
 		for (auto it = editor->rois.rbegin(); it != editor->rois.rend();
 		     ++it) {
 			const region_of_interest &roi = *it;
-			DrawROI(roi, editor->rectFill, opacity,
+			DrawROI(roi, opacity, effect, colour_param,
 				editor->texBlockSize);
 		}
 		editor->roi_mutex.unlock();
