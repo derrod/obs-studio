@@ -19,6 +19,9 @@ RoiEditor *roi_edit;
 
 /// ToDo cleanup this whole refresh mess, just rebuild data always when necessary,
 /// and then update preview if visible, always run encoder update.
+/// ToDo: Smooth edges (few steps of transition)
+/// ToDo Circular center focus
+/// ToDo: repositionable center-focus
 
 RoiEditor::RoiEditor(QWidget *parent) : QDialog(parent), ui(new Ui_ROIEditor)
 {
@@ -26,14 +29,31 @@ RoiEditor::RoiEditor(QWidget *parent) : QDialog(parent), ui(new Ui_ROIEditor)
 
 	setWindowFlags(windowFlags() & ~Qt::WindowContextHelpButtonHint);
 
+	geometry = QByteArray();
+
 	// Hide properties until needed
-	ui->roiPropertiesGroupBox->setVisible(false);
+	ui->roiPropertiesStack->setVisible(false);
+	ui->roiCommonPropertiesGroupBox->setVisible(false);
 
 	// Fill block size list
 	ui->roiBlockSize->addItem(obs_module_text("ROI.BlockSize.16"), 16);
 	ui->roiBlockSize->addItem(obs_module_text("ROI.BlockSize.32"), 32);
 	ui->roiBlockSize->addItem(obs_module_text("ROI.BlockSize.64"), 64);
 	ui->roiBlockSize->addItem(obs_module_text("ROI.BlockSize.128"), 128);
+
+	auto addSmoothingItem = [&](const char *text, int val) {
+		ui->roiPropManualSmoothing->addItem(text, val);
+		ui->roiPropSceneItemSmoothing->addItem(text, val);
+	};
+
+	addSmoothingItem(obs_module_text("ROI.Property.Smoothing.None"),
+			 Smoothing::None);
+	addSmoothingItem(obs_module_text("ROI.Property.Smoothing.Inside"),
+			 Smoothing::Inside);
+	addSmoothingItem(obs_module_text("ROI.Property.Smoothing.Outside"),
+			 Smoothing::Outside);
+	addSmoothingItem(obs_module_text("ROI.Property.Smoothing.Edge"),
+			 Smoothing::Edge);
 
 	connect(ui->close, &QPushButton::clicked, this, &RoiEditor::close);
 
@@ -77,6 +97,12 @@ RoiEditor::RoiEditor(QWidget *parent) : QDialog(parent), ui(new Ui_ROIEditor)
 		&RoiEditor::PropertiesChanges);
 	connect(ui->roiPropRadiusInnerAspect, &QCheckBox::stateChanged, this,
 		&RoiEditor::PropertiesChanges);
+	connect(ui->roiPropManualSmoothingSteps, &QSpinBox::valueChanged, this,
+		&RoiEditor::PropertiesChanges);
+	connect(ui->roiPropManualSmoothing, &QComboBox::currentIndexChanged,
+		this, &RoiEditor::PropertiesChanges);
+	connect(ui->roiPropManualSmoothingPriority, &QSlider::valueChanged,
+		this, &RoiEditor::PropertiesChanges);
 
 	CreateDisplay();
 }
@@ -85,7 +111,7 @@ void RoiEditor::CreateDisplay(bool recreate)
 {
 	// Need to recreate the display because once it's destroyed there's no way to un-destroy it.
 	if (recreate) {
-		int idx = ui->previewLazout->indexOf(ui->preview);
+		int idx = ui->previewLayout->indexOf(ui->preview);
 		delete ui->preview;
 
 		/* Copied from auto-generated MOC code */
@@ -99,7 +125,7 @@ void RoiEditor::CreateDisplay(bool recreate)
 			ui->preview->sizePolicy().hasHeightForWidth());
 		ui->preview->setSizePolicy(sizePolicy);
 
-		ui->previewLazout->insertWidget(idx, ui->preview);
+		ui->previewLayout->insertWidget(idx, ui->preview);
 	}
 
 	auto addDrawCallback = [this]() {
@@ -139,6 +165,11 @@ void RoiEditor::PropertiesChanges()
 	RoiData data = {};
 	data.priority = (float)ui->roiPropPrioritySlider->value() / 100.0f;
 	data.enabled = ui->roiPropEnabled->isChecked();
+	// ToDo link those to the other ones
+	data.smoothing_steps = ui->roiPropManualSmoothingSteps->value();
+	data.smoothing_type = ui->roiPropManualSmoothing->currentData().toInt();
+	data.smoothing_priority =
+		(float)ui->roiPropManualSmoothingPriority->value() / 100.0f;
 
 	if (currentItem->type() == RoiListItem::SceneItem) {
 		auto sceneVar = ui->sceneSelect->currentData();
@@ -212,39 +243,52 @@ void RoiEditor::ItemSelected(QListWidgetItem *item, QListWidgetItem *)
 
 	auto new_item = dynamic_cast<RoiListItem *>(item);
 	if (!new_item) {
-		ui->roiPropertiesGroupBox->setVisible(false);
+		ui->roiCommonPropertiesGroupBox->setVisible(false);
+		ui->roiPropertiesStack->setVisible(false);
 		return;
 	}
 
-	ui->roiPropertiesGroupBox->setVisible(true);
-
-	bool manual = false;
-	bool sceneitem = false;
-	bool center = false;
+	ui->roiCommonPropertiesGroupBox->setVisible(true);
+	ui->roiPropertiesStack->setVisible(true);
 
 	QVariant var = item->data(ROIData);
 	RoiData data = var.value<RoiData>();
 
+	// Generic properties
 	ui->roiPropEnabled->setChecked(data.enabled);
 	ui->roiPropPrioritySlider->setValue((int)(100 * data.priority));
 
+	// The "Manual" widgets act as a master for all other ones for the same values
+	ui->roiPropManualSmoothingPriority->setValue(
+		(int)(100 * data.smoothing_priority));
+	ui->roiPropManualSmoothingSteps->setValue(data.smoothing_steps);
+
+	int idx = ui->roiPropManualSmoothing->findData(data.smoothing_type);
+	if (idx != -1)
+		ui->roiPropManualSmoothing->setCurrentIndex(idx);
+
 	// Type specific properties
 	if (item->type() == RoiListItem::SceneItem) {
-		sceneitem = true;
-		RefreshSceneItems(false);
+		ui->roiPropertiesStack->setCurrentWidget(
+			ui->roiSceneItemPropertiesGroupBox);
 
+		RefreshSceneItems(false);
 		int idx = ui->roiPropSceneItem->findData(data.scene_item_id);
 		if (idx != -1)
 			ui->roiPropSceneItem->setCurrentIndex(idx);
 
 	} else if (item->type() == RoiListItem::Manual) {
-		manual = true;
+		ui->roiPropertiesStack->setCurrentWidget(
+			ui->roiManualPropertiesGroupBox);
+
 		ui->roiPropPosX->setValue(data.posX);
 		ui->roiPropPosY->setValue(data.posY);
 		ui->roiPropSizeX->setValue(data.width);
 		ui->roiPropSizeY->setValue(data.height);
+
 	} else if (item->type() == RoiListItem::CenterFocus) {
-		center = true;
+		ui->roiPropertiesStack->setCurrentWidget(
+			ui->roiCenterFocusPropertiesGroupBox);
 
 		ui->roiPropOuterPrioritySlider->setValue(
 			(int)(100 * data.outer_priority));
@@ -255,31 +299,6 @@ void RoiEditor::ItemSelected(QListWidgetItem *item, QListWidgetItem *)
 		ui->roiPropStepsInnerSb->setValue(data.inner_steps);
 		ui->roiPropStepsOuterSb->setValue(data.outer_steps);
 	}
-
-	ui->roiPropPosX->setVisible(manual);
-	ui->roiPropPosY->setVisible(manual);
-	ui->roiPropPosLabel->setVisible(manual);
-	ui->roiPropSizeLabel->setVisible(manual);
-	ui->roiPropSizeX->setVisible(manual);
-	ui->roiPropSizeY->setVisible(manual);
-
-	ui->roiPropSceneItem->setVisible(sceneitem);
-	ui->roiPropSceneItemLabel->setVisible(sceneitem);
-
-	ui->roiPropOuterPriorityLabel->setVisible(center);
-	ui->roiPropOuterPrioritySlider->setVisible(center);
-	ui->roiPropOuterPrioritySpinbox->setVisible(center);
-	ui->roiPropRadiusInnerLabel->setVisible(center);
-	ui->roiPropRadiusInnerSb->setVisible(center);
-	ui->roiPropRadiusInnerAspect->setVisible(center);
-	ui->roiPropRadiusOuterAspect->setVisible(center);
-	ui->roiPropRadiusOuterLabel->setVisible(center);
-	ui->roiPropRadiusOuterSb->setVisible(center);
-	ui->roiPropStepsLabel->setVisible(center);
-	ui->roiPropStepsInnerLabel->setVisible(center);
-	ui->roiPropStepsOuterLabel->setVisible(center);
-	ui->roiPropStepsInnerSb->setVisible(center);
-	ui->roiPropStepsOuterSb->setVisible(center);
 
 	/* Only set after loading so any signals to PropertiesChanged are no-ops */
 	currentItem = new_item;
@@ -337,11 +356,23 @@ void RoiEditor::RegionItemsToData()
 		if (item->type() == RoiListItem::SceneItem) {
 			obs_data_set_int(data, "scene_item_id",
 					 roi.scene_item_id);
+			obs_data_set_int(data, "smoothing_steps",
+					 roi.smoothing_steps);
+			obs_data_set_int(data, "smoothing_type",
+					 roi.smoothing_type);
+			obs_data_set_double(data, "smoothing_priority",
+					    roi.smoothing_priority);
 		} else if (item->type() == RoiListItem::Manual) {
 			obs_data_set_int(data, "x", roi.posX);
 			obs_data_set_int(data, "y", roi.posY);
 			obs_data_set_int(data, "width", roi.width);
 			obs_data_set_int(data, "height", roi.height);
+			obs_data_set_int(data, "smoothing_steps",
+					 roi.smoothing_steps);
+			obs_data_set_double(data, "smoothing_priority",
+					    roi.smoothing_priority);
+			obs_data_set_int(data, "smoothing_type",
+					 roi.smoothing_type);
 		} else if (item->type() == RoiListItem::CenterFocus) {
 			obs_data_set_int(data, "center_radius_inner",
 					 roi.inner_radius);
@@ -396,7 +427,7 @@ static region_of_interest GetItemROI(obs_sceneitem_t *item, float priority)
 	return roi;
 }
 
-static constexpr int64_t kMinBlockSize = 16; // Use H.264 as a baseline
+static constexpr int32_t kMinBlockSize = 16; // Use H.264 as a baseline
 
 static void BuildInnerRegions(vector<region_of_interest> &rois, float priority,
 			      int64_t steps, int64_t radius,
@@ -511,17 +542,75 @@ static void BuildCenterFocusROI(vector<region_of_interest> &rois,
 			  aspect_outer, width, height);
 }
 
-void RoiEditor::RegionsFromData(vector<region_of_interest> &rois,
+/// Split specified ROI up into multiple based on given mode
+static void SmoothROI(vector<region_of_interest> &regions,
+		      const region_of_interest &roi, RoiEditor::Smoothing type,
+		      int steps, const double edge_priority)
+{
+	int max_steps = 0;
+	uint32_t width = roi.right - roi.left;
+	uint32_t height = roi.bottom - roi.top;
+
+	// Figure out how many steps we can even do
+	if (type == RoiEditor::Inside) {
+		max_steps = std::min(width / kMinBlockSize / 2,
+				     height / kMinBlockSize / 2);
+	} else if (type == RoiEditor::Outside) {
+		max_steps = 64; // limit to something reasonable
+	} else if (type == RoiEditor::Edge) {
+		// Effectively gives us inside + outside
+		max_steps = std::min(width / kMinBlockSize + 1,
+				     height / kMinBlockSize + 1);
+	}
+
+	steps = std::min(steps, max_steps);
+
+	if (type == RoiEditor::None || steps < 2) {
+		regions.push_back(roi);
+		return;
+	}
+
+	// Just create a bunch of additional zones fading to outside priority
+	double interval = (roi.priority - edge_priority) / (double)(steps - 1);
+
+	int32_t step_offset = 0;
+	if (type == RoiEditor::Edge)
+		step_offset = -steps / 2 + 1;
+	else if (type == RoiEditor::Inside)
+		step_offset = -steps + 1;
+
+	for (int32_t step = 0; step < steps; step++) {
+		float region_priority = std::clamp(
+			roi.priority - (float)(interval * step), -1.0f, 1.0f);
+
+		int32_t mul = step + step_offset;
+		uint32_t top = std::clamp(
+			(int32_t)roi.top - kMinBlockSize * mul, 0, 16384);
+		uint32_t bottom = std::clamp(
+			(int32_t)roi.bottom + kMinBlockSize * mul, 0, 16384);
+		uint32_t left = std::clamp(
+			(int32_t)roi.left - kMinBlockSize * mul, 0, 16384);
+		uint32_t right = std::clamp(
+			(int32_t)roi.right + kMinBlockSize * mul, 0, 16384);
+
+		region_of_interest step_region = {
+			top, bottom, left, right, region_priority,
+		};
+		regions.push_back(step_region);
+	}
+}
+
+void RoiEditor::RegionsFromData(vector<region_of_interest> &regions,
 				const string &uuid)
 {
-	const auto &regions = roi_data[uuid];
-	if (regions.empty())
+	const auto &region_data = roi_data[uuid];
+	if (region_data.empty())
 		return;
 	OBSSourceAutoRelease source = obs_get_source_by_uuid(uuid.c_str());
 	if (!source)
 		return;
 
-	for (obs_data_t *data : regions) {
+	for (obs_data_t *data : region_data) {
 		float priority = obs_data_get_double(data, "priority");
 
 		if (!obs_data_get_bool(data, "enabled"))
@@ -529,6 +618,11 @@ void RoiEditor::RegionsFromData(vector<region_of_interest> &rois,
 
 		auto type = (RoiListItem::RoiItemType)obs_data_get_int(data,
 								       "type");
+		auto smoothing_type = (RoiEditor::Smoothing)obs_data_get_int(
+			data, "smoothing_type");
+		int smoothing_steps = obs_data_get_int(data, "smoothing_steps");
+		double smoothing_priority =
+			obs_data_get_double(data, "smoothing_priority");
 
 		if (type == RoiListItem::SceneItem) {
 			/* Scene Item ROI */
@@ -538,8 +632,18 @@ void RoiEditor::RegionsFromData(vector<region_of_interest> &rois,
 
 			if (sceneItem && obs_sceneitem_visible(sceneItem)) {
 				auto roi = GetItemROI(sceneItem, priority);
-				if (roi.bottom != 0 && roi.right != 0)
-					rois.push_back(roi);
+				if (roi.bottom == 0 || roi.right == 0)
+					continue;
+
+				if (smoothing_type != Smoothing::None &&
+				    smoothing_steps > 1 &&
+				    smoothing_priority != priority) {
+					SmoothROI(regions, roi, smoothing_type,
+						  smoothing_steps,
+						  smoothing_priority);
+				} else {
+					regions.push_back(roi);
+				}
 			}
 
 		} else if (type == RoiListItem::Manual) {
@@ -557,12 +661,21 @@ void RoiEditor::RegionsFromData(vector<region_of_interest> &rois,
 
 			region_of_interest roi{top, bottom, left, right,
 					       priority};
-			rois.push_back(roi);
+
+			if (smoothing_type != Smoothing::None &&
+			    smoothing_steps > 1 &&
+			    smoothing_priority != priority) {
+				SmoothROI(regions, roi, smoothing_type,
+					  smoothing_steps, smoothing_priority);
+			} else {
+				regions.push_back(roi);
+			}
+
 		} else if (type == RoiListItem::CenterFocus) {
 			/* Center-focus ROI */
 			uint32_t cx = obs_source_get_width(source);
 			uint32_t cy = obs_source_get_height(source);
-			BuildCenterFocusROI(rois, data, cx, cy);
+			BuildCenterFocusROI(regions, data, cx, cy);
 		}
 	}
 }
@@ -832,24 +945,32 @@ void RoiEditor::RefreshRoiList()
 		auto type =
 			(RoiListItem::RoiItemType)obs_data_get_int(roi, "type");
 
-		RoiData data = {
-			scene_uuid,
-			obs_data_get_int(roi, "scene_item_id"),
-			(uint32_t)obs_data_get_int(roi, "x"),
-			(uint32_t)obs_data_get_int(roi, "y"),
-			(uint32_t)obs_data_get_int(roi, "width"),
-			(uint32_t)obs_data_get_int(roi, "height"),
-			obs_data_get_int(roi, "center_radius_inner"),
-			obs_data_get_int(roi, "center_steps_inner"),
-			obs_data_get_bool(roi, "center_aspect_inner"),
-			obs_data_get_int(roi, "center_radius_outer"),
-			obs_data_get_int(roi, "center_steps_outer"),
-			(float)obs_data_get_double(roi,
-						   "center_priority_outer"),
-			obs_data_get_bool(roi, "center_aspect_outer"),
-			obs_data_get_bool(roi, "enabled"),
-			(float)obs_data_get_double(roi, "priority"),
-		};
+		RoiData data{};
+
+		data.scene_uuid = scene_uuid;
+		data.scene_item_id = obs_data_get_int(roi, "scene_item_id");
+		data.posX = obs_data_get_int(roi, "x");
+		data.posY = obs_data_get_int(roi, "y");
+		data.width = obs_data_get_int(roi, "width");
+		data.height = obs_data_get_int(roi, "height");
+		data.inner_radius =
+			obs_data_get_int(roi, "center_radius_inner");
+		data.inner_steps = obs_data_get_int(roi, "center_steps_inner");
+		data.inner_aspect =
+			obs_data_get_bool(roi, "center_aspect_inner");
+		data.outer_radius =
+			obs_data_get_int(roi, "center_radius_outer");
+		data.outer_steps = obs_data_get_int(roi, "center_steps_outer");
+		data.outer_priority = (float)obs_data_get_double(
+			roi, "center_priority_outer");
+		data.outer_aspect =
+			obs_data_get_bool(roi, "center_aspect_outer");
+		data.smoothing_steps = obs_data_get_int(roi, "smoothing_steps");
+		data.smoothing_type = obs_data_get_int(roi, "smoothing_type");
+		data.smoothing_priority =
+			obs_data_get_double(roi, "smoothing_priority");
+		data.enabled = obs_data_get_bool(roi, "enabled");
+		data.priority = (float)obs_data_get_double(roi, "priority");
 
 		RoiListItem *item = new RoiListItem(type);
 		ui->roiList->addItem(item);

@@ -24,6 +24,9 @@ struct RoiData {
 	float outer_priority;
 	bool outer_aspect;
 	/* Shared attributes */
+	int smoothing_type;
+	int smoothing_steps;
+	float smoothing_priority;
 	bool enabled;
 	float priority;
 };
@@ -35,6 +38,8 @@ class RoiEditor : public QDialog {
 	enum Direction { Up, Down };
 
 public:
+	enum Smoothing { None, Inside, Outside, Edge };
+
 	std::unique_ptr<Ui_ROIEditor> ui;
 	RoiEditor(QWidget *parent);
 	~RoiEditor()
