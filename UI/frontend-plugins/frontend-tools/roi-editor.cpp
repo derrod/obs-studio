@@ -1110,7 +1110,7 @@ void RoiListItem::setData(int role, const QVariant &value)
 }
 
 /*
- * C stuff
+ * Frontend callbacks
  */
 
 static void SaveRoiEditor(obs_data_t *save_data, bool saving, void *)
@@ -1143,28 +1143,28 @@ static void OBSEvent(obs_frontend_event event, void *)
 	}
 }
 
+/*
+ * C stuff
+ */
+
 extern "C" void FreeRoiEditor() {}
 
-// ToDo websocket vendor request
 extern "C" void InitRoiEditor()
 {
-	QAction *action = (QAction *)obs_frontend_add_tools_menu_qaction(
-		obs_module_text("ROIEditor"));
+	auto action =
+		static_cast<QAction *>(obs_frontend_add_tools_menu_qaction(
+			obs_module_text("ROIEditor")));
+	auto window =
+		static_cast<QMainWindow *>(obs_frontend_get_main_window());
 
+	/* Push translation function so that strings in .ui file are translated */
 	obs_frontend_push_ui_translation(obs_module_get_string);
-
-	QMainWindow *window = (QMainWindow *)obs_frontend_get_main_window();
-
 	roi_edit = new RoiEditor(window);
-
-	auto cb = [] {
-		roi_edit->ShowHideDialog();
-	};
-
 	obs_frontend_pop_ui_translation();
 
 	obs_frontend_add_save_callback(SaveRoiEditor, nullptr);
 	obs_frontend_add_event_callback(OBSEvent, nullptr);
 
-	action->connect(action, &QAction::triggered, cb);
+	QAction::connect(action, &QAction::triggered, roi_edit,
+			 &RoiEditor::ShowHideDialog);
 }
