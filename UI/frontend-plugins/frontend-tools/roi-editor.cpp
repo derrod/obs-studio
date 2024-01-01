@@ -735,8 +735,7 @@ void RoiEditor::RebuildPreview(bool rebuildData)
 }
 
 static void DrawROI(const region_of_interest &roi, const float opacity,
-		    gs_effect_t *effect, gs_eparam_t *colour_param,
-		    const uint32_t blockSize)
+		    gs_eparam_t *colour_param, const uint32_t blockSize)
 {
 	const uint32_t roi_left = roi.left / blockSize;
 	const uint32_t roi_top = roi.top / blockSize;
@@ -816,7 +815,7 @@ void RoiEditor::CreatePreviewTexture(RoiEditor *editor, uint32_t cx,
 		for (auto it = editor->rois.rbegin(); it != editor->rois.rend();
 		     ++it) {
 			const region_of_interest &roi = *it;
-			DrawROI(roi, opacity, effect, colour_param,
+			DrawROI(roi, opacity, colour_param,
 				editor->texBlockSize);
 		}
 		editor->roi_mutex.unlock();
