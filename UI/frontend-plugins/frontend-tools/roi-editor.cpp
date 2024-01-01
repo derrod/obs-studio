@@ -111,6 +111,7 @@ void RoiEditor::CreateDisplay(bool recreate)
 
 void RoiEditor::closeEvent(QCloseEvent *)
 {
+	geometry = saveGeometry();
 	obs_frontend_save();
 }
 
@@ -118,6 +119,9 @@ void RoiEditor::ShowHideDialog()
 {
 	if (!isVisible()) {
 		setVisible(true);
+		if (!geometry.isEmpty())
+			restoreGeometry(geometry);
+
 		CreateDisplay(true);
 		RefreshSceneList();
 		RefreshRoiList();
@@ -1014,6 +1018,10 @@ void RoiEditor::LoadRoisFromOBSData(obs_data_t *obj)
 	if (obs_data_has_user_value(obj, "opacity"))
 		ui->previewOpacity->setValue(obs_data_get_int(obj, "opacity"));
 
+	const char *geo = obs_data_get_string(obj, "window_geometry");
+	if (geo)
+		geometry = QByteArray::fromBase64(geo);
+
 	OBSDataAutoRelease scenes = obs_data_get_obj(obj, "scenes");
 	obs_data_item *item = obs_data_first(scenes);
 
@@ -1051,6 +1059,8 @@ void RoiEditor::SaveRoisToOBSData(obs_data_t *obj)
 	obs_data_set_obj(obj, "scenes", scenes);
 	obs_data_set_bool(obj, "enabled", ui->enableRoi->isChecked());
 	obs_data_set_int(obj, "opacity", ui->previewOpacity->value());
+	obs_data_set_string(obj, "window_geometry",
+			    saveGeometry().toBase64().constData());
 }
 
 /*

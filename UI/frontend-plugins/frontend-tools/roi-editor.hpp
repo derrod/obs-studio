@@ -110,6 +110,7 @@ private:
 
 	// Qt stuff
 	RoiListItem *currentItem = nullptr;
+	QByteArray geometry;
 };
 
 enum ROIDataRoles { ROIData = Qt::UserRole };
