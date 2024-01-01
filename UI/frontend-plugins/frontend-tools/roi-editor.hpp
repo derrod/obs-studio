@@ -23,6 +23,8 @@ struct RoiData {
 	int64_t outer_steps;
 	float outer_priority;
 	bool outer_aspect;
+	int32_t center_x;
+	int32_t center_y;
 	/* Shared attributes */
 	int smoothing_type;
 	int smoothing_steps;

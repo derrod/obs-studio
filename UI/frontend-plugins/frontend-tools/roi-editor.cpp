@@ -103,6 +103,10 @@ RoiEditor::RoiEditor(QWidget *parent) : QDialog(parent), ui(new Ui_ROIEditor)
 		this, &RoiEditor::PropertiesChanges);
 	connect(ui->roiPropManualSmoothingPriority, &QSlider::valueChanged,
 		this, &RoiEditor::PropertiesChanges);
+	connect(ui->roiPropCenterPosX, &QSpinBox::valueChanged, this,
+		&RoiEditor::PropertiesChanges);
+	connect(ui->roiPropCenterPosY, &QSpinBox::valueChanged, this,
+		&RoiEditor::PropertiesChanges);
 
 	CreateDisplay();
 }
@@ -190,6 +194,8 @@ void RoiEditor::PropertiesChanges()
 		data.outer_steps = ui->roiPropStepsOuterSb->value();
 		data.outer_priority =
 			(float)ui->roiPropOuterPrioritySlider->value() / 100.0f;
+		data.center_x = ui->roiPropCenterPosX->value();
+		data.center_y = ui->roiPropCenterPosY->value();
 	}
 
 	currentItem->setData(ROIData, QVariant::fromValue<RoiData>(data));
@@ -298,6 +304,8 @@ void RoiEditor::ItemSelected(QListWidgetItem *item, QListWidgetItem *)
 		ui->roiPropRadiusOuterAspect->setChecked(data.outer_aspect);
 		ui->roiPropStepsInnerSb->setValue(data.inner_steps);
 		ui->roiPropStepsOuterSb->setValue(data.outer_steps);
+		ui->roiPropCenterPosX->setValue(data.center_x);
+		ui->roiPropCenterPosY->setValue(data.center_y);
 	}
 
 	/* Only set after loading so any signals to PropertiesChanged are no-ops */
@@ -388,6 +396,8 @@ void RoiEditor::RegionItemsToData()
 					 roi.outer_steps);
 			obs_data_set_double(data, "center_priority_outer",
 					    roi.outer_priority);
+			obs_data_set_int(data, "center_x", roi.center_x);
+			obs_data_set_double(data, "center_y", roi.center_y);
 		}
 
 		roi_data[scene_uuid].emplace_back(data);
@@ -431,13 +441,13 @@ static constexpr int32_t kMinBlockSize = 16; // Use H.264 as a baseline
 
 static void BuildInnerRegions(vector<region_of_interest> &rois, float priority,
 			      int64_t steps, int64_t radius,
-			      bool correct_aspect, uint32_t width,
-			      uint32_t height)
+			      bool correct_aspect, int32_t center_x,
+			      int32_t center_y, uint32_t width, uint32_t height)
 {
 	if (!radius || height < radius || width < radius ||
 	    radius < kMinBlockSize / 2 || priority == 0.0 || !steps)
 		return;
-	int64_t interval = radius / steps;
+	int32_t interval = radius / steps;
 
 	if (interval < kMinBlockSize) {
 		/* Clamp interval size and step count to the smallest block size */
@@ -446,7 +456,7 @@ static void BuildInnerRegions(vector<region_of_interest> &rois, float priority,
 	} else if (interval % kMinBlockSize) {
 		/* Round interval to nearest multiple of kMinBlockSize */
 		interval =
-			(int64_t)round((float)interval / float(kMinBlockSize)) *
+			(int32_t)round((float)interval / float(kMinBlockSize)) *
 			kMinBlockSize;
 		steps = std::max((radius + kMinBlockSize) / interval, 1LL);
 	}
@@ -456,16 +466,22 @@ static void BuildInnerRegions(vector<region_of_interest> &rois, float priority,
 	if (correct_aspect)
 		aspect = (double)width / (double)height;
 
-	uint32_t middle_x = width / 2;
-	uint32_t middle_y = height / 2;
+	int32_t middle_x = center_x >= 0 ? center_x : width / 2;
+	int32_t middle_y = center_y >= 0 ? center_y : height / 2;
 
-	for (int i = 1; i <= steps; i++) {
-		region_of_interest roi = {
-			(uint32_t)(middle_y - interval * i),
-			(uint32_t)(middle_y + interval * i),
-			(uint32_t)(middle_x - interval * i * aspect),
-			(uint32_t)(middle_x + interval * i * aspect),
-			(float)(priority - priority_interval * (i - 1))};
+	for (int32_t i = 1; i <= steps; i++) {
+		// Configurable center point means we have to clamp these.
+		uint32_t top = std::clamp(middle_y - interval * i, 0, 16384);
+		uint32_t bottom = std::clamp(middle_y + interval * i, 0, 16384);
+		uint32_t left = std::clamp(
+			(int32_t)(middle_x - interval * i * aspect), 0, 16384);
+		uint32_t right = std::clamp(
+			(int32_t)(middle_x + interval * i * aspect), 0, 16384);
+		float region_priority =
+			(float)(priority - priority_interval * (i - 1));
+
+		region_of_interest roi = {top, bottom, left, right,
+					  region_priority};
 		rois.push_back(roi);
 	}
 }
@@ -531,13 +547,15 @@ static void BuildCenterFocusROI(vector<region_of_interest> &rois,
 	bool aspect_outer = obs_data_get_bool(data, "center_aspect_outer");
 	int64_t steps_inner = obs_data_get_int(data, "center_steps_inner");
 	int64_t steps_outer = obs_data_get_int(data, "center_steps_outer");
+	int32_t center_x = obs_data_get_int(data, "center_x");
+	int32_t center_y = obs_data_get_int(data, "center_y");
 	double priority_outer =
 		obs_data_get_double(data, "center_priority_outer");
 	double priority = obs_data_get_double(data, "priority");
 
 	/* Inner regions (if any) */
 	BuildInnerRegions(rois, priority, steps_inner, inner_radius,
-			  aspect_inner, width, height);
+			  aspect_inner, center_x, center_y, width, height);
 	BuildOuterRegions(rois, priority_outer, steps_outer, outer_radius,
 			  aspect_outer, width, height);
 }
@@ -965,12 +983,20 @@ void RoiEditor::RefreshRoiList()
 			roi, "center_priority_outer");
 		data.outer_aspect =
 			obs_data_get_bool(roi, "center_aspect_outer");
+		data.center_x = -1;
+		data.center_y = -1;
 		data.smoothing_steps = obs_data_get_int(roi, "smoothing_steps");
 		data.smoothing_type = obs_data_get_int(roi, "smoothing_type");
 		data.smoothing_priority =
 			obs_data_get_double(roi, "smoothing_priority");
 		data.enabled = obs_data_get_bool(roi, "enabled");
 		data.priority = (float)obs_data_get_double(roi, "priority");
+
+		// Special case, these have to be -1 if unset
+		if (obs_data_has_user_value(roi, "center_x"))
+			data.center_x = obs_data_get_int(roi, "center_x");
+		if (obs_data_has_user_value(roi, "center_y"))
+			data.center_y = obs_data_get_int(roi, "center_y");
 
 		RoiListItem *item = new RoiListItem(type);
 		ui->roiList->addItem(item);
