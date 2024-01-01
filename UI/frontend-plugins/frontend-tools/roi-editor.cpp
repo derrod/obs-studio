@@ -19,9 +19,6 @@ RoiEditor *roi_edit;
 
 /// ToDo cleanup this whole refresh mess, just rebuild data always when necessary,
 /// and then update preview if visible, always run encoder update.
-/// ToDo: Smooth edges (few steps of transition)
-/// ToDo Circular center focus
-/// ToDo: repositionable center-focus
 
 RoiEditor::RoiEditor(QWidget *parent) : QDialog(parent), ui(new Ui_ROIEditor)
 {
