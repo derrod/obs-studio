@@ -490,7 +490,7 @@
                 <string> px</string>
                </property>
                <property name="prefix">
-                <string>ROI.Property.Width.Prefix</string>
+                <string>ROI.Property.Size.X.Prefix</string>
                </property>
                <property name="minimum">
                 <number>16</number>
@@ -506,7 +506,7 @@
                 <string> px</string>
                </property>
                <property name="prefix">
-                <string>ROI.Property.Height.Prefix</string>
+                <string>ROI.Property.Size.Y.Prefix</string>
                </property>
                <property name="minimum">
                 <number>16</number>
