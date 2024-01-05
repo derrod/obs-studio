@@ -65,7 +65,6 @@ target_sources(
           auth-listener.hpp
           auth-oauth.cpp
           auth-oauth.hpp
-          display-helpers.hpp
           ffmpeg-utils.cpp
           ffmpeg-utils.hpp
           multiview.cpp
@@ -77,8 +76,6 @@ target_sources(
           obs-proxy-style.cpp
           obs-proxy-style.hpp
           platform.hpp
-          qt-display.cpp
-          qt-display.hpp
           ui-config.h
           ui-validation.cpp
           ui-validation.hpp)
