@@ -28,11 +28,6 @@ if(OS_WINDOWS)
   find_package(AMF 1.4.29 REQUIRED)
   find_package(FFnvcodec 12 REQUIRED)
 
-  add_library(obs-nvenc-version INTERFACE)
-  add_library(OBS::obs-nvenc-version ALIAS obs-nvenc-version)
-  target_sources(obs-nvenc-version INTERFACE obs-nvenc-ver.h)
-  target_include_directories(obs-nvenc-version INTERFACE "${CMAKE_CURRENT_SOURCE_DIR}")
-
   add_subdirectory(obs-amf-test)
   add_subdirectory(obs-nvenc-test)
 elseif(

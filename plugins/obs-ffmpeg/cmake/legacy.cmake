@@ -97,15 +97,8 @@ if(OS_WINDOWS)
   set(MODULE_DESCRIPTION "OBS FFmpeg module")
   configure_file(${CMAKE_SOURCE_DIR}/cmake/bundle/windows/obs-module.rc.in obs-ffmpeg.rc)
 
-  target_sources(
-    obs-ffmpeg
-    PRIVATE texture-amf.cpp
-            texture-amf-opts.hpp
-            obs-nvenc.c
-            obs-nvenc.h
-            obs-nvenc-helpers.c
-            obs-nvenc-ver.h
-            obs-ffmpeg.rc)
+  target_sources(obs-ffmpeg PRIVATE texture-amf.cpp texture-amf-opts.hpp obs-nvenc.c obs-nvenc.h obs-nvenc-helpers.c
+                                    obs-ffmpeg.rc)
 
 elseif(OS_POSIX AND NOT OS_MACOS)
   find_package(Libva REQUIRED)

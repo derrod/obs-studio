@@ -3,11 +3,6 @@
 #include <stdio.h>
 
 #include <ffnvcodec/nvEncodeAPI.h>
-#ifdef OBS_LEGACY
-#include "../obs-nvenc-ver.h"
-#else
-#include <obs-nvenc-ver.h>
-#endif
 
 #include <dxgi.h>
 #include <d3d11.h>
@@ -158,8 +153,8 @@ static inline bool init_nvenc_internal(void)
 	if (ver == 0)
 		return false;
 
-	uint32_t supported_ver = (NVENC_COMPAT_MAJOR_VER << 4) |
-				 NVENC_COMPAT_MINOR_VER;
+	uint32_t supported_ver = (NVENCAPI_MAJOR_VERSION << 4) |
+				 NVENCAPI_MINOR_VERSION;
 	if (supported_ver > ver)
 		return false;
 

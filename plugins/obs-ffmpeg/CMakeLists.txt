@@ -58,7 +58,6 @@ target_link_libraries(
           FFmpeg::avutil
           FFmpeg::swscale
           FFmpeg::swresample
-          $<$<PLATFORM_ID:Windows>:OBS::obs-nvenc-version>
           $<$<PLATFORM_ID:Windows>:OBS::w32-pthreads>
           $<$<PLATFORM_ID:Windows>:AMF::AMF>
           $<$<PLATFORM_ID:Windows>:FFnvcodec::FFnvcodec>

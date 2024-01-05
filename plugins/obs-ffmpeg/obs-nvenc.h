@@ -5,7 +5,6 @@
 
 #include <obs-module.h>
 #include <ffnvcodec/nvEncodeAPI.h>
-#include "obs-nvenc-ver.h"
 
 typedef NVENCSTATUS(NVENCAPI *NV_CREATE_INSTANCE_FUNC)(
 	NV_ENCODE_API_FUNCTION_LIST *);

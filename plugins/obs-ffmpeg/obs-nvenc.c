@@ -10,34 +10,6 @@
 #include <d3d11_1.h>
 #include <obs-hevc.h>
 
-/* ========================================================================= */
-/* a hack of the ages: nvenc backward compatibility                          */
-
-#define CONFIGURED_NVENC_MAJOR 12
-#define CONFIGURED_NVENC_MINOR 0
-#define CONFIGURED_NVENC_VER \
-	(CONFIGURED_NVENC_MAJOR | (CONFIGURED_NVENC_MINOR << 24))
-
-/* we cannot guarantee structures haven't changed, so purposely break on
- * version change to force the programmer to update or remove backward
- * compatibility NVENC code. */
-#if CONFIGURED_NVENC_VER != NVENCAPI_VERSION
-#error NVENC version changed, update or remove NVENC compatibility code
-#endif
-
-#undef NVENCAPI_STRUCT_VERSION
-#define NVENCAPI_STRUCT_VERSION(ver)                              \
-	((uint32_t)(enc->codec == CODEC_AV1 ? NVENCAPI_VERSION    \
-					    : NVENC_COMPAT_VER) | \
-	 ((ver) << 16) | (0x7 << 28))
-
-#define NV_ENC_CONFIG_COMPAT_VER (NVENCAPI_STRUCT_VERSION(7) | (1 << 31))
-#define NV_ENC_PIC_PARAMS_COMPAT_VER (NVENCAPI_STRUCT_VERSION(4) | (1 << 31))
-#define NV_ENC_LOCK_BITSTREAM_COMPAT_VER NVENCAPI_STRUCT_VERSION(1)
-#define NV_ENC_REGISTER_RESOURCE_COMPAT_VER NVENCAPI_STRUCT_VERSION(3)
-
-/* ========================================================================= */
-
 #define EXTRA_BUFFERS 5
 
 #define do_log(level, format, ...)               \
@@ -186,11 +158,7 @@ static bool nv_texture_init(struct nvenc_data *enc, struct nv_texture *nvtex)
 
 	tex->lpVtbl->SetEvictionPriority(tex, DXGI_RESOURCE_PRIORITY_MAXIMUM);
 
-	uint32_t struct_ver = enc->codec == CODEC_AV1
-				      ? NV_ENC_REGISTER_RESOURCE_VER
-				      : NV_ENC_REGISTER_RESOURCE_COMPAT_VER;
-
-	NV_ENC_REGISTER_RESOURCE res = {struct_ver};
+	NV_ENC_REGISTER_RESOURCE res = {NV_ENC_REGISTER_RESOURCE_VER};
 	res.resourceType = NV_ENC_INPUT_RESOURCE_TYPE_DIRECTX;
 	res.resourceToRegister = tex;
 	res.width = enc->cx;
@@ -360,8 +328,7 @@ static bool init_session(struct nvenc_data *enc)
 		NV_ENC_OPEN_ENCODE_SESSION_EX_PARAMS_VER};
 	params.device = enc->device;
 	params.deviceType = NV_ENC_DEVICE_TYPE_DIRECTX;
-	params.apiVersion = enc->codec == CODEC_AV1 ? NVENCAPI_VERSION
-						    : NVENC_COMPAT_VER;
+	params.apiVersion = NVENCAPI_VERSION;
 
 	if (NV_FAILED(nv.nvEncOpenEncodeSessionEx(&params, &enc->session))) {
 		return false;
@@ -566,12 +533,8 @@ static bool init_encoder_base(struct nvenc_data *enc, obs_data_t *settings,
 	/* -------------------------- */
 	/* get preset default config  */
 
-	uint32_t config_ver = enc->codec == CODEC_AV1
-				      ? NV_ENC_CONFIG_VER
-				      : NV_ENC_CONFIG_COMPAT_VER;
-
 	NV_ENC_PRESET_CONFIG preset_config = {NV_ENC_PRESET_CONFIG_VER,
-					      {config_ver}};
+					      {NV_ENC_CONFIG_VER}};
 
 	err = nv.nvEncGetEncodePresetConfigEx(enc->session, enc->codec_guid,
 					      nv_preset, nv_tuning,
@@ -1207,12 +1170,7 @@ static void nvenc_destroy(void *data)
 	struct nvenc_data *enc = data;
 
 	if (enc->encode_started) {
-		size_t next_bitstream = enc->next_bitstream;
-
-		uint32_t struct_ver = enc->codec == CODEC_AV1
-					      ? NV_ENC_PIC_PARAMS_VER
-					      : NV_ENC_PIC_PARAMS_COMPAT_VER;
-		NV_ENC_PIC_PARAMS params = {struct_ver};
+		NV_ENC_PIC_PARAMS params = {NV_ENC_PIC_PARAMS_VER};
 		params.encodePicFlags = NV_ENC_PIC_FLAG_EOS;
 		nv.nvEncEncodePicture(enc->session, &params);
 		get_encoded_packet(enc, true);
@@ -1313,12 +1271,7 @@ static bool get_encoded_packet(struct nvenc_data *enc, bool finalize)
 
 		/* ---------------- */
 
-		uint32_t struct_ver =
-			enc->codec == CODEC_AV1
-				? NV_ENC_LOCK_BITSTREAM_VER
-				: NV_ENC_LOCK_BITSTREAM_COMPAT_VER;
-
-		NV_ENC_LOCK_BITSTREAM lock = {struct_ver};
+		NV_ENC_LOCK_BITSTREAM lock = {NV_ENC_LOCK_BITSTREAM_VER};
 		lock.outputBitstream = bs->ptr;
 		lock.doNotWait = false;
 
@@ -1433,9 +1386,7 @@ static bool nvenc_encode_tex(void *data, uint32_t handle, int64_t pts,
 	/* ------------------------------------ */
 	/* do actual encode call                */
 
-	NV_ENC_PIC_PARAMS params = {0};
-	params.version = enc->codec == CODEC_AV1 ? NV_ENC_PIC_PARAMS_VER
-						 : NV_ENC_PIC_PARAMS_COMPAT_VER;
+	NV_ENC_PIC_PARAMS params = {NV_ENC_PIC_PARAMS_VER};
 	params.pictureStruct = NV_ENC_PIC_STRUCT_FRAME;
 	params.inputBuffer = nvtex->mapped_res;
 	params.bufferFmt = obs_p010_tex_active()

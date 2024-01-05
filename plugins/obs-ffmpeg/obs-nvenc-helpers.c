@@ -196,8 +196,8 @@ static inline bool init_nvenc_internal(obs_encoder_t *encoder)
 		return false;
 	}
 
-	uint32_t supported_ver = (NVENC_COMPAT_MAJOR_VER << 4) |
-				 NVENC_COMPAT_MINOR_VER;
+	uint32_t supported_ver = (NVENCAPI_MAJOR_VERSION << 4) |
+				 NVENCAPI_MINOR_VERSION;
 	if (supported_ver > ver) {
 		obs_encoder_set_last_error(
 			encoder, obs_module_text("NVENC.OutdatedDriver"));
