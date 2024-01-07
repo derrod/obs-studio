@@ -4724,11 +4724,20 @@ int OBSBasic::ResetVideo()
 	const char *colorRange =
 		config_get_string(basicConfig, "Video", "ColorRange");
 
+	auto section = basicConfig["Video"];
+	ovi.base_width = section["BaseCX"];
+	ovi.base_height = section["BaseCY"];
+
+	uint32_t width = basicConfig["Video"]["BaseCX"];
+
+	section["ColorRange2"] = "Test1";
+	section.set("ColorRange3", "Test2");
+
+	string a = section["ColorRange2"];
+	string b = section.get<string>("ColorRange3");
+	blog(LOG_DEBUG, "string a: %s, string b: %s", a.c_str(), b.c_str());
+
 	ovi.graphics_module = App()->GetRenderModule();
-	ovi.base_width =
-		(uint32_t)config_get_uint(basicConfig, "Video", "BaseCX");
-	ovi.base_height =
-		(uint32_t)config_get_uint(basicConfig, "Video", "BaseCY");
 	ovi.output_width =
 		(uint32_t)config_get_uint(basicConfig, "Video", "OutputCX");
 	ovi.output_height =
