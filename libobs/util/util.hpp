@@ -22,6 +22,7 @@
 #include <stdarg.h>
 #include <utility>
 #include <string>
+#include <memory>
 
 #include "bmem.h"
 #include "config-file.h"
@@ -70,19 +71,41 @@ public:
 	inline T *Get() const { return ptr; }
 };
 
-class ConfigValue {
+/* RAII wrapper that just exists to keep the config open until the last shared_ptr is released */
+class ConfigPtr {
 	config_t *config;
-	const char *section;
-	const char *key;
 
 public:
-	ConfigValue(config_t *config, const char *section, const char *key)
-		: config(config),
-		  section(section),
+	ConfigPtr() : config(nullptr){};
+	ConfigPtr(config_t *config) : config(config) {}
+
+	ConfigPtr(ConfigPtr &&) = delete;
+	ConfigPtr(ConfigPtr const &) = delete;
+	ConfigPtr &operator=(ConfigPtr const &) = delete;
+
+	~ConfigPtr() { config_close(config); }
+
+	operator config_t *() const { return config; }
+	operator config_t **() { return &config; }
+};
+
+using ConfigRef = std::shared_ptr<ConfigPtr>;
+
+class ConfigValue {
+	friend class ConfigSection;
+
+	ConfigRef config;
+	std::string section;
+	std::string key;
+
+	ConfigValue(ConfigRef config, std::string section, const char *key)
+		: config(std::move(config)),
+		  section(std::move(section)),
 		  key(key)
 	{
 	}
 
+public:
 	/* No copy, move or assignment operators */
 	ConfigValue(ConfigValue &&) = delete;
 	ConfigValue(ConfigValue const &) = delete;
@@ -91,156 +114,169 @@ public:
 	/* Getters w/ conversions */
 	operator int64_t() const
 	{
-		return config_get_int(config, section, key);
+		return config_get_int(*config, section.c_str(), key.c_str());
 	}
 
 	operator int32_t() const
 	{
 		return static_cast<int32_t>(
-			config_get_int(config, section, key));
+			config_get_int(*config, section.c_str(), key.c_str()));
 	}
 
 	operator uint64_t() const
 	{
-		return config_get_uint(config, section, key);
+		return config_get_uint(*config, section.c_str(), key.c_str());
 	}
 
 	operator uint32_t() const
 	{
 		return static_cast<uint32_t>(
-			config_get_uint(config, section, key));
+			config_get_uint(*config, section.c_str(), key.c_str()));
 	}
 
 	operator double() const
 	{
-		return config_get_double(config, section, key);
+		return config_get_double(*config, section.c_str(), key.c_str());
 	}
 
 	operator float() const
 	{
-		return static_cast<float>(
-			config_get_double(config, section, key));
+		return static_cast<float>(config_get_double(
+			*config, section.c_str(), key.c_str()));
 	}
 
-	operator bool() const { return config_get_bool(config, section, key); }
+	operator bool() const
+	{
+		return config_get_bool(*config, section.c_str(), key.c_str());
+	}
 
 	operator const char *() const
 	{
-		return config_get_string(config, section, key);
+		return config_get_string(*config, section.c_str(), key.c_str());
 	}
 
 	operator std::string() const
 	{
-		return config_get_string(config, section, key);
+		return config_get_string(*config, section.c_str(), key.c_str());
 	}
 
 	/* Setters */
 	ConfigValue &operator=(const char *value)
 	{
-		config_set_string(config, section, key, value);
+		config_set_string(*config, section.c_str(), key.c_str(), value);
 		return *this;
 	}
 
 	ConfigValue &operator=(const std::string &value)
 	{
-		config_set_string(config, section, key, value.c_str());
+		config_set_string(*config, section.c_str(), key.c_str(),
+				  value.c_str());
 		return *this;
 	}
 
 	ConfigValue &operator=(const bool value)
 	{
-		config_set_bool(config, section, key, value);
+		config_set_bool(*config, section.c_str(), key.c_str(), value);
 		return *this;
 	}
 
 	ConfigValue &operator=(const int64_t value)
 	{
-		config_set_int(config, section, key, value);
+		config_set_int(*config, section.c_str(), key.c_str(), value);
 		return *this;
 	}
 
 	ConfigValue &operator=(const int32_t value)
 	{
-		config_set_int(config, section, key, value);
+		config_set_int(*config, section.c_str(), key.c_str(), value);
 		return *this;
 	}
 
 	ConfigValue &operator=(const uint32_t value)
 	{
-		config_set_uint(config, section, key, value);
+		config_set_uint(*config, section.c_str(), key.c_str(), value);
 		return *this;
 	}
 
 	ConfigValue &operator=(const uint64_t value)
 	{
-		config_set_uint(config, section, key, value);
+		config_set_uint(*config, section.c_str(), key.c_str(), value);
 		return *this;
 	}
 
 	ConfigValue &operator=(const double value)
 	{
-		config_set_double(config, section, key, value);
+		config_set_double(*config, section.c_str(), key.c_str(), value);
 		return *this;
 	}
 
 	ConfigValue &operator=(const float value)
 	{
-		config_set_double(config, section, key, value);
+		config_set_double(*config, section.c_str(), key.c_str(), value);
 		return *this;
 	}
 
 	/* Default setters */
 	ConfigValue &operator^=(const char *value)
 	{
-		config_set_default_string(config, section, key, value);
+		config_set_default_string(*config, section.c_str(), key.c_str(),
+					  value);
 		return *this;
 	}
 
 	ConfigValue &operator^=(const std::string &value)
 	{
-		config_set_default_string(config, section, key, value.c_str());
+		config_set_default_string(*config, section.c_str(), key.c_str(),
+					  value.c_str());
 		return *this;
 	}
 
 	ConfigValue &operator^=(const bool value)
 	{
-		config_set_default_bool(config, section, key, value);
+		config_set_default_bool(*config, section.c_str(), key.c_str(),
+					value);
 		return *this;
 	}
 
 	ConfigValue &operator^=(const int64_t value)
 	{
-		config_set_default_int(config, section, key, value);
+		config_set_default_int(*config, section.c_str(), key.c_str(),
+				       value);
 		return *this;
 	}
 
 	ConfigValue &operator^=(const int32_t value)
 	{
-		config_set_default_int(config, section, key, value);
+		config_set_default_int(*config, section.c_str(), key.c_str(),
+				       value);
 		return *this;
 	}
 
 	ConfigValue &operator^=(const uint32_t value)
 	{
-		config_set_default_uint(config, section, key, value);
+		config_set_default_uint(*config, section.c_str(), key.c_str(),
+					value);
 		return *this;
 	}
 
 	ConfigValue &operator^=(const uint64_t value)
 	{
-		config_set_default_uint(config, section, key, value);
+		config_set_default_uint(*config, section.c_str(), key.c_str(),
+					value);
 		return *this;
 	}
 
 	ConfigValue &operator^=(const double value)
 	{
-		config_set_default_double(config, section, key, value);
+		config_set_default_double(*config, section.c_str(), key.c_str(),
+					  value);
 		return *this;
 	}
 
 	ConfigValue &operator^=(const float value)
 	{
-		config_set_default_double(config, section, key, value);
+		config_set_default_double(*config, section.c_str(), key.c_str(),
+					  value);
 		return *this;
 	}
 
@@ -248,26 +284,30 @@ public:
 
 	bool remove() const
 	{
-		return config_remove_value(config, section, key);
+		return config_remove_value(*config, section.c_str(),
+					   key.c_str());
 	}
 
 	bool exists() const
 	{
-		return config_has_user_value(config, section, key);
+		return config_has_user_value(*config, section.c_str(),
+					     key.c_str());
 	}
 };
 
 class ConfigSection {
-	config_t *config;
-	const char *section;
+	friend class ConfigFile;
 
-public:
-	ConfigSection(config_t *config, const char *section)
-		: config(config),
+	ConfigRef config;
+	std::string section;
+
+	ConfigSection(ConfigRef config, const char *section)
+		: config(std::move(config)),
 		  section(section)
 	{
 	}
 
+public:
 	/* No copy, move or assignment operators */
 	ConfigSection(ConfigSection &&) = delete;
 	ConfigSection(ConfigSection const &) = delete;
@@ -295,70 +335,63 @@ public:
 
 	bool remove(const char *key) const
 	{
-		return config_remove_value(config, section, key);
+		return config_remove_value(*config, section.c_str(), key);
 	}
 
-	bool exists(const char *key) const
+	bool contains(const char *key) const
 	{
-		return config_has_user_value(config, section, key);
+		return config_has_user_value(*config, section.c_str(), key);
 	}
 };
 
 class ConfigFile {
-	config_t *config;
+	ConfigRef config;
 
 	ConfigFile(ConfigFile const &) = delete;
 	ConfigFile &operator=(ConfigFile const &) = delete;
 
 public:
-	inline ConfigFile() : config(NULL) {}
-	inline ConfigFile(ConfigFile &&other) noexcept : config(other.config)
-	{
-		other.config = nullptr;
-	}
-	inline ~ConfigFile() { config_close(config); }
+	ConfigFile() : config(new ConfigPtr) {}
 
-	inline bool Create(const char *file)
+	ConfigFile(ConfigFile &&other) noexcept
 	{
-		Close();
-		config = config_create(file);
-		return config != NULL;
+		config.swap(other.config);
+		other.config.reset();
 	}
 
-	inline void Swap(ConfigFile &other)
+	~ConfigFile() { config.reset(); }
+
+	void Swap(ConfigFile &other) { config.swap(other.config); }
+
+	bool Create(const char *file)
 	{
-		config_t *newConfig = other.config;
-		other.config = config;
-		config = newConfig;
+		config_t *conf = config_create(file);
+		config.reset(new ConfigPtr(conf));
+		return conf != nullptr;
 	}
 
-	inline int OpenString(const char *str)
+	int OpenString(const char *str)
 	{
-		Close();
-		return config_open_string(&config, str);
+		config.reset(new ConfigPtr);
+		return config_open_string(*config, str);
 	}
 
-	inline int Open(const char *file, config_open_type openType)
+	int Open(const char *file, config_open_type openType)
 	{
-		Close();
-		return config_open(&config, file, openType);
+		config.reset(new ConfigPtr);
+		return config_open(*config, file, openType);
 	}
 
-	inline int Save() { return config_save(config); }
+	int Save() { return config_save(*config); }
 
-	inline int SaveSafe(const char *temp_ext,
-			    const char *backup_ext = nullptr)
+	int SaveSafe(const char *temp_ext, const char *backup_ext = nullptr)
 	{
-		return config_save_safe(config, temp_ext, backup_ext);
+		return config_save_safe(*config, temp_ext, backup_ext);
 	}
 
-	inline void Close()
-	{
-		config_close(config);
-		config = NULL;
-	}
+	void Close() { config.reset(); }
 
-	inline operator config_t *() const { return config; }
+	operator config_t *() const { return *config; }
 
 	ConfigSection operator[](const char *section)
 	{
