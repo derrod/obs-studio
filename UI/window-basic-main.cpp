@@ -4717,45 +4717,37 @@ int OBSBasic::ResetVideo()
 
 	GetConfigFPS(ovi.fps_num, ovi.fps_den);
 
-	const char *colorFormat =
-		config_get_string(basicConfig, "Video", "ColorFormat");
-	const char *colorSpace =
-		config_get_string(basicConfig, "Video", "ColorSpace");
-	const char *colorRange =
-		config_get_string(basicConfig, "Video", "ColorRange");
+	ConfigSection video = basicConfig["Video"];
+
+	const char *colorFormat = video["ColorFormat"];
+	const char *colorSpace = video["ColorSpace"];
+	const char *colorRange = video["ColorRange"];
 
 	ovi.graphics_module = App()->GetRenderModule();
-	ovi.base_width =
-		(uint32_t)config_get_uint(basicConfig, "Video", "BaseCX");
-	ovi.base_height =
-		(uint32_t)config_get_uint(basicConfig, "Video", "BaseCY");
-	ovi.output_width =
-		(uint32_t)config_get_uint(basicConfig, "Video", "OutputCX");
-	ovi.output_height =
-		(uint32_t)config_get_uint(basicConfig, "Video", "OutputCY");
+	ovi.output_width = video["OutputCX"];
+	ovi.output_height = video["OutputCY"];
 	ovi.output_format = GetVideoFormatFromName(colorFormat);
 	ovi.colorspace = GetVideoColorSpaceFromName(colorSpace);
 	ovi.range = astrcmpi(colorRange, "Full") == 0 ? VIDEO_RANGE_FULL
 						      : VIDEO_RANGE_PARTIAL;
-	ovi.adapter =
-		config_get_uint(App()->GlobalConfig(), "Video", "AdapterIdx");
+	ovi.adapter = video["AdapterIdx"];
 	ovi.gpu_conversion = true;
 	ovi.scale_type = GetScaleType(basicConfig);
 
 	if (ovi.base_width < 32 || ovi.base_height < 32) {
 		ovi.base_width = 1920;
 		ovi.base_height = 1080;
-		config_set_uint(basicConfig, "Video", "BaseCX", 1920);
-		config_set_uint(basicConfig, "Video", "BaseCY", 1080);
+
+		video["BaseCX"] = 1920;
+		video["BaseCY"] = 1080;
 	}
 
 	if (ovi.output_width < 32 || ovi.output_height < 32) {
 		ovi.output_width = ovi.base_width;
 		ovi.output_height = ovi.base_height;
-		config_set_uint(basicConfig, "Video", "OutputCX",
-				ovi.base_width);
-		config_set_uint(basicConfig, "Video", "OutputCY",
-				ovi.base_height);
+
+		video["OutputCX"] = ovi.base_width;
+		video["OutputCY"] = ovi.base_height;
 	}
 
 	ret = AttemptToResetVideo(&ovi);
@@ -4769,10 +4761,9 @@ int OBSBasic::ResetVideo()
 		if (program)
 			ResizeProgram(ovi.base_width, ovi.base_height);
 
-		const float sdr_white_level = (float)config_get_uint(
-			basicConfig, "Video", "SdrWhiteLevel");
-		const float hdr_nominal_peak_level = (float)config_get_uint(
-			basicConfig, "Video", "HdrNominalPeakLevel");
+		const float sdr_white_level = video["SdrWhiteLevel"];
+		const float hdr_nominal_peak_level =
+			video["HdrNominalPeakLevel"];
 		obs_set_video_levels(sdr_white_level, hdr_nominal_peak_level);
 		OBSBasicStats::InitializeValues();
 		OBSProjector::UpdateMultiviewProjectors();
