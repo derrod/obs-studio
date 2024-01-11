@@ -1132,41 +1132,9 @@ fail:
 	return NULL;
 }
 
-static void *nvenc_create_base(enum codec_type codec, obs_data_t *settings,
-			       obs_encoder_t *encoder)
+static void *nvenc_create_rerouted(enum codec_type codec, obs_data_t *settings,
+				   obs_encoder_t *encoder)
 {
-	/* this encoder requires shared textures, this cannot be used on a
-	 * gpu other than the one OBS is currently running on. */
-	const int gpu = (int)obs_data_get_int(settings, "gpu");
-	if (gpu != 0) {
-		blog(LOG_INFO,
-		     "[obs-nvenc] different GPU selected by user, falling back to ffmpeg");
-		goto reroute;
-	}
-
-	if (obs_encoder_scaling_enabled(encoder)) {
-		if (!obs_encoder_gpu_scaling_enabled(encoder)) {
-			blog(LOG_INFO,
-			     "[obs-nvenc] CPU scaling enabled, falling back to ffmpeg");
-			goto reroute;
-		}
-		blog(LOG_INFO, "[obs-nvenc] GPU scaling enabled");
-	}
-
-	if (!obs_p010_tex_active() && !obs_nv12_tex_active()) {
-		blog(LOG_INFO,
-		     "[obs-nvenc] nv12/p010 not active, falling back to ffmpeg");
-		goto reroute;
-	}
-
-	struct nvenc_data *enc =
-		nvenc_create_internal(codec, settings, encoder);
-
-	if (enc) {
-		return enc;
-	}
-
-reroute:
 	switch (codec) {
 	case CODEC_H264:
 		return obs_encoder_create_rerouted(encoder, "ffmpeg_nvenc");
@@ -1181,6 +1149,36 @@ reroute:
 	}
 
 	return NULL;
+}
+
+static void *nvenc_create_base(enum codec_type codec, obs_data_t *settings,
+			       obs_encoder_t *encoder)
+{
+	/* this encoder requires shared textures, this cannot be used on a
+	 * gpu other than the one OBS is currently running on. */
+	const int gpu = (int)obs_data_get_int(settings, "gpu");
+	if (gpu != 0) {
+		blog(LOG_INFO,
+		     "[obs-nvenc] different GPU selected by user, falling back to ffmpeg");
+		return nvenc_create_rerouted(codec, settings, encoder);
+	}
+
+	if (obs_encoder_scaling_enabled(encoder)) {
+		if (!obs_encoder_gpu_scaling_enabled(encoder)) {
+			blog(LOG_INFO,
+			     "[obs-nvenc] CPU scaling enabled, falling back to ffmpeg");
+			return nvenc_create_rerouted(codec, settings, encoder);
+		}
+		blog(LOG_INFO, "[obs-nvenc] GPU scaling enabled");
+	}
+
+	if (!obs_p010_tex_active() && !obs_nv12_tex_active()) {
+		blog(LOG_INFO,
+		     "[obs-nvenc] nv12/p010 not active, falling back to ffmpeg");
+		return nvenc_create_rerouted(codec, settings, encoder);
+	}
+
+	return nvenc_create_internal(codec, settings, encoder);
 }
 
 static void *h264_nvenc_create(obs_data_t *settings, obs_encoder_t *encoder)
