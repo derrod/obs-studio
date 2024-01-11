@@ -1483,6 +1483,23 @@ static void add_roi(struct nvenc_data *enc, NV_ENC_PIC_PARAMS *params)
 	enc->roi_increment = increment;
 	params->qpDeltaMap = enc->roi_map;
 	params->qpDeltaMapSize = (uint32_t)map_size;
+
+#ifdef _DEBUG
+	blog(LOG_DEBUG, "ROI Map:");
+	for (size_t off = 0; off < enc->roi_map_size; off += mb_width) {
+		struct dstr str = {0};
+		dstr_reserve(&str, mb_width * 12);
+		dstr_cat(&str, "\t | ");
+		for (size_t h_idx = 0; h_idx < mb_width; h_idx++) {
+			dstr_catf(&str, "%d", enc->roi_map[off + h_idx]);
+			if (h_idx < mb_width - 1)
+				dstr_cat(&str, ", ");
+		}
+		dstr_cat(&str, " |");
+		blog(LOG_DEBUG, str.array);
+		dstr_free(&str);
+	}
+#endif
 }
 
 static bool nvenc_encode_tex(void *data, uint32_t handle, int64_t pts,
