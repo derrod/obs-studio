@@ -104,10 +104,12 @@ struct nvenc_data {
 	bool first_packet;
 	bool can_change_bitrate;
 	bool needs_compat_ver;
+	bool cuda;
 	int32_t bframes;
 
 	DARRAY(struct nv_bitstream) bitstreams;
 	DARRAY(struct nv_texture) textures;
+	DARRAY(struct nv_input_buf) input_buffers;
 	DARRAY(struct handle_tex) input_textures;
 	struct deque dts_list;
 
@@ -130,6 +132,8 @@ struct nvenc_data {
 	int8_t *roi_map;
 	size_t roi_map_size;
 	uint32_t roi_increment;
+
+	CUcontext cu_ctx;
 };
 
 /* ------------------------------------------------------------------------- */
@@ -230,6 +234,42 @@ static void nv_texture_free(struct nvenc_data *enc, struct nv_texture *nvtex)
 }
 
 /* ------------------------------------------------------------------------- */
+/* Surfaces                                                                  */
+
+struct nv_input_buf {
+	NV_ENC_INPUT_PTR ptr;
+	NV_ENC_BUFFER_FORMAT format;
+};
+
+static bool nv_input_buf_init(struct nvenc_data *enc,
+			      struct nv_input_buf *nvbuf)
+{
+	const bool p010 = obs_p010_tex_active();
+	NV_ENC_CREATE_INPUT_BUFFER bufParams = {0};
+	bufParams.version = NV_ENC_CREATE_INPUT_BUFFER_VER;
+	bufParams.width = enc->cx;
+	bufParams.height = enc->cy;
+	bufParams.bufferFmt = p010 ? NV_ENC_BUFFER_FORMAT_YUV420_10BIT
+				   : NV_ENC_BUFFER_FORMAT_NV12;
+
+	if (NV_FAILED(nv.nvEncCreateInputBuffer(enc->session, &bufParams)))
+		return false;
+
+	nvbuf->ptr = bufParams.inputBuffer;
+	nvbuf->format = bufParams.bufferFmt;
+
+	return true;
+}
+
+static void nv_input_buf_free(struct nvenc_data *enc,
+			      struct nv_input_buf *nvbuf)
+{
+	if (nvbuf->ptr) {
+		nv.nvEncDestroyInputBuffer(enc->session, nvbuf->ptr);
+	}
+}
+
+/* ------------------------------------------------------------------------- */
 /* Implementation                                                            */
 
 static const char *h264_nvenc_get_name(void *type_data)
@@ -238,12 +278,28 @@ static const char *h264_nvenc_get_name(void *type_data)
 	return "NVIDIA NVENC H.264";
 }
 
+#ifdef _WIN32
+static const char *h264_nvenc_soft_get_name(void *type_data)
+{
+	UNUSED_PARAMETER(type_data);
+	return "NVIDIA NVENC H.264 (Fallback)";
+}
+#endif
+
 #ifdef ENABLE_HEVC
 static const char *hevc_nvenc_get_name(void *type_data)
 {
 	UNUSED_PARAMETER(type_data);
 	return "NVIDIA NVENC HEVC";
 }
+
+#ifdef _WIN32
+static const char *hevc_nvenc_soft_get_name(void *type_data)
+{
+	UNUSED_PARAMETER(type_data);
+	return "NVIDIA NVENC H.264 (Fallback)";
+}
+#endif
 #endif
 
 static const char *av1_nvenc_get_name(void *type_data)
@@ -251,6 +307,14 @@ static const char *av1_nvenc_get_name(void *type_data)
 	UNUSED_PARAMETER(type_data);
 	return "NVIDIA NVENC AV1";
 }
+
+#ifdef _WIN32
+static const char *av1_nvenc_soft_get_name(void *type_data)
+{
+	UNUSED_PARAMETER(type_data);
+	return "NVIDIA NVENC AV1 (FALLBACK)";
+}
+#endif
 
 static inline int nv_get_cap(struct nvenc_data *enc, NV_ENC_CAPS cap)
 {
@@ -366,10 +430,15 @@ static bool init_session(struct nvenc_data *enc)
 {
 	NV_ENC_OPEN_ENCODE_SESSION_EX_PARAMS params = {
 		NV_ENC_OPEN_ENCODE_SESSION_EX_PARAMS_VER};
-	params.device = enc->device;
-	params.deviceType = NV_ENC_DEVICE_TYPE_DIRECTX;
 	params.apiVersion = enc->needs_compat_ver ? NVENC_COMPAT_VER
 						  : NVENCAPI_VERSION;
+	if (enc->cuda) {
+		params.device = enc->cu_ctx;
+		params.deviceType = NV_ENC_DEVICE_TYPE_CUDA;
+	} else {
+		params.device = enc->device;
+		params.deviceType = NV_ENC_DEVICE_TYPE_DIRECTX;
+	}
 
 	if (NV_FAILED(nv.nvEncOpenEncodeSessionEx(&params, &enc->session))) {
 		return false;
@@ -1017,6 +1086,52 @@ static bool init_textures(struct nvenc_data *enc)
 	return true;
 }
 
+static bool init_input_buffers(struct nvenc_data *enc)
+{
+	da_reserve(enc->input_buffers, enc->buf_count);
+
+	for (int i = 0; i < enc->buf_count; i++) {
+		struct nv_input_buf buf;
+		if (!nv_input_buf_init(enc, &buf)) {
+			return false;
+		}
+
+		da_push_back(enc->input_buffers, &buf);
+	}
+
+	return true;
+}
+
+static bool init_cuda_ctx(struct nvenc_data *enc, obs_data_t *settings)
+{
+	const int gpu = (int)obs_data_get_int(settings, "gpu");
+
+	if (cu->cuInit(0) != CUDA_SUCCESS)
+		return false;
+
+	int count;
+	if (cu->cuDeviceGetCount(&count) != CUDA_SUCCESS)
+		return false;
+
+	if (!count) {
+		NV_FAIL("No CUDA devices found");
+		return false;
+	}
+
+	CUdevice device;
+	if (cu->cuDeviceGet(&device, gpu) != CUDA_SUCCESS) {
+		NV_FAIL("Failed creating CUDA device");
+		return false;
+	}
+
+	if (cu->cuCtxCreate(&enc->cu_ctx, 0, device) != CUDA_SUCCESS) {
+		NV_FAIL("Failed creating CUDA context");
+		return false;
+	}
+
+	return true;
+}
+
 static void nvenc_destroy(void *data);
 
 static bool init_specific_encoder(struct nvenc_data *enc, obs_data_t *settings,
@@ -1090,12 +1205,13 @@ static bool init_encoder(struct nvenc_data *enc, enum codec_type codec,
 }
 
 static void *nvenc_create_internal(enum codec_type codec, obs_data_t *settings,
-				   obs_encoder_t *encoder)
+				   obs_encoder_t *encoder, bool texture)
 {
 	struct nvenc_data *enc = bzalloc(sizeof(*enc));
 	enc->encoder = encoder;
 	enc->codec = codec;
 	enc->first_packet = true;
+	enc->cuda = !texture;
 
 	NV_ENCODE_API_FUNCTION_LIST init = {NV_ENCODE_API_FUNCTION_LIST_VER};
 
@@ -1114,10 +1230,16 @@ static void *nvenc_create_internal(enum codec_type codec, obs_data_t *settings,
 	if (!init_nvenc(encoder)) {
 		goto fail;
 	}
+	if (!texture && !init_cuda(encoder)) {
+		goto fail;
+	}
 	if (NV_FAILED(nv_create_instance(&init))) {
 		goto fail;
 	}
-	if (!init_d3d11(enc, settings)) {
+	if (texture && !init_d3d11(enc, settings)) {
+		goto fail;
+	}
+	if (!texture && !init_cuda_ctx(enc, settings)) {
 		goto fail;
 	}
 	if (get_nvenc_ver() == COMPATIBILITY_VERSION) {
@@ -1132,10 +1254,12 @@ static void *nvenc_create_internal(enum codec_type codec, obs_data_t *settings,
 	if (!init_bitstreams(enc)) {
 		goto fail;
 	}
-	if (!init_textures(enc)) {
+	if (texture && !init_textures(enc)) {
 		goto fail;
 	}
-
+	if (!texture && !init_input_buffers(enc)) {
+		goto fail;
+	}
 #ifdef ENABLE_HEVC
 	enc->codec = codec;
 #endif
@@ -1147,21 +1271,23 @@ fail:
 }
 
 static void *nvenc_create_base(enum codec_type codec, obs_data_t *settings,
-			       obs_encoder_t *encoder)
+			       obs_encoder_t *encoder, bool texture)
 {
 	/* this encoder requires shared textures, this cannot be used on a
 	 * gpu other than the one OBS is currently running on. */
 	const int gpu = (int)obs_data_get_int(settings, "gpu");
-	if (gpu != 0) {
+	if (gpu != 0 && texture) {
 		blog(LOG_INFO,
-		     "[obs-nvenc] different GPU selected by user, falling back to ffmpeg");
+		     "[obs-nvenc] different GPU selected by user, falling back "
+		     "to non-texture encoder");
 		goto reroute;
 	}
 
 	if (obs_encoder_scaling_enabled(encoder)) {
 		if (!obs_encoder_gpu_scaling_enabled(encoder)) {
 			blog(LOG_INFO,
-			     "[obs-nvenc] CPU scaling enabled, falling back to ffmpeg");
+			     "[obs-nvenc] CPU scaling enabled, falling back to"
+			     " non-texture encoder");
 			goto reroute;
 		}
 		blog(LOG_INFO, "[obs-nvenc] GPU scaling enabled");
@@ -1169,12 +1295,13 @@ static void *nvenc_create_base(enum codec_type codec, obs_data_t *settings,
 
 	if (!obs_p010_tex_active() && !obs_nv12_tex_active()) {
 		blog(LOG_INFO,
-		     "[obs-nvenc] nv12/p010 not active, falling back to ffmpeg");
+		     "[obs-nvenc] nv12/p010 not active, falling back to "
+		     "non-texture encoder");
 		goto reroute;
 	}
 
 	struct nvenc_data *enc =
-		nvenc_create_internal(codec, settings, encoder);
+		nvenc_create_internal(codec, settings, encoder, texture);
 
 	if (enc) {
 		return enc;
@@ -1183,15 +1310,14 @@ static void *nvenc_create_base(enum codec_type codec, obs_data_t *settings,
 reroute:
 	switch (codec) {
 	case CODEC_H264:
-		return obs_encoder_create_rerouted(encoder, "ffmpeg_nvenc");
+		return obs_encoder_create_rerouted(encoder,
+						   "h264_fallback_nvenc");
 	case CODEC_HEVC:
 		return obs_encoder_create_rerouted(encoder,
-						   "ffmpeg_hevc_nvenc");
+						   "hevc_fallback_nvenc");
 	case CODEC_AV1:
-		obs_encoder_set_last_error(
-			encoder,
-			obs_module_text("NVENC.NoAV1FallbackPossible"));
-		break;
+		return obs_encoder_create_rerouted(encoder,
+						   "av1_fallback_nvenc");
 	}
 
 	return NULL;
@@ -1199,19 +1325,36 @@ reroute:
 
 static void *h264_nvenc_create(obs_data_t *settings, obs_encoder_t *encoder)
 {
-	return nvenc_create_base(CODEC_H264, settings, encoder);
+	return nvenc_create_base(CODEC_H264, settings, encoder, true);
+}
+
+static void *h264_nvenc_soft_create(obs_data_t *settings,
+				    obs_encoder_t *encoder)
+{
+	return nvenc_create_base(CODEC_H264, settings, encoder, false);
 }
 
 #ifdef ENABLE_HEVC
 static void *hevc_nvenc_create(obs_data_t *settings, obs_encoder_t *encoder)
 {
-	return nvenc_create_base(CODEC_HEVC, settings, encoder);
+	return nvenc_create_base(CODEC_HEVC, settings, encoder, true);
+}
+
+static void *hevc_nvenc_soft_create(obs_data_t *settings,
+				    obs_encoder_t *encoder)
+{
+	return nvenc_create_base(CODEC_HEVC, settings, encoder, false);
 }
 #endif
 
 static void *av1_nvenc_create(obs_data_t *settings, obs_encoder_t *encoder)
 {
-	return nvenc_create_base(CODEC_AV1, settings, encoder);
+	return nvenc_create_base(CODEC_AV1, settings, encoder, true);
+}
+
+static void *av1_nvenc_soft_create(obs_data_t *settings, obs_encoder_t *encoder)
+{
+	return nvenc_create_base(CODEC_AV1, settings, encoder, false);
 }
 
 static bool get_encoded_packet(struct nvenc_data *enc, bool finalize);
@@ -1232,6 +1375,9 @@ static void nvenc_destroy(void *data)
 	for (size_t i = 0; i < enc->textures.num; i++) {
 		nv_texture_free(enc, &enc->textures.array[i]);
 	}
+	for (size_t i = 0; i < enc->input_buffers.num; i++) {
+		nv_input_buf_free(enc, &enc->input_buffers.array[i]);
+	}
 	for (size_t i = 0; i < enc->bitstreams.num; i++) {
 		nv_bitstream_free(enc, &enc->bitstreams.array[i]);
 	}
@@ -1250,11 +1396,15 @@ static void nvenc_destroy(void *data)
 	if (enc->device) {
 		enc->device->lpVtbl->Release(enc->device);
 	}
+	if (enc->cu_ctx) {
+		cu->cuCtxDestroy(enc->cu_ctx);
+	}
 
 	bfree(enc->header);
 	bfree(enc->sei);
 	deque_free(&enc->dts_list);
 	da_free(enc->textures);
+	da_free(enc->input_buffers);
 	da_free(enc->bitstreams);
 	da_free(enc->input_textures);
 	da_free(enc->packet_data);
@@ -1322,7 +1472,8 @@ static bool get_encoded_packet(struct nvenc_data *enc, bool finalize)
 	for (size_t i = 0; i < count; i++) {
 		size_t cur_bs_idx = enc->cur_bitstream;
 		struct nv_bitstream *bs = &enc->bitstreams.array[cur_bs_idx];
-		struct nv_texture *nvtex = &enc->textures.array[cur_bs_idx];
+		struct nv_texture *nvtex =
+			enc->cuda ? NULL : &enc->textures.array[cur_bs_idx];
 
 		/* ---------------- */
 
@@ -1366,7 +1517,7 @@ static bool get_encoded_packet(struct nvenc_data *enc, bool finalize)
 
 		/* ---------------- */
 
-		if (nvtex->mapped_res) {
+		if (nvtex && nvtex->mapped_res) {
 			NVENCSTATUS err;
 			err = nv.nvEncUnmapInputResource(s, nvtex->mapped_res);
 			if (nv_failed(enc->encoder, err, __FUNCTION__,
@@ -1477,20 +1628,86 @@ static void add_roi(struct nvenc_data *enc, NV_ENC_PIC_PARAMS *params)
 	params->qpDeltaMapSize = (uint32_t)map_size;
 }
 
+static bool nvenc_encode_shared(struct nvenc_data *enc, struct nv_bitstream *bs,
+				void *pic, int64_t pts,
+				struct encoder_packet *packet,
+				bool *received_packet)
+{
+	NV_ENC_PIC_PARAMS params = {0};
+	params.version = enc->needs_compat_ver ? NV_ENC_PIC_PARAMS_COMPAT_VER
+					       : NV_ENC_PIC_PARAMS_VER;
+	params.pictureStruct = NV_ENC_PIC_STRUCT_FRAME;
+	params.inputBuffer = pic;
+	params.bufferFmt = obs_p010_tex_active()
+				   ? NV_ENC_BUFFER_FORMAT_YUV420_10BIT
+				   : NV_ENC_BUFFER_FORMAT_NV12;
+	params.inputTimeStamp = (uint64_t)pts;
+	params.inputWidth = enc->cx;
+	params.inputHeight = enc->cy;
+	params.inputPitch = enc->cx;
+	params.outputBitstream = bs->ptr;
+
+	/* Add ROI map if enabled */
+	if (obs_encoder_has_roi(enc->encoder))
+		add_roi(enc, &params);
+
+	NVENCSTATUS err = nv.nvEncEncodePicture(enc->session, &params);
+	if (err != NV_ENC_SUCCESS && err != NV_ENC_ERR_NEED_MORE_INPUT) {
+		nv_failed(enc->encoder, err, __FUNCTION__,
+			  "nvEncEncodePicture");
+		return false;
+	}
+
+	enc->encode_started = true;
+	enc->buffers_queued++;
+
+	if (++enc->next_bitstream == enc->buf_count) {
+		enc->next_bitstream = 0;
+	}
+
+	/* ------------------------------------ */
+	/* check for encoded packet and parse   */
+
+	if (!get_encoded_packet(enc, false)) {
+		return false;
+	}
+
+	/* ------------------------------------ */
+	/* output encoded packet                */
+
+	if (enc->packet_data.num) {
+		int64_t dts;
+		deque_pop_front(&enc->dts_list, &dts, sizeof(dts));
+
+		/* subtract bframe delay from dts */
+		dts -= (int64_t)enc->bframes * packet->timebase_num;
+
+		*received_packet = true;
+		packet->data = enc->packet_data.array;
+		packet->size = enc->packet_data.num;
+		packet->type = OBS_ENCODER_VIDEO;
+		packet->pts = enc->packet_pts;
+		packet->dts = dts;
+		packet->keyframe = enc->packet_keyframe;
+	} else {
+		*received_packet = false;
+	}
+
+	return true;
+}
+
 static bool nvenc_encode_tex(void *data, uint32_t handle, int64_t pts,
 			     uint64_t lock_key, uint64_t *next_key,
 			     struct encoder_packet *packet,
 			     bool *received_packet)
 {
 	struct nvenc_data *enc = data;
-	ID3D11Device *device = enc->device;
 	ID3D11DeviceContext *context = enc->context;
 	ID3D11Texture2D *input_tex;
 	ID3D11Texture2D *output_tex;
 	IDXGIKeyedMutex *km;
 	struct nv_texture *nvtex;
 	struct nv_bitstream *bs;
-	NVENCSTATUS err;
 
 	if (handle == GS_INVALID_HANDLE) {
 		error("Encode failed: bad texture handle");
@@ -1535,67 +1752,86 @@ static bool nvenc_encode_tex(void *data, uint32_t handle, int64_t pts,
 	/* ------------------------------------ */
 	/* do actual encode call                */
 
-	NV_ENC_PIC_PARAMS params = {0};
-	params.version = enc->needs_compat_ver ? NV_ENC_PIC_PARAMS_COMPAT_VER
-					       : NV_ENC_PIC_PARAMS_VER;
-	params.pictureStruct = NV_ENC_PIC_STRUCT_FRAME;
-	params.inputBuffer = nvtex->mapped_res;
-	params.bufferFmt = obs_p010_tex_active()
-				   ? NV_ENC_BUFFER_FORMAT_YUV420_10BIT
-				   : NV_ENC_BUFFER_FORMAT_NV12;
-	params.inputTimeStamp = (uint64_t)pts;
-	params.inputWidth = enc->cx;
-	params.inputHeight = enc->cy;
-	params.inputPitch = enc->cx;
-	params.outputBitstream = bs->ptr;
+	return nvenc_encode_shared(enc, bs, nvtex->mapped_res, pts, packet,
+				   received_packet);
+}
 
-	/* Add ROI map if enabled */
-	if (obs_encoder_has_roi(enc->encoder))
-		add_roi(enc, &params);
+static inline void nvenc_copy_frame(struct nvenc_data *enc,
+				    struct nv_input_buf *buf,
+				    struct encoder_frame *frame,
+				    NV_ENC_LOCK_INPUT_BUFFER *lock)
+{
+	size_t height = enc->cy;
+	size_t line_size = enc->cx;
+	uint8_t *ptr = lock->bufferDataPtr;
 
-	err = nv.nvEncEncodePicture(enc->session, &params);
-	if (err != NV_ENC_SUCCESS && err != NV_ENC_ERR_NEED_MORE_INPUT) {
-		nv_failed(enc->encoder, err, __FUNCTION__,
-			  "nvEncEncodePicture");
-		return false;
+	// ToDo RGB/444
+
+	if (buf->format == NV_ENC_BUFFER_FORMAT_YUV420_10BIT)
+		line_size *= 2;
+
+	// Copy Y plane
+	for (size_t i = 0; i < height; i++) {
+		memcpy(ptr, frame->data[0] + i * frame->linesize[0], line_size);
+		ptr += lock->pitch;
 	}
 
-	enc->encode_started = true;
-	enc->buffers_queued++;
-
-	if (++enc->next_bitstream == enc->buf_count) {
-		enc->next_bitstream = 0;
+	// Copy UV plane
+	for (size_t i = 0; i < height / 2; i++) {
+		memcpy(ptr, frame->data[1] + i * frame->linesize[1], line_size);
+		ptr += lock->pitch;
 	}
+}
+
+static bool nvenc_encode_soft(void *data, struct encoder_frame *frame,
+			      struct encoder_packet *packet,
+			      bool *received_packet)
+{
+	struct nvenc_data *enc = data;
+	struct nv_input_buf *buf;
+	struct nv_bitstream *bs;
+
+	bs = &enc->bitstreams.array[enc->next_bitstream];
+	buf = &enc->input_buffers.array[enc->next_bitstream];
+
+	deque_push_back(&enc->dts_list, &frame->pts, sizeof(frame->pts));
 
 	/* ------------------------------------ */
-	/* check for encoded packet and parse   */
+	/* copy to input buffer                 */
 
-	if (!get_encoded_packet(enc, false)) {
+	NV_ENC_LOCK_INPUT_BUFFER lock = {0};
+	lock.version = NV_ENC_LOCK_INPUT_BUFFER_VER;
+	lock.inputBuffer = buf->ptr;
+
+	if (NV_FAILED(nv.nvEncLockInputBuffer(enc->session, &lock)))
 		return false;
-	}
+
+	nvenc_copy_frame(enc, buf, frame, &lock);
+
+	if (NV_FAILED(nv.nvEncUnlockInputBuffer(enc->session, buf->ptr)))
+		return false;
 
 	/* ------------------------------------ */
-	/* output encoded packet                */
+	/* do actual encode call                */
 
-	if (enc->packet_data.num) {
-		int64_t dts;
-		deque_pop_front(&enc->dts_list, &dts, sizeof(dts));
+	return nvenc_encode_shared(enc, bs, buf->ptr, frame->pts, packet,
+				   received_packet);
+}
 
-		/* subtract bframe delay from dts */
-		dts -= (int64_t)enc->bframes * packet->timebase_num;
+static void nvenc_soft_video_info(void *data, struct video_scale_info *info)
+{
+	struct nvenc_data *enc = data;
 
-		*received_packet = true;
-		packet->data = enc->packet_data.array;
-		packet->size = enc->packet_data.num;
-		packet->type = OBS_ENCODER_VIDEO;
-		packet->pts = enc->packet_pts;
-		packet->dts = dts;
-		packet->keyframe = enc->packet_keyframe;
-	} else {
-		*received_packet = false;
+	// ToDO RGB/444 support
+	switch (info->format) {
+	case VIDEO_FORMAT_I010:
+	case VIDEO_FORMAT_P010:
+		info->format = enc->codec != CODEC_H264 ? VIDEO_FORMAT_P010
+							: VIDEO_FORMAT_NV12;
+		break;
+	default:
+		info->format = VIDEO_FORMAT_NV12;
 	}
-
-	return true;
 }
 
 extern void h264_nvenc_defaults(obs_data_t *settings);
@@ -1650,6 +1886,29 @@ struct obs_encoder_info h264_nvenc_info = {
 	.get_sei_data = nvenc_sei_data,
 };
 
+struct obs_encoder_info h264_nvenc_soft_info = {
+	.id = "h264_fallback_nvenc",
+	.codec = "h264",
+	.type = OBS_ENCODER_VIDEO,
+#ifdef _WIN32
+	.caps = OBS_ENCODER_CAP_DYN_BITRATE | OBS_ENCODER_CAP_ROI |
+		OBS_ENCODER_CAP_INTERNAL,
+	.get_name = h264_nvenc_soft_get_name,
+#else
+	.caps = OBS_ENCODER_CAP_DYN_BITRATE | OBS_ENCODER_CAP_ROI,
+	.get_name = h264_nvenc_get_name,
+#endif
+	.create = h264_nvenc_soft_create,
+	.destroy = nvenc_destroy,
+	.update = nvenc_update,
+	.encode = nvenc_encode_soft,
+	.get_defaults = h264_nvenc_defaults,
+	.get_properties = h264_nvenc_properties,
+	.get_extra_data = nvenc_extra_data,
+	.get_sei_data = nvenc_sei_data,
+	.get_video_info = nvenc_soft_video_info,
+};
+
 #ifdef ENABLE_HEVC
 struct obs_encoder_info hevc_nvenc_info = {
 	.id = "jim_hevc_nvenc",
@@ -1667,6 +1926,29 @@ struct obs_encoder_info hevc_nvenc_info = {
 	.get_extra_data = nvenc_extra_data,
 	.get_sei_data = nvenc_sei_data,
 };
+
+struct obs_encoder_info hevc_nvenc_soft_info = {
+	.id = "hevc_fallback_nvenc",
+	.codec = "hevc",
+	.type = OBS_ENCODER_VIDEO,
+#ifdef _WIN32
+	.caps = OBS_ENCODER_CAP_DYN_BITRATE | OBS_ENCODER_CAP_ROI |
+		OBS_ENCODER_CAP_INTERNAL,
+	.get_name = hevc_nvenc_soft_get_name,
+#else
+	.caps = OBS_ENCODER_CAP_DYN_BITRATE | OBS_ENCODER_CAP_ROI,
+	.get_name = hevc_nvenc_get_name,
+#endif
+	.create = hevc_nvenc_soft_create,
+	.destroy = nvenc_destroy,
+	.update = nvenc_update,
+	.encode = nvenc_encode_soft,
+	.get_defaults = hevc_nvenc_defaults,
+	.get_properties = hevc_nvenc_properties,
+	.get_extra_data = nvenc_extra_data,
+	.get_sei_data = nvenc_sei_data,
+	.get_video_info = nvenc_soft_video_info,
+};
 #endif
 
 struct obs_encoder_info av1_nvenc_info = {
@@ -1683,4 +1965,26 @@ struct obs_encoder_info av1_nvenc_info = {
 	.get_defaults = av1_nvenc_defaults,
 	.get_properties = av1_nvenc_properties,
 	.get_extra_data = nvenc_extra_data,
+};
+
+struct obs_encoder_info av1_nvenc_soft_info = {
+	.id = "av1_fallback_nvenc",
+	.codec = "av1",
+	.type = OBS_ENCODER_VIDEO,
+#ifdef _WIN32
+	.caps = OBS_ENCODER_CAP_DYN_BITRATE | OBS_ENCODER_CAP_ROI |
+		OBS_ENCODER_CAP_INTERNAL,
+	.get_name = av1_nvenc_soft_get_name,
+#else
+	.caps = OBS_ENCODER_CAP_DYN_BITRATE | OBS_ENCODER_CAP_ROI,
+	.get_name = av1_nvenc_get_name,
+#endif
+	.create = av1_nvenc_soft_create,
+	.destroy = nvenc_destroy,
+	.update = nvenc_update,
+	.encode = nvenc_encode_soft,
+	.get_defaults = av1_nvenc_defaults,
+	.get_properties = av1_nvenc_properties,
+	.get_extra_data = nvenc_extra_data,
+	.get_video_info = nvenc_soft_video_info,
 };
