@@ -7,9 +7,11 @@
 #include <util/pipe.h>
 
 static void *nvenc_lib = NULL;
+static void *cuda_lib = NULL;
 static pthread_mutex_t init_mutex = PTHREAD_MUTEX_INITIALIZER;
 NV_ENCODE_API_FUNCTION_LIST nv = {NV_ENCODE_API_FUNCTION_LIST_VER};
 NV_CREATE_INSTANCE_FUNC nv_create_instance = NULL;
+CudaFunctions *cu = NULL;
 
 #define error(format, ...) blog(LOG_ERROR, "[obs-nvenc] " format, ##__VA_ARGS__)
 
@@ -107,6 +109,21 @@ bool load_nvenc_lib(void)
 static void *load_nv_func(const char *func)
 {
 	void *func_ptr = os_dlsym(nvenc_lib, func);
+	if (!func_ptr) {
+		error("Could not load function: %s", func);
+	}
+	return func_ptr;
+}
+
+bool load_cuda_lib(void)
+{
+	cuda_lib = os_dlopen("nvcuda.dll");
+	return cuda_lib != NULL;
+}
+
+static void *load_cuda_func(const char *func)
+{
+	void *func_ptr = os_dlsym(cuda_lib, func);
 	if (!func_ptr) {
 		error("Could not load function: %s", func);
 	}
@@ -227,6 +244,41 @@ static inline bool init_nvenc_internal(obs_encoder_t *encoder)
 	return true;
 }
 
+static inline bool init_cuda_internal(obs_encoder_t *encoder)
+{
+	static bool initialized = false;
+	static bool success = false;
+
+	if (initialized)
+		return success;
+	initialized = true;
+
+	if (!load_cuda_lib()) {
+		obs_encoder_set_last_error(encoder,
+					   "Loading CUDA library failed.");
+		return false;
+	}
+
+	cu = bzalloc(sizeof(CudaFunctions));
+	cu->cuInit = (tcuInit *)load_cuda_func("cuInit");
+	cu->cuDeviceGetCount =
+		(tcuDeviceGetCount *)load_cuda_func("cuDeviceGetCount");
+	cu->cuDeviceGet = (tcuDeviceGet *)load_cuda_func("cuDeviceGet");
+	cu->cuCtxCreate = (tcuCtxCreate_v2 *)load_cuda_func("cuCtxCreate_v2");
+	cu->cuCtxDestroy =
+		(tcuCtxDestroy_v2 *)load_cuda_func("cuCtxDestroy_v2");
+
+	if (!cu->cuInit || !cu->cuDeviceGetCount || !cu->cuDeviceGet ||
+	    !cu->cuCtxCreate || !cu->cuCtxDestroy) {
+		obs_encoder_set_last_error(encoder,
+					   "Loading CUDA functions failed.");
+		return false;
+	}
+
+	success = true;
+	return true;
+}
+
 bool init_nvenc(obs_encoder_t *encoder)
 {
 	bool success;
@@ -238,11 +290,25 @@ bool init_nvenc(obs_encoder_t *encoder)
 	return success;
 }
 
+bool init_cuda(obs_encoder_t *encoder)
+{
+	bool success;
+
+	pthread_mutex_lock(&init_mutex);
+	success = init_cuda_internal(encoder);
+	pthread_mutex_unlock(&init_mutex);
+
+	return success;
+}
+
 extern struct obs_encoder_info h264_nvenc_info;
+extern struct obs_encoder_info h264_nvenc_soft_info;
 #ifdef ENABLE_HEVC
 extern struct obs_encoder_info hevc_nvenc_info;
+extern struct obs_encoder_info hevc_nvenc_soft_info;
 #endif
 extern struct obs_encoder_info av1_nvenc_info;
+extern struct obs_encoder_info av1_nvenc_soft_info;
 
 static bool enum_luids(void *param, uint32_t idx, uint64_t luid)
 {
@@ -323,19 +389,26 @@ fail:
 void obs_nvenc_load(bool h264, bool hevc, bool av1)
 {
 	pthread_mutex_init(&init_mutex, NULL);
-	if (h264)
+	if (h264) {
 		obs_register_encoder(&h264_nvenc_info);
+		obs_register_encoder(&h264_nvenc_soft_info);
+	}
 #ifdef ENABLE_HEVC
-	if (hevc)
+	if (hevc) {
 		obs_register_encoder(&hevc_nvenc_info);
+		obs_register_encoder(&hevc_nvenc_soft_info);
+	}
 #endif
-	if (av1 && av1_supported())
+	if (av1 && av1_supported()) {
 		obs_register_encoder(&av1_nvenc_info);
-	else
+		obs_register_encoder(&av1_nvenc_soft_info);
+	} else {
 		blog(LOG_WARNING, "[NVENC] AV1 is not supported");
+	}
 }
 
 void obs_nvenc_unload(void)
 {
+	bfree(cu);
 	pthread_mutex_destroy(&init_mutex);
 }
