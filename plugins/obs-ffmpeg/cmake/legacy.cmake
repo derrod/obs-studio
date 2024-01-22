@@ -112,6 +112,13 @@ elseif(OS_POSIX AND NOT OS_MACOS)
   find_package(Libpci REQUIRED)
   target_sources(obs-ffmpeg PRIVATE obs-ffmpeg-vaapi.c vaapi-utils.c vaapi-utils.h)
   target_link_libraries(obs-ffmpeg PRIVATE Libva::va Libva::drm LIBPCI::LIBPCI)
+
+  find_package(FFnvcodec 12)
+  if(FFNVCODEC_FOUND)
+    target_sources(obs-ffmpeg PRIVATE obs-nvenc.c obs-nvenc.h obs-nvenc-helpers.c obs-nvenc-ver.h)
+    target_link_libraries(obs-ffmpeg PRIVATE FFnvcodec::FFnvcodec)
+    target_compile_definitions(obs-ffmpeg PRIVATE NVCODEC_AVAILABLE)
+  endif()
 endif()
 
 setup_plugin_target(obs-ffmpeg)

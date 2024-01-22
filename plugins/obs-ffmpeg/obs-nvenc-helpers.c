@@ -2,9 +2,12 @@
 #include <util/platform.h>
 #include <util/threading.h>
 #include <util/config-file.h>
-#include <util/windows/device-enum.h>
 #include <util/dstr.h>
 #include <util/pipe.h>
+
+#ifdef _WIN32
+#include <util/windows/device-enum.h>
+#endif
 
 static void *nvenc_lib = NULL;
 static void *cuda_lib = NULL;
@@ -17,6 +20,8 @@ CudaFunctions *cu = NULL;
 
 bool nv_fail2(obs_encoder_t *encoder, void *session, const char *format, ...)
 {
+	UNUSED_PARAMETER(session);
+
 	struct dstr message = {0};
 	struct dstr error_message = {0};
 
@@ -100,9 +105,11 @@ bool nv_failed2(obs_encoder_t *encoder, void *session, NVENCSTATUS err,
 
 bool load_nvenc_lib(void)
 {
-	const char *const file = (sizeof(void *) == 8) ? "nvEncodeAPI64.dll"
-						       : "nvEncodeAPI.dll";
-	nvenc_lib = os_dlopen(file);
+#ifdef _WIN32
+	nvenc_lib = os_dlopen("nvEncodeAPI64.dll");
+#else
+	nvenc_lib = os_dlopen("libnvidia-encode.so.1");
+#endif
 	return nvenc_lib != NULL;
 }
 
@@ -117,7 +124,11 @@ static void *load_nv_func(const char *func)
 
 bool load_cuda_lib(void)
 {
+#ifdef _WIN32
 	cuda_lib = os_dlopen("nvcuda.dll");
+#else
+	cuda_lib = os_dlopen("libcuda.so.1");
+#endif
 	return cuda_lib != NULL;
 }
 
@@ -301,15 +312,21 @@ bool init_cuda(obs_encoder_t *encoder)
 	return success;
 }
 
+#ifdef _WIN32
 extern struct obs_encoder_info h264_nvenc_info;
-extern struct obs_encoder_info h264_nvenc_soft_info;
 #ifdef ENABLE_HEVC
 extern struct obs_encoder_info hevc_nvenc_info;
-extern struct obs_encoder_info hevc_nvenc_soft_info;
 #endif
 extern struct obs_encoder_info av1_nvenc_info;
+#endif
+
+extern struct obs_encoder_info h264_nvenc_soft_info;
+#ifdef ENABLE_HEVC
+extern struct obs_encoder_info hevc_nvenc_soft_info;
+#endif
 extern struct obs_encoder_info av1_nvenc_soft_info;
 
+#ifdef _WIN32
 static bool enum_luids(void *param, uint32_t idx, uint64_t luid)
 {
 	struct dstr *cmd = param;
@@ -385,22 +402,34 @@ fail:
 
 	return av1_supported;
 }
+#else
+bool av1_supported()
+{
+	return get_nvenc_ver() >= ((12 << 4) | 0);
+}
+#endif
 
 void obs_nvenc_load(bool h264, bool hevc, bool av1)
 {
 	pthread_mutex_init(&init_mutex, NULL);
 	if (h264) {
+#ifdef _WIN32
 		obs_register_encoder(&h264_nvenc_info);
+#endif
 		obs_register_encoder(&h264_nvenc_soft_info);
 	}
 #ifdef ENABLE_HEVC
 	if (hevc) {
+#ifdef _WIN32
 		obs_register_encoder(&hevc_nvenc_info);
+#endif
 		obs_register_encoder(&hevc_nvenc_soft_info);
 	}
 #endif
 	if (av1 && av1_supported()) {
+#ifdef _WIN32
 		obs_register_encoder(&av1_nvenc_info);
+#endif
 		obs_register_encoder(&av1_nvenc_soft_info);
 	} else {
 		blog(LOG_WARNING, "[NVENC] AV1 is not supported");
