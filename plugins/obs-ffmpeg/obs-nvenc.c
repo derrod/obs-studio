@@ -1181,6 +1181,22 @@ static bool init_cuda_ctx(struct nvenc_data *enc, obs_data_t *settings)
 	return true;
 }
 
+static enum video_format get_preferred_format(enum video_format format)
+{
+	switch (format) {
+	case VIDEO_FORMAT_I010:
+	case VIDEO_FORMAT_P010:
+		return VIDEO_FORMAT_P010;
+	case VIDEO_FORMAT_RGBA:
+	case VIDEO_FORMAT_BGRA:
+	case VIDEO_FORMAT_BGRX:
+	case VIDEO_FORMAT_I444:
+		return VIDEO_FORMAT_I444;
+	default:
+		return VIDEO_FORMAT_NV12;
+	}
+}
+
 static void nvenc_destroy(void *data);
 
 static bool init_specific_encoder(struct nvenc_data *enc, obs_data_t *settings,
@@ -1211,7 +1227,7 @@ static bool init_encoder(struct nvenc_data *enc, enum codec_type codec,
 
 	video_t *video = obs_encoder_video(enc->encoder);
 	const struct video_output_info *voi = video_output_get_info(video);
-	enc->in_format = voi->format;
+	enc->in_format = get_preferred_format(voi->format);
 
 	if (is_10_bit(enc) && !support_10bit) {
 		NV_FAIL(obs_module_text("NVENC.10bitUnsupported"));
@@ -1922,22 +1938,8 @@ static bool nvenc_encode_soft(void *data, struct encoder_frame *frame,
 
 static void nvenc_soft_video_info(void *data, struct video_scale_info *info)
 {
-	UNUSED_PARAMETER(data);
-
-	switch (info->format) {
-	case VIDEO_FORMAT_I010:
-	case VIDEO_FORMAT_P010:
-		info->format = VIDEO_FORMAT_P010;
-		break;
-	case VIDEO_FORMAT_RGBA:
-	case VIDEO_FORMAT_BGRA:
-	case VIDEO_FORMAT_BGRX:
-	case VIDEO_FORMAT_I444:
-		info->format = VIDEO_FORMAT_I444;
-		break;
-	default:
-		info->format = VIDEO_FORMAT_NV12;
-	}
+	struct nvenc_data *enc = data;
+	info->format = enc->in_format;
 }
 
 extern void h264_nvenc_defaults(obs_data_t *settings);
