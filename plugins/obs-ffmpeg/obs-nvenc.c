@@ -122,6 +122,7 @@ struct nvenc_data {
 
 	DARRAY(struct nv_bitstream) bitstreams;
 	DARRAY(struct nv_input_buf) input_buffers;
+	NV_ENC_BUFFER_FORMAT input_buffer_format;
 	struct deque dts_list;
 
 	DARRAY(uint8_t) packet_data;
@@ -137,6 +138,7 @@ struct nvenc_data {
 
 	uint32_t cx;
 	uint32_t cy;
+	enum video_format in_format;
 
 	uint8_t *header;
 	size_t header_size;
@@ -255,25 +257,21 @@ static void nv_texture_free(struct nvenc_data *enc, struct nv_texture *nvtex)
 
 struct nv_input_buf {
 	NV_ENC_INPUT_PTR ptr;
-	NV_ENC_BUFFER_FORMAT format;
 };
 
 static bool nv_input_buf_init(struct nvenc_data *enc,
 			      struct nv_input_buf *nvbuf)
 {
-	const bool p010 = obs_p010_tex_active();
 	NV_ENC_CREATE_INPUT_BUFFER bufParams = {0};
 	bufParams.version = NV_ENC_CREATE_INPUT_BUFFER_VER;
 	bufParams.width = enc->cx;
 	bufParams.height = enc->cy;
-	bufParams.bufferFmt = p010 ? NV_ENC_BUFFER_FORMAT_YUV420_10BIT
-				   : NV_ENC_BUFFER_FORMAT_NV12;
+	bufParams.bufferFmt = enc->input_buffer_format;
 
 	if (NV_FAILED(nv.nvEncCreateInputBuffer(enc->session, &bufParams)))
 		return false;
 
 	nvbuf->ptr = bufParams.inputBuffer;
-	nvbuf->format = bufParams.bufferFmt;
 
 	return true;
 }
@@ -534,6 +532,12 @@ static inline NV_ENC_MULTI_PASS get_nv_multipass(const char *multipass)
 	} else {
 		return NV_ENC_MULTI_PASS_DISABLED;
 	}
+}
+
+static bool is_10_bit(const struct nvenc_data *enc)
+{
+	return enc->cuda ? enc->in_format == VIDEO_FORMAT_P010
+			 : obs_p010_tex_active();
 }
 
 static bool init_encoder_base(struct nvenc_data *enc, obs_data_t *settings,
@@ -883,7 +887,10 @@ static bool init_encoder_h264(struct nvenc_data *enc, obs_data_t *settings,
 	/* -------------------------- */
 	/* profile                    */
 
-	if (astrcmpi(profile, "main") == 0) {
+	if (enc->in_format == VIDEO_FORMAT_I444) {
+		config->profileGUID = NV_ENC_H264_PROFILE_HIGH_444_GUID;
+		h264_config->chromaFormatIDC = 3;
+	} else if (astrcmpi(profile, "main") == 0) {
 		config->profileGUID = NV_ENC_H264_PROFILE_MAIN_GUID;
 	} else if (astrcmpi(profile, "baseline") == 0) {
 		config->profileGUID = NV_ENC_H264_PROFILE_BASELINE_GUID;
@@ -976,7 +983,7 @@ static bool init_encoder_hevc(struct nvenc_data *enc, obs_data_t *settings,
 		vui_params->chromaSampleLocationBot = 2;
 	}
 
-	hevc_config->pixelBitDepthMinus8 = obs_p010_tex_active() ? 2 : 0;
+	hevc_config->pixelBitDepthMinus8 = is_10_bit(enc) ? 2 : 0;
 
 	if (astrcmpi(rc, "cbr") == 0) {
 		hevc_config->outputBufferingPeriodSEI = 1;
@@ -987,9 +994,12 @@ static bool init_encoder_hevc(struct nvenc_data *enc, obs_data_t *settings,
 	/* -------------------------- */
 	/* profile                    */
 
-	if (astrcmpi(profile, "main10") == 0) {
+	if (enc->in_format == VIDEO_FORMAT_I444) {
+		config->profileGUID = NV_ENC_HEVC_PROFILE_FREXT_GUID;
+		hevc_config->chromaFormatIDC = 3;
+	} else if (astrcmpi(profile, "main10") == 0) {
 		config->profileGUID = NV_ENC_HEVC_PROFILE_MAIN10_GUID;
-	} else if (obs_p010_tex_active()) {
+	} else if (is_10_bit(enc)) {
 		blog(LOG_WARNING, "[obs-nvenc] Forcing main10 for P010");
 		config->profileGUID = NV_ENC_HEVC_PROFILE_MAIN10_GUID;
 	} else {
@@ -1069,7 +1079,7 @@ static bool init_encoder_av1(struct nvenc_data *enc, obs_data_t *settings,
 
 	av1_config->level = NV_ENC_LEVEL_AV1_AUTOSELECT;
 	av1_config->chromaFormatIDC = 1;
-	av1_config->pixelBitDepthMinus8 = obs_p010_tex_active() ? 2 : 0;
+	av1_config->pixelBitDepthMinus8 = is_10_bit(enc) ? 2 : 0;
 	av1_config->inputPixelBitDepthMinus8 = av1_config->pixelBitDepthMinus8;
 	av1_config->numFwdRefs = 1;
 	av1_config->numBwdRefs = 1;
@@ -1116,6 +1126,17 @@ static bool init_textures(struct nvenc_data *enc)
 
 static bool init_input_buffers(struct nvenc_data *enc)
 {
+	switch (enc->in_format) {
+	case VIDEO_FORMAT_P010:
+		enc->input_buffer_format = NV_ENC_BUFFER_FORMAT_YUV420_10BIT;
+		break;
+	case VIDEO_FORMAT_I444:
+		enc->input_buffer_format = NV_ENC_BUFFER_FORMAT_YUV444;
+		break;
+	default:
+		enc->input_buffer_format = NV_ENC_BUFFER_FORMAT_NV12;
+	}
+
 	da_reserve(enc->input_buffers, enc->buf_count);
 
 	for (uint32_t i = 0; i < enc->buf_count; i++) {
@@ -1188,13 +1209,15 @@ static bool init_encoder(struct nvenc_data *enc, enum codec_type codec,
 		nv_get_cap(enc, NV_ENC_CAPS_SUPPORT_10BIT_ENCODE);
 	const int bf_max = nv_get_cap(enc, NV_ENC_CAPS_NUM_MAX_BFRAMES);
 
-	if (obs_p010_tex_active() && !support_10bit) {
+	video_t *video = obs_encoder_video(enc->encoder);
+	const struct video_output_info *voi = video_output_get_info(video);
+	enc->in_format = voi->format;
+
+	if (is_10_bit(enc) && !support_10bit) {
 		NV_FAIL(obs_module_text("NVENC.10bitUnsupported"));
 		return false;
 	}
 
-	video_t *video = obs_encoder_video(enc->encoder);
-	const struct video_output_info *voi = video_output_get_info(video);
 	switch (voi->format) {
 	case VIDEO_FORMAT_I010:
 	case VIDEO_FORMAT_P010:
@@ -1692,14 +1715,19 @@ static bool nvenc_encode_shared(struct nvenc_data *enc, struct nv_bitstream *bs,
 					       : NV_ENC_PIC_PARAMS_VER;
 	params.pictureStruct = NV_ENC_PIC_STRUCT_FRAME;
 	params.inputBuffer = pic;
-	params.bufferFmt = obs_p010_tex_active()
-				   ? NV_ENC_BUFFER_FORMAT_YUV420_10BIT
-				   : NV_ENC_BUFFER_FORMAT_NV12;
 	params.inputTimeStamp = (uint64_t)pts;
 	params.inputWidth = enc->cx;
 	params.inputHeight = enc->cy;
 	params.inputPitch = enc->cx;
 	params.outputBitstream = bs->ptr;
+
+	if (enc->cuda) {
+		params.bufferFmt = enc->input_buffer_format;
+	} else {
+		params.bufferFmt = obs_p010_tex_active()
+					   ? NV_ENC_BUFFER_FORMAT_YUV420_10BIT
+					   : NV_ENC_BUFFER_FORMAT_NV12;
+	}
 
 	/* Add ROI map if enabled */
 	if (obs_encoder_has_roi(enc->encoder))
@@ -1812,8 +1840,23 @@ static bool nvenc_encode_tex(void *data, uint32_t handle, int64_t pts,
 }
 #endif
 
+static inline void copy_plane(uint8_t *src, uint8_t **dst, size_t linesize_src,
+			      size_t linesize_dst, size_t linesize,
+			      size_t lines)
+{
+	if (linesize_dst == linesize_src) {
+		size_t size = linesize_dst * lines;
+		memcpy(*dst, src, size);
+		*dst += size;
+	} else {
+		for (size_t i = 0; i < lines; i++) {
+			memcpy(*dst, src + i * linesize_src, linesize);
+			*dst += linesize_dst;
+		}
+	}
+}
+
 static inline void nvenc_copy_frame(struct nvenc_data *enc,
-				    struct nv_input_buf *buf,
 				    struct encoder_frame *frame,
 				    NV_ENC_LOCK_INPUT_BUFFER *lock)
 {
@@ -1821,21 +1864,24 @@ static inline void nvenc_copy_frame(struct nvenc_data *enc,
 	size_t line_size = enc->cx;
 	uint8_t *ptr = lock->bufferDataPtr;
 
-	// ToDo RGB/444
-
-	if (buf->format == NV_ENC_BUFFER_FORMAT_YUV420_10BIT)
-		line_size *= 2;
-
-	// Copy Y plane
-	for (size_t i = 0; i < height; i++) {
-		memcpy(ptr, frame->data[0] + i * frame->linesize[0], line_size);
-		ptr += lock->pitch;
-	}
-
-	// Copy UV plane
-	for (size_t i = 0; i < height / 2; i++) {
-		memcpy(ptr, frame->data[1] + i * frame->linesize[1], line_size);
-		ptr += lock->pitch;
+	if (enc->input_buffer_format == NV_ENC_BUFFER_FORMAT_NV12) {
+		copy_plane(frame->data[0], &ptr, frame->linesize[0],
+			   lock->pitch, line_size, height);
+		copy_plane(frame->data[1], &ptr, frame->linesize[1],
+			   lock->pitch, line_size, height / 2);
+	} else if (enc->input_buffer_format ==
+		   NV_ENC_BUFFER_FORMAT_YUV420_10BIT) {
+		copy_plane(frame->data[0], &ptr, frame->linesize[0],
+			   lock->pitch, line_size * 2, height);
+		copy_plane(frame->data[1], &ptr, frame->linesize[1],
+			   lock->pitch, line_size * 2, height / 2);
+	} else {
+		copy_plane(frame->data[0], &ptr, frame->linesize[0],
+			   lock->pitch, line_size, height);
+		copy_plane(frame->data[1], &ptr, frame->linesize[1],
+			   lock->pitch, line_size, height);
+		copy_plane(frame->data[2], &ptr, frame->linesize[2],
+			   lock->pitch, line_size, height);
 	}
 }
 
@@ -1862,7 +1908,7 @@ static bool nvenc_encode_soft(void *data, struct encoder_frame *frame,
 	if (NV_FAILED(nv.nvEncLockInputBuffer(enc->session, &lock)))
 		return false;
 
-	nvenc_copy_frame(enc, buf, frame, &lock);
+	nvenc_copy_frame(enc, frame, &lock);
 
 	if (NV_FAILED(nv.nvEncUnlockInputBuffer(enc->session, buf->ptr)))
 		return false;
@@ -1876,14 +1922,18 @@ static bool nvenc_encode_soft(void *data, struct encoder_frame *frame,
 
 static void nvenc_soft_video_info(void *data, struct video_scale_info *info)
 {
-	struct nvenc_data *enc = data;
+	UNUSED_PARAMETER(data);
 
-	// ToDO RGB/444 support
 	switch (info->format) {
 	case VIDEO_FORMAT_I010:
 	case VIDEO_FORMAT_P010:
-		info->format = enc->codec != CODEC_H264 ? VIDEO_FORMAT_P010
-							: VIDEO_FORMAT_NV12;
+		info->format = VIDEO_FORMAT_P010;
+		break;
+	case VIDEO_FORMAT_RGBA:
+	case VIDEO_FORMAT_BGRA:
+	case VIDEO_FORMAT_BGRX:
+	case VIDEO_FORMAT_I444:
+		info->format = VIDEO_FORMAT_I444;
 		break;
 	default:
 		info->format = VIDEO_FORMAT_NV12;
