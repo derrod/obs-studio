@@ -255,7 +255,45 @@ static inline bool init_nvenc_internal(obs_encoder_t *encoder)
 	return true;
 }
 
-static inline bool init_cuda_internal(obs_encoder_t *encoder)
+typedef struct cuda_function {
+	ptrdiff_t offset;
+	const char *name;
+} cuda_function;
+
+static const cuda_function cuda_functions[] = {
+	{offsetof(CudaFunctions, cuInit), "cuInit"},
+
+	{offsetof(CudaFunctions, cuDeviceGetCount), "cuDeviceGetCount"},
+	{offsetof(CudaFunctions, cuDeviceGet), "cuDeviceGet"},
+
+	{offsetof(CudaFunctions, cuCtxCreate), "cuCtxCreate_v2"},
+	{offsetof(CudaFunctions, cuCtxDestroy), "cuCtxDestroy_v2"},
+	{offsetof(CudaFunctions, cuCtxPushCurrent), "cuCtxPushCurrent_v2"},
+	{offsetof(CudaFunctions, cuCtxPopCurrent), "cuCtxPopCurrent_v2"},
+
+#ifndef _WIN32
+	{offsetof(CudaFunctions, cuMemAllocPitch), "cuMemAllocPitch_v2"},
+	{offsetof(CudaFunctions, cuMemFree), "cuMemFree_v2"},
+	{offsetof(CudaFunctions, cuMemcpy2D), "cuMemcpy2D_v2"},
+	{offsetof(CudaFunctions, cuGraphicsGLRegisterImage),
+	 "cuGraphicsGLRegisterImage"},
+	{offsetof(CudaFunctions, cuGraphicsUnregisterResource),
+	 "cuGraphicsUnregisterResource"},
+	{offsetof(CudaFunctions, cuGraphicsMapResources),
+	 "cuGraphicsMapResources"},
+	{offsetof(CudaFunctions, cuGraphicsUnmapResources),
+	 "cuGraphicsUnmapResources"},
+	{offsetof(CudaFunctions, cuGraphicsResourceGetMappedPointer),
+	 "cuGraphicsResourceGetMappedPointer_v2"},
+	{offsetof(CudaFunctions, cuGraphicsSubResourceGetMappedArray),
+	 "cuGraphicsSubResourceGetMappedArray"},
+#endif
+};
+
+static const size_t num_cuda_funcs =
+	sizeof(cuda_functions) / sizeof(cuda_function);
+
+static bool init_cuda_internal(obs_encoder_t *encoder)
 {
 	static bool initialized = false;
 	static bool success = false;
@@ -271,58 +309,19 @@ static inline bool init_cuda_internal(obs_encoder_t *encoder)
 	}
 
 	cu = bzalloc(sizeof(CudaFunctions));
-	cu->cuInit = (tcuInit *)load_cuda_func("cuInit");
-	cu->cuDeviceGetCount =
-		(tcuDeviceGetCount *)load_cuda_func("cuDeviceGetCount");
-	cu->cuDeviceGet = (tcuDeviceGet *)load_cuda_func("cuDeviceGet");
-	cu->cuCtxCreate = (tcuCtxCreate_v2 *)load_cuda_func("cuCtxCreate_v2");
-	cu->cuCtxDestroy =
-		(tcuCtxDestroy_v2 *)load_cuda_func("cuCtxDestroy_v2");
-	cu->cuCtxPushCurrent =
-		(tcuCtxPushCurrent_v2 *)load_cuda_func("cuCtxPushCurrent_v2");
-	cu->cuCtxPopCurrent =
-		(tcuCtxPopCurrent_v2 *)load_cuda_func("cuCtxPopCurrent_v2");
 
-#ifndef _WIN32
-	cu->cuMemAllocPitch =
-		(tcuMemAllocPitch_v2 *)load_cuda_func("cuMemAllocPitch_v2");
-	cu->cuMemFree = (tcuMemFree_v2 *)load_cuda_func("cuMemFree_v2");
+	for (size_t idx = 0; idx < num_cuda_funcs; idx++) {
+		const cuda_function func = cuda_functions[idx];
+		void *fptr = load_cuda_func(func.name);
 
-	cu->cuGraphicsGLRegisterImage =
-		(tcuGraphicsGLRegisterImage *)load_cuda_func(
-			"cuGraphicsGLRegisterImage");
-	cu->cuGraphicsUnregisterResource =
-		(tcuGraphicsUnregisterResource *)load_cuda_func(
-			"cuGraphicsUnregisterResource");
-	cu->cuGraphicsMapResources = (tcuGraphicsMapResources *)load_cuda_func(
-		"cuGraphicsMapResources");
-	cu->cuGraphicsUnmapResources =
-		(tcuGraphicsUnmapResources *)load_cuda_func(
-			"cuGraphicsUnmapResources");
-	cu->cuGraphicsResourceGetMappedPointer =
-		(tcuGraphicsResourceGetMappedPointer *)load_cuda_func(
-			"cuGraphicsResourceGetMappedPointer_v2");
-	cu->cuGraphicsSubResourceGetMappedArray =
-		(tcuGraphicsSubResourceGetMappedArray *)load_cuda_func(
-			"cuGraphicsSubResourceGetMappedArray");
-	cu->cuMemcpy2D = (tcuMemcpy2D_v2 *)load_cuda_func("cuMemcpy2D_v2");
-#endif
+		if (!fptr) {
+			error("Failed to find CUDA function: %s", func.name);
+			obs_encoder_set_last_error(
+				encoder, "Loading CUDA functions failed.");
+			return false;
+		}
 
-	if (!cu->cuInit || !cu->cuDeviceGetCount || !cu->cuDeviceGet ||
-	    !cu->cuCtxCreate || !cu->cuCtxDestroy || !cu->cuCtxPushCurrent ||
-	    !cu->cuCtxPopCurrent
-#ifndef _WIN32
-	    || !cu->cuMemAllocPitch || !cu->cuMemFree ||
-	    !cu->cuGraphicsGLRegisterImage ||
-	    !cu->cuGraphicsUnregisterResource || !cu->cuGraphicsMapResources ||
-	    !cu->cuGraphicsUnmapResources ||
-	    !cu->cuGraphicsResourceGetMappedPointer ||
-	    !cu->cuGraphicsSubResourceGetMappedArray || !cu->cuMemcpy2D
-#endif
-	) {
-		obs_encoder_set_last_error(encoder,
-					   "Loading CUDA functions failed.");
-		return false;
+		*(uintptr_t *)((uintptr_t)cu + func.offset) = (uintptr_t)fptr;
 	}
 
 	success = true;
