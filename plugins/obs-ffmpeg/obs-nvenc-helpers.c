@@ -278,9 +278,48 @@ static inline bool init_cuda_internal(obs_encoder_t *encoder)
 	cu->cuCtxCreate = (tcuCtxCreate_v2 *)load_cuda_func("cuCtxCreate_v2");
 	cu->cuCtxDestroy =
 		(tcuCtxDestroy_v2 *)load_cuda_func("cuCtxDestroy_v2");
+	cu->cuCtxPushCurrent =
+		(tcuCtxPushCurrent_v2 *)load_cuda_func("cuCtxPushCurrent_v2");
+	cu->cuCtxPopCurrent =
+		(tcuCtxPopCurrent_v2 *)load_cuda_func("cuCtxPopCurrent_v2");
+
+#ifndef _WIN32
+	cu->cuMemAllocPitch =
+		(tcuMemAllocPitch_v2 *)load_cuda_func("cuMemAllocPitch_v2");
+	cu->cuMemFree = (tcuMemFree_v2 *)load_cuda_func("cuMemFree_v2");
+
+	cu->cuGraphicsGLRegisterImage =
+		(tcuGraphicsGLRegisterImage *)load_cuda_func(
+			"cuGraphicsGLRegisterImage");
+	cu->cuGraphicsUnregisterResource =
+		(tcuGraphicsUnregisterResource *)load_cuda_func(
+			"cuGraphicsUnregisterResource");
+	cu->cuGraphicsMapResources = (tcuGraphicsMapResources *)load_cuda_func(
+		"cuGraphicsMapResources");
+	cu->cuGraphicsUnmapResources =
+		(tcuGraphicsUnmapResources *)load_cuda_func(
+			"cuGraphicsUnmapResources");
+	cu->cuGraphicsResourceGetMappedPointer =
+		(tcuGraphicsResourceGetMappedPointer *)load_cuda_func(
+			"cuGraphicsResourceGetMappedPointer_v2");
+	cu->cuGraphicsSubResourceGetMappedArray =
+		(tcuGraphicsSubResourceGetMappedArray *)load_cuda_func(
+			"cuGraphicsSubResourceGetMappedArray");
+	cu->cuMemcpy2D = (tcuMemcpy2D_v2 *)load_cuda_func("cuMemcpy2D_v2");
+#endif
 
 	if (!cu->cuInit || !cu->cuDeviceGetCount || !cu->cuDeviceGet ||
-	    !cu->cuCtxCreate || !cu->cuCtxDestroy) {
+	    !cu->cuCtxCreate || !cu->cuCtxDestroy || !cu->cuCtxPushCurrent ||
+	    !cu->cuCtxPopCurrent
+#ifndef _WIN32
+	    || !cu->cuMemAllocPitch || !cu->cuMemFree ||
+	    !cu->cuGraphicsGLRegisterImage ||
+	    !cu->cuGraphicsUnregisterResource || !cu->cuGraphicsMapResources ||
+	    !cu->cuGraphicsUnmapResources ||
+	    !cu->cuGraphicsResourceGetMappedPointer ||
+	    !cu->cuGraphicsSubResourceGetMappedArray || !cu->cuMemcpy2D
+#endif
+	) {
 		obs_encoder_set_last_error(encoder,
 					   "Loading CUDA functions failed.");
 		return false;
@@ -312,13 +351,11 @@ bool init_cuda(obs_encoder_t *encoder)
 	return success;
 }
 
-#ifdef _WIN32
 extern struct obs_encoder_info h264_nvenc_info;
 #ifdef ENABLE_HEVC
 extern struct obs_encoder_info hevc_nvenc_info;
 #endif
 extern struct obs_encoder_info av1_nvenc_info;
-#endif
 
 extern struct obs_encoder_info h264_nvenc_soft_info;
 #ifdef ENABLE_HEVC
@@ -413,23 +450,17 @@ void obs_nvenc_load(bool h264, bool hevc, bool av1)
 {
 	pthread_mutex_init(&init_mutex, NULL);
 	if (h264) {
-#ifdef _WIN32
 		obs_register_encoder(&h264_nvenc_info);
-#endif
 		obs_register_encoder(&h264_nvenc_soft_info);
 	}
 #ifdef ENABLE_HEVC
 	if (hevc) {
-#ifdef _WIN32
 		obs_register_encoder(&hevc_nvenc_info);
-#endif
 		obs_register_encoder(&hevc_nvenc_soft_info);
 	}
 #endif
 	if (av1 && av1_supported()) {
-#ifdef _WIN32
 		obs_register_encoder(&av1_nvenc_info);
-#endif
 		obs_register_encoder(&av1_nvenc_soft_info);
 	} else {
 		blog(LOG_WARNING, "[NVENC] AV1 is not supported");

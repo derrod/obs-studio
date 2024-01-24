@@ -13,10 +13,27 @@
 
 typedef struct CudaFunctions {
 	tcuInit *cuInit;
+
 	tcuDeviceGetCount *cuDeviceGetCount;
 	tcuDeviceGet *cuDeviceGet;
+
 	tcuCtxCreate_v2 *cuCtxCreate;
 	tcuCtxDestroy_v2 *cuCtxDestroy;
+	tcuCtxPushCurrent_v2 *cuCtxPushCurrent;
+	tcuCtxPopCurrent_v2 *cuCtxPopCurrent;
+
+#ifndef _WIN32
+	tcuMemAllocPitch_v2 *cuMemAllocPitch;
+	tcuMemFree_v2 *cuMemFree;
+	tcuMemcpy2D_v2 *cuMemcpy2D;
+	tcuGraphicsGLRegisterImage *cuGraphicsGLRegisterImage;
+	tcuGraphicsUnregisterResource *cuGraphicsUnregisterResource;
+	tcuGraphicsMapResources *cuGraphicsMapResources;
+	tcuGraphicsUnmapResources *cuGraphicsUnmapResources;
+	tcuGraphicsResourceGetMappedPointer *cuGraphicsResourceGetMappedPointer;
+	tcuGraphicsSubResourceGetMappedArray
+		*cuGraphicsSubResourceGetMappedArray;
+#endif
 } CudaFunctions;
 
 typedef NVENCSTATUS(NVENCAPI *NV_CREATE_INSTANCE_FUNC)(

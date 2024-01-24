@@ -13,6 +13,8 @@
 #include <dxgi.h>
 #include <d3d11.h>
 #include <d3d11_1.h>
+#else
+#include <GL/gl.h>
 #endif
 
 /* ========================================================================= */
@@ -66,9 +68,9 @@
 
 struct nv_bitstream;
 struct nv_input_buf;
-#ifdef _WIN32
 struct nv_texture;
 
+#ifdef _WIN32
 struct handle_tex {
 	uint32_t handle;
 	ID3D11Texture2D *tex;
@@ -122,6 +124,7 @@ struct nvenc_data {
 
 	DARRAY(struct nv_bitstream) bitstreams;
 	DARRAY(struct nv_input_buf) input_buffers;
+	DARRAY(struct nv_texture) textures;
 	NV_ENC_BUFFER_FORMAT input_buffer_format;
 	struct deque dts_list;
 
@@ -130,7 +133,6 @@ struct nvenc_data {
 	bool packet_keyframe;
 
 #ifdef _WIN32
-	DARRAY(struct nv_texture) textures;
 	DARRAY(struct handle_tex) input_textures;
 	ID3D11Device *device;
 	ID3D11DeviceContext *context;
@@ -239,18 +241,57 @@ static bool nv_texture_init(struct nvenc_data *enc, struct nv_texture *nvtex)
 	return true;
 }
 
+#else
+
+struct nv_texture {
+	void *res;
+	CUdeviceptr tex;
+	size_t pitch;
+	void *mapped_res;
+};
+
+static bool nv_texture_init(struct nvenc_data *enc, struct nv_texture *nvtex)
+{
+	const bool p010 = obs_p010_tex_active();
+
+	cu->cuMemAllocPitch(&nvtex->tex, &nvtex->pitch, p010 ? enc->cx * 2 : enc->cx,
+			    enc->cy + enc->cy / 2, 16);
+
+	NV_ENC_REGISTER_RESOURCE res = {NV_ENC_REGISTER_RESOURCE_VER};
+	res.resourceType = NV_ENC_INPUT_RESOURCE_TYPE_CUDADEVICEPTR;
+	res.resourceToRegister = (void *)nvtex->tex;
+	res.width = p010;
+	res.height = enc->cy;
+	res.pitch = nvtex->pitch;
+	res.bufferFormat = p010 ? NV_ENC_BUFFER_FORMAT_YUV420_10BIT
+				: NV_ENC_BUFFER_FORMAT_NV12;
+
+	if (NV_FAILED(nv.nvEncRegisterResource(enc->session, &res))) {
+		return false;
+	}
+
+	nvtex->res = res.registeredResource;
+	nvtex->mapped_res = NULL;
+	return true;
+}
+#endif
+
 static void nv_texture_free(struct nvenc_data *enc, struct nv_texture *nvtex)
 {
+
 	if (nvtex->res) {
 		if (nvtex->mapped_res) {
 			nv.nvEncUnmapInputResource(enc->session,
 						   nvtex->mapped_res);
 		}
 		nv.nvEncUnregisterResource(enc->session, nvtex->res);
+#ifdef _WIN32
 		nvtex->tex->lpVtbl->Release(nvtex->tex);
+#else
+		cu->cuMemFree(nvtex->tex);
+#endif
 	}
 }
-#endif
 
 /* ------------------------------------------------------------------------- */
 /* Surfaces                                                                  */
@@ -293,13 +334,11 @@ static const char *h264_nvenc_get_name(void *type_data)
 	return "NVIDIA NVENC H.264";
 }
 
-#ifdef _WIN32
 static const char *h264_nvenc_soft_get_name(void *type_data)
 {
 	UNUSED_PARAMETER(type_data);
 	return "NVIDIA NVENC H.264 (Fallback)";
 }
-#endif
 
 #ifdef ENABLE_HEVC
 static const char *hevc_nvenc_get_name(void *type_data)
@@ -308,13 +347,11 @@ static const char *hevc_nvenc_get_name(void *type_data)
 	return "NVIDIA NVENC HEVC";
 }
 
-#ifdef _WIN32
 static const char *hevc_nvenc_soft_get_name(void *type_data)
 {
 	UNUSED_PARAMETER(type_data);
-	return "NVIDIA NVENC H.264 (Fallback)";
+	return "NVIDIA NVENC HEVC (Fallback)";
 }
-#endif
 #endif
 
 static const char *av1_nvenc_get_name(void *type_data)
@@ -323,13 +360,11 @@ static const char *av1_nvenc_get_name(void *type_data)
 	return "NVIDIA NVENC AV1";
 }
 
-#ifdef _WIN32
 static const char *av1_nvenc_soft_get_name(void *type_data)
 {
 	UNUSED_PARAMETER(type_data);
-	return "NVIDIA NVENC AV1 (FALLBACK)";
+	return "NVIDIA NVENC AV1 (Fallback)";
 }
-#endif
 
 static inline int nv_get_cap(struct nvenc_data *enc, NV_ENC_CAPS cap)
 {
@@ -457,7 +492,9 @@ static bool init_session(struct nvenc_data *enc)
 		params.device = enc->device;
 		params.deviceType = NV_ENC_DEVICE_TYPE_DIRECTX;
 #else
-		return false;
+		// ToDo make enc->cuda not disable texture shite
+		params.device = enc->cu_ctx;
+		params.deviceType = NV_ENC_DEVICE_TYPE_CUDA;
 #endif
 	}
 
@@ -1107,10 +1144,12 @@ static bool init_bitstreams(struct nvenc_data *enc)
 	return true;
 }
 
-#ifdef _WIN32
 static bool init_textures(struct nvenc_data *enc)
 {
 	da_reserve(enc->textures, enc->buf_count);
+#ifndef _WIN32
+	cu->cuCtxPushCurrent(enc->cu_ctx);
+#endif
 	for (uint32_t i = 0; i < enc->buf_count; i++) {
 		struct nv_texture texture;
 		if (!nv_texture_init(enc, &texture)) {
@@ -1119,10 +1158,12 @@ static bool init_textures(struct nvenc_data *enc)
 
 		da_push_back(enc->textures, &texture);
 	}
+#ifndef _WIN32
+	cu->cuCtxPopCurrent(NULL);
+#endif
 
 	return true;
 }
-#endif
 
 static bool init_input_buffers(struct nvenc_data *enc)
 {
@@ -1175,6 +1216,11 @@ static bool init_cuda_ctx(struct nvenc_data *enc, obs_data_t *settings)
 
 	if (cu->cuCtxCreate(&enc->cu_ctx, 0, device) != CUDA_SUCCESS) {
 		NV_FAIL("Failed creating CUDA context");
+		return false;
+	}
+
+	if (cu->cuCtxPopCurrent(NULL) != CUDA_SUCCESS) {
+		NV_FAIL("Failed popping CUDA context");
 		return false;
 	}
 
@@ -1302,7 +1348,11 @@ static void *nvenc_create_internal(enum codec_type codec, obs_data_t *settings,
 	if (!init_nvenc(encoder)) {
 		goto fail;
 	}
-	if (!texture && !init_cuda(encoder)) {
+	if (
+#ifdef _WIN32
+		!texture &&
+#endif
+		!init_cuda(encoder)) {
 		goto fail;
 	}
 	if (NV_FAILED(nv_create_instance(&init))) {
@@ -1313,7 +1363,11 @@ static void *nvenc_create_internal(enum codec_type codec, obs_data_t *settings,
 		goto fail;
 	}
 #endif
-	if (!texture && !init_cuda_ctx(enc, settings)) {
+	if (
+#ifdef _WIN32
+		!texture &&
+#endif
+		!init_cuda_ctx(enc, settings)) {
 		goto fail;
 	}
 	if (get_nvenc_ver() == COMPATIBILITY_VERSION) {
@@ -1328,17 +1382,13 @@ static void *nvenc_create_internal(enum codec_type codec, obs_data_t *settings,
 	if (!init_bitstreams(enc)) {
 		goto fail;
 	}
-#ifdef _WIN32
 	if (texture && !init_textures(enc)) {
 		goto fail;
 	}
-#endif
 	if (!texture && !init_input_buffers(enc)) {
 		goto fail;
 	}
-#ifdef ENABLE_HEVC
 	enc->codec = codec;
-#endif
 	return enc;
 
 fail:
@@ -1369,14 +1419,12 @@ static void *nvenc_create_base(enum codec_type codec, obs_data_t *settings,
 		blog(LOG_INFO, "[obs-nvenc] GPU scaling enabled");
 	}
 
-#ifdef WIN32
 	if (texture && !obs_p010_tex_active() && !obs_nv12_tex_active()) {
 		blog(LOG_INFO,
 		     "[obs-nvenc] nv12/p010 not active, falling back to "
 		     "non-texture encoder");
 		goto reroute;
 	}
-#endif
 
 	struct nvenc_data *enc =
 		nvenc_create_internal(codec, settings, encoder, texture);
@@ -1401,7 +1449,6 @@ reroute:
 	return NULL;
 }
 
-#ifdef _WIN32
 static void *h264_nvenc_create(obs_data_t *settings, obs_encoder_t *encoder)
 {
 	return nvenc_create_base(CODEC_H264, settings, encoder, true);
@@ -1418,7 +1465,6 @@ static void *av1_nvenc_create(obs_data_t *settings, obs_encoder_t *encoder)
 {
 	return nvenc_create_base(CODEC_AV1, settings, encoder, true);
 }
-#endif
 
 static void *h264_nvenc_soft_create(obs_data_t *settings,
 				    obs_encoder_t *encoder)
@@ -1445,6 +1491,10 @@ static void nvenc_destroy(void *data)
 {
 	struct nvenc_data *enc = data;
 
+#ifndef _WIN32
+	cu->cuCtxPushCurrent(enc->cu_ctx);
+#endif
+
 	if (enc->encode_started) {
 		uint32_t struct_ver = enc->needs_compat_ver
 					      ? NV_ENC_PIC_PARAMS_COMPAT_VER
@@ -1454,11 +1504,9 @@ static void nvenc_destroy(void *data)
 		nv.nvEncEncodePicture(enc->session, &params);
 		get_encoded_packet(enc, true);
 	}
-#ifdef _WIN32
 	for (size_t i = 0; i < enc->textures.num; i++) {
 		nv_texture_free(enc, &enc->textures.array[i]);
 	}
-#endif
 	for (size_t i = 0; i < enc->input_buffers.num; i++) {
 		nv_input_buf_free(enc, &enc->input_buffers.array[i]);
 	}
@@ -1486,13 +1534,17 @@ static void nvenc_destroy(void *data)
 		cu->cuCtxDestroy(enc->cu_ctx);
 	}
 
+#ifndef _WIN32
+	cu->cuCtxPopCurrent(NULL);
+#endif
+
 	bfree(enc->header);
 	bfree(enc->sei);
 	deque_free(&enc->dts_list);
 	da_free(enc->input_buffers);
 	da_free(enc->bitstreams);
-#ifdef _WIN32
 	da_free(enc->textures);
+#ifdef _WIN32
 	da_free(enc->input_textures);
 #endif
 	da_free(enc->packet_data);
@@ -1562,10 +1614,8 @@ static bool get_encoded_packet(struct nvenc_data *enc, bool finalize)
 	for (size_t i = 0; i < count; i++) {
 		size_t cur_bs_idx = enc->cur_bitstream;
 		struct nv_bitstream *bs = &enc->bitstreams.array[cur_bs_idx];
-#ifdef _WIN32
 		struct nv_texture *nvtex =
 			enc->cuda ? NULL : &enc->textures.array[cur_bs_idx];
-#endif
 
 		/* ---------------- */
 
@@ -1608,7 +1658,7 @@ static bool get_encoded_packet(struct nvenc_data *enc, bool finalize)
 		}
 
 		/* ---------------- */
-#ifdef _WIN32
+
 		if (nvtex && nvtex->mapped_res) {
 			NVENCSTATUS err;
 			err = nv.nvEncUnmapInputResource(s, nvtex->mapped_res);
@@ -1618,7 +1668,6 @@ static bool get_encoded_packet(struct nvenc_data *enc, bool finalize)
 			}
 			nvtex->mapped_res = NULL;
 		}
-#endif
 
 		/* ---------------- */
 
@@ -1854,6 +1903,117 @@ static bool nvenc_encode_tex(void *data, uint32_t handle, int64_t pts,
 	return nvenc_encode_shared(enc, bs, nvtex->mapped_res, pts, packet,
 				   received_packet);
 }
+
+#else
+
+static bool nvenc_encode_tex2(void *data, struct encoder_texture *tex,
+			      int64_t pts, uint64_t lock_key,
+			      uint64_t *next_key, struct encoder_packet *packet,
+			      bool *received_packet)
+{
+	struct nvenc_data *enc = data;
+	struct nv_texture *nvtex;
+	struct nv_bitstream *bs;
+	const bool p010 = obs_p010_tex_active();
+	bool success = false;
+
+	GLuint input_tex[2];
+
+	CUgraphicsResource mapped_tex[2];
+	CUarray mapped_cuda;
+	CUresult res;
+
+	if (tex == NULL || tex->tex[0] == NULL) {
+		error("Encode failed: bad texture handle");
+		*next_key = lock_key;
+		return false;
+	}
+
+	bs = &enc->bitstreams.array[enc->next_bitstream];
+	nvtex = &enc->textures.array[enc->next_bitstream];
+
+	obs_enter_graphics();
+	if (cu->cuCtxPushCurrent(enc->cu_ctx) != CUDA_SUCCESS)
+		goto fail;
+
+	input_tex[0] = *(GLuint *)gs_texture_get_obj(tex->tex[0]);
+	input_tex[1] = *(GLuint *)gs_texture_get_obj(tex->tex[1]);
+
+	deque_push_back(&enc->dts_list, &pts, sizeof(pts));
+
+	/* ------------------------------------ */
+	/* copy to CUDA data                    */
+
+	// ToDo CUDA error handling
+	res = cu->cuGraphicsGLRegisterImage(
+		&mapped_tex[0], input_tex[0], GL_TEXTURE_2D,
+		CU_GRAPHICS_REGISTER_FLAGS_READ_ONLY);
+	res = cu->cuGraphicsGLRegisterImage(
+		&mapped_tex[1], input_tex[1], GL_TEXTURE_2D,
+		CU_GRAPHICS_REGISTER_FLAGS_READ_ONLY);
+	res = cu->cuGraphicsMapResources(2, mapped_tex, 0);
+
+	CUDA_MEMCPY2D m = {0};
+	m.dstMemoryType = CU_MEMORYTYPE_DEVICE;
+	m.dstDevice = nvtex->tex;
+	m.dstPitch = nvtex->pitch;
+
+	res = cu->cuGraphicsSubResourceGetMappedArray(&mapped_cuda,
+						      mapped_tex[0], 0, 0);
+	m.srcMemoryType = CU_MEMORYTYPE_ARRAY;
+	m.srcArray = mapped_cuda;
+
+	m.WidthInBytes = p010 ? enc->cx * 2 : enc->cx;
+	m.Height = enc->cy;
+
+	// Copy Y texture
+	res = cu->cuMemcpy2D(&m);
+	if (res != CUDA_SUCCESS)
+		goto unmap;
+
+	res = cu->cuGraphicsSubResourceGetMappedArray(&mapped_cuda,
+						      mapped_tex[1], 0, 0);
+	m.srcArray = mapped_cuda;
+	m.dstY = enc->cy;
+	m.Height = enc->cy / 2;
+
+	// Copy UV texture
+	res = cu->cuMemcpy2D(&m);
+	if (res != CUDA_SUCCESS)
+		goto unmap;
+
+unmap:
+	CUresult res2 = cu->cuGraphicsUnmapResources(2, mapped_tex, 0);
+	res2 = cu->cuGraphicsUnregisterResource(mapped_tex[0]);
+	res2 = cu->cuGraphicsUnregisterResource(mapped_tex[1]);
+	if (res != CUDA_SUCCESS)
+		goto fail;
+
+	/* ------------------------------------ */
+	/* map output tex so nvenc can use it   */
+
+	NV_ENC_MAP_INPUT_RESOURCE map = {NV_ENC_MAP_INPUT_RESOURCE_VER};
+	map.registeredResource = nvtex->res;
+	map.mappedBufferFmt = p010 ? NV_ENC_BUFFER_FORMAT_YUV420_10BIT
+				   : NV_ENC_BUFFER_FORMAT_NV12;
+
+	if (NV_FAILED(nv.nvEncMapInputResource(enc->session, &map)))
+		goto fail;
+
+	nvtex->mapped_res = map.mappedResource;
+
+	/* ------------------------------------ */
+	/* do actual encode call                */
+
+	success = nvenc_encode_shared(enc, bs, nvtex->mapped_res, pts, packet,
+				      received_packet);
+
+fail:
+	obs_leave_graphics();
+	cu->cuCtxPopCurrent(NULL);
+
+	return success;
+}
 #endif
 
 static inline void copy_plane(uint8_t *src, uint8_t **dst, size_t linesize_src,
@@ -1977,7 +2137,6 @@ static bool nvenc_sei_data(void *data, uint8_t **sei, size_t *size)
 	return true;
 }
 
-#ifdef _WIN32
 struct obs_encoder_info h264_nvenc_info = {
 	.id = "jim_nvenc",
 	.codec = "h264",
@@ -1988,7 +2147,11 @@ struct obs_encoder_info h264_nvenc_info = {
 	.create = h264_nvenc_create,
 	.destroy = nvenc_destroy,
 	.update = nvenc_update,
+#ifdef _WIN32
 	.encode_texture = nvenc_encode_tex,
+#else
+	.encode_texture2 = nvenc_encode_tex2,
+#endif
 	.get_defaults = h264_nvenc_defaults,
 	.get_properties = h264_nvenc_properties,
 	.get_extra_data = nvenc_extra_data,
@@ -2006,7 +2169,11 @@ struct obs_encoder_info hevc_nvenc_info = {
 	.create = hevc_nvenc_create,
 	.destroy = nvenc_destroy,
 	.update = nvenc_update,
+#ifdef _WIN32
 	.encode_texture = nvenc_encode_tex,
+#else
+	.encode_texture2 = nvenc_encode_tex2,
+#endif
 	.get_defaults = hevc_nvenc_defaults,
 	.get_properties = hevc_nvenc_properties,
 	.get_extra_data = nvenc_extra_data,
@@ -2024,12 +2191,15 @@ struct obs_encoder_info av1_nvenc_info = {
 	.create = av1_nvenc_create,
 	.destroy = nvenc_destroy,
 	.update = nvenc_update,
+#ifdef _WIN32
 	.encode_texture = nvenc_encode_tex,
+#else
+	.encode_texture2 = nvenc_encode_tex2,
+#endif
 	.get_defaults = av1_nvenc_defaults,
 	.get_properties = av1_nvenc_properties,
 	.get_extra_data = nvenc_extra_data,
 };
-#endif
 
 struct obs_encoder_info h264_nvenc_soft_info = {
 	.id = "h264_fallback_nvenc",
@@ -2038,11 +2208,10 @@ struct obs_encoder_info h264_nvenc_soft_info = {
 #ifdef _WIN32
 	.caps = OBS_ENCODER_CAP_DYN_BITRATE | OBS_ENCODER_CAP_ROI |
 		OBS_ENCODER_CAP_INTERNAL,
-	.get_name = h264_nvenc_soft_get_name,
 #else
 	.caps = OBS_ENCODER_CAP_DYN_BITRATE | OBS_ENCODER_CAP_ROI,
-	.get_name = h264_nvenc_get_name,
 #endif
+	.get_name = h264_nvenc_soft_get_name,
 	.create = h264_nvenc_soft_create,
 	.destroy = nvenc_destroy,
 	.update = nvenc_update,
@@ -2062,11 +2231,10 @@ struct obs_encoder_info hevc_nvenc_soft_info = {
 #ifdef _WIN32
 	.caps = OBS_ENCODER_CAP_DYN_BITRATE | OBS_ENCODER_CAP_ROI |
 		OBS_ENCODER_CAP_INTERNAL,
-	.get_name = hevc_nvenc_soft_get_name,
 #else
 	.caps = OBS_ENCODER_CAP_DYN_BITRATE | OBS_ENCODER_CAP_ROI,
-	.get_name = hevc_nvenc_get_name,
 #endif
+	.get_name = hevc_nvenc_soft_get_name,
 	.create = hevc_nvenc_soft_create,
 	.destroy = nvenc_destroy,
 	.update = nvenc_update,
@@ -2086,11 +2254,10 @@ struct obs_encoder_info av1_nvenc_soft_info = {
 #ifdef _WIN32
 	.caps = OBS_ENCODER_CAP_DYN_BITRATE | OBS_ENCODER_CAP_ROI |
 		OBS_ENCODER_CAP_INTERNAL,
-	.get_name = av1_nvenc_soft_get_name,
 #else
 	.caps = OBS_ENCODER_CAP_DYN_BITRATE | OBS_ENCODER_CAP_ROI,
-	.get_name = av1_nvenc_get_name,
 #endif
+	.get_name = av1_nvenc_soft_get_name,
 	.create = av1_nvenc_soft_create,
 	.destroy = nvenc_destroy,
 	.update = nvenc_update,
