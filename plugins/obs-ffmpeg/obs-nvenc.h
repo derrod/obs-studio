@@ -28,6 +28,16 @@ typedef struct CudaFunctions {
 
 	tcuGetErrorName *cuGetErrorName;
 	tcuGetErrorString *cuGetErrorString;
+
+#ifndef _WIN32
+	tcuGLGetDevices_v2 *cuGLGetDevices;
+	tcuGraphicsGLRegisterImage *cuGraphicsGLRegisterImage;
+	tcuGraphicsUnregisterResource *cuGraphicsUnregisterResource;
+	tcuGraphicsMapResources *cuGraphicsMapResources;
+	tcuGraphicsUnmapResources *cuGraphicsUnmapResources;
+	tcuGraphicsSubResourceGetMappedArray
+		*cuGraphicsSubResourceGetMappedArray;
+#endif
 } CudaFunctions;
 
 typedef NVENCSTATUS(NVENCAPI *NV_CREATE_INSTANCE_FUNC)(
