@@ -13,6 +13,8 @@
 #include <dxgi.h>
 #include <d3d11.h>
 #include <d3d11_1.h>
+#else
+#include <GL/gl.h>
 #endif
 
 /* ========================================================================= */
@@ -1954,6 +1956,122 @@ static bool nvenc_encode_tex(void *data, uint32_t handle, int64_t pts,
 	return nvenc_encode_shared(enc, bs, nvtex->mapped_res, pts, packet,
 				   received_packet);
 }
+
+#else
+
+#define CU_CHECK(func)                                                       \
+	{                                                                    \
+		CUresult res = func;                                         \
+		if (res != CUDA_SUCCESS) {                                   \
+			error("CUDA operation \"%s\" failed with %d", #func, \
+			      res);                                          \
+			success = false;                                     \
+			goto unmap;                                          \
+		}                                                            \
+	}
+
+static inline bool copy_tex_cuda(struct nvenc_data *enc, const bool p010,
+				 GLuint tex[2], struct nv_cuda_surface *surf)
+{
+	bool success = true;
+	CUgraphicsResource mapped_tex[2] = {0};
+	CUarray mapped_cuda;
+
+	CU_CHECK(cu->cuGraphicsGLRegisterImage(
+		&mapped_tex[0], tex[0], GL_TEXTURE_2D,
+		CU_GRAPHICS_REGISTER_FLAGS_READ_ONLY))
+	CU_CHECK(cu->cuGraphicsGLRegisterImage(
+		&mapped_tex[1], tex[1], GL_TEXTURE_2D,
+		CU_GRAPHICS_REGISTER_FLAGS_READ_ONLY))
+	CU_CHECK(cu->cuGraphicsMapResources(2, mapped_tex, 0))
+
+	CUDA_MEMCPY2D m = {0};
+	m.dstMemoryType = CU_MEMORYTYPE_ARRAY;
+	m.srcMemoryType = CU_MEMORYTYPE_ARRAY;
+	m.dstArray = surf->tex;
+	m.WidthInBytes = p010 ? enc->cx * 2 : enc->cx;
+	m.Height = enc->cy;
+
+	// Map and copy Y texture
+	CU_CHECK(cu->cuGraphicsSubResourceGetMappedArray(&mapped_cuda,
+							 mapped_tex[0], 0, 0));
+	m.srcArray = mapped_cuda;
+	CU_CHECK(cu->cuMemcpy2D(&m))
+
+	// Map anc copy UV texture
+	CU_CHECK(cu->cuGraphicsSubResourceGetMappedArray(&mapped_cuda,
+							 mapped_tex[1], 0, 0))
+	m.srcArray = mapped_cuda;
+	m.dstY += enc->cy;
+	m.Height = enc->cy / 2;
+
+	CU_CHECK(cu->cuMemcpy2D(&m))
+
+unmap:
+	cu->cuGraphicsUnmapResources(2, mapped_tex, 0);
+	cu->cuGraphicsUnregisterResource(mapped_tex[0]);
+	cu->cuGraphicsUnregisterResource(mapped_tex[1]);
+
+	return success;
+}
+
+static bool nvenc_encode_tex2(void *data, struct encoder_texture *tex,
+			      int64_t pts, uint64_t lock_key,
+			      uint64_t *next_key, struct encoder_packet *packet,
+			      bool *received_packet)
+{
+	struct nvenc_data *enc = data;
+	struct nv_cuda_surface *surf;
+	struct nv_bitstream *bs;
+	const bool p010 = obs_p010_tex_active();
+	GLuint input_tex[2];
+
+	if (tex == NULL || tex->tex[0] == NULL) {
+		error("Encode failed: bad texture handle");
+		*next_key = lock_key;
+		return false;
+	}
+
+	bs = &enc->bitstreams.array[enc->next_bitstream];
+	surf = &enc->surfaces.array[enc->next_bitstream];
+
+	deque_push_back(&enc->dts_list, &pts, sizeof(pts));
+
+	/* ------------------------------------ */
+	/* copy to CUDA data                    */
+
+	CU_FAILED(cu->cuCtxPushCurrent(enc->cu_ctx))
+	obs_enter_graphics();
+	input_tex[0] = *(GLuint *)gs_texture_get_obj(tex->tex[0]);
+	input_tex[1] = *(GLuint *)gs_texture_get_obj(tex->tex[1]);
+
+	bool success = copy_tex_cuda(enc, p010, input_tex, surf);
+
+	obs_leave_graphics();
+	CU_FAILED(cu->cuCtxPopCurrent(NULL))
+
+	if (!success)
+		return false;
+
+	/* ------------------------------------ */
+	/* map output tex so nvenc can use it   */
+
+	NV_ENC_MAP_INPUT_RESOURCE map = {NV_ENC_MAP_INPUT_RESOURCE_VER};
+	map.registeredResource = surf->res;
+	map.mappedBufferFmt = p010 ? NV_ENC_BUFFER_FORMAT_YUV420_10BIT
+				   : NV_ENC_BUFFER_FORMAT_NV12;
+
+	if (NV_FAILED(nv.nvEncMapInputResource(enc->session, &map)))
+		return false;
+
+	surf->mapped_res = map.mappedResource;
+
+	/* ------------------------------------ */
+	/* do actual encode call                */
+
+	return nvenc_encode_shared(enc, bs, surf->mapped_res, pts, packet,
+				   received_packet);
+}
 #endif
 
 static inline bool nvenc_copy_frame(struct nvenc_data *enc,
@@ -2106,7 +2224,6 @@ static bool nvenc_sei_data(void *data, uint8_t **sei, size_t *size)
 	return true;
 }
 
-#ifdef _WIN32
 struct obs_encoder_info h264_nvenc_info = {
 	.id = "jim_nvenc",
 	.codec = "h264",
@@ -2117,7 +2234,11 @@ struct obs_encoder_info h264_nvenc_info = {
 	.create = h264_nvenc_create,
 	.destroy = nvenc_destroy,
 	.update = nvenc_update,
+#ifdef _WIN32
 	.encode_texture = nvenc_encode_tex,
+#else
+	.encode_texture2 = nvenc_encode_tex2,
+#endif
 	.get_defaults = h264_nvenc_defaults,
 	.get_properties = h264_nvenc_properties,
 	.get_extra_data = nvenc_extra_data,
@@ -2135,7 +2256,11 @@ struct obs_encoder_info hevc_nvenc_info = {
 	.create = hevc_nvenc_create,
 	.destroy = nvenc_destroy,
 	.update = nvenc_update,
+#ifdef _WIN32
 	.encode_texture = nvenc_encode_tex,
+#else
+	.encode_texture2 = nvenc_encode_tex2,
+#endif
 	.get_defaults = hevc_nvenc_defaults,
 	.get_properties = hevc_nvenc_properties,
 	.get_extra_data = nvenc_extra_data,
@@ -2153,12 +2278,15 @@ struct obs_encoder_info av1_nvenc_info = {
 	.create = av1_nvenc_create,
 	.destroy = nvenc_destroy,
 	.update = nvenc_update,
+#ifdef _WIN32
 	.encode_texture = nvenc_encode_tex,
+#else
+	.encode_texture2 = nvenc_encode_tex2,
+#endif
 	.get_defaults = av1_nvenc_defaults,
 	.get_properties = av1_nvenc_properties,
 	.get_extra_data = nvenc_extra_data,
 };
-#endif
 
 struct obs_encoder_info h264_nvenc_soft_info = {
 	.id = "h264_fallback_nvenc",
@@ -2167,11 +2295,10 @@ struct obs_encoder_info h264_nvenc_soft_info = {
 #ifdef _WIN32
 	.caps = OBS_ENCODER_CAP_DYN_BITRATE | OBS_ENCODER_CAP_ROI |
 		OBS_ENCODER_CAP_INTERNAL,
-	.get_name = h264_nvenc_soft_get_name,
 #else
 	.caps = OBS_ENCODER_CAP_DYN_BITRATE | OBS_ENCODER_CAP_ROI,
-	.get_name = h264_nvenc_get_name,
 #endif
+	.get_name = h264_nvenc_soft_get_name,
 	.create = h264_nvenc_soft_create,
 	.destroy = nvenc_destroy,
 	.update = nvenc_update,
@@ -2191,11 +2318,10 @@ struct obs_encoder_info hevc_nvenc_soft_info = {
 #ifdef _WIN32
 	.caps = OBS_ENCODER_CAP_DYN_BITRATE | OBS_ENCODER_CAP_ROI |
 		OBS_ENCODER_CAP_INTERNAL,
-	.get_name = hevc_nvenc_soft_get_name,
 #else
 	.caps = OBS_ENCODER_CAP_DYN_BITRATE | OBS_ENCODER_CAP_ROI,
-	.get_name = hevc_nvenc_get_name,
 #endif
+	.get_name = hevc_nvenc_soft_get_name,
 	.create = hevc_nvenc_soft_create,
 	.destroy = nvenc_destroy,
 	.update = nvenc_update,
@@ -2215,11 +2341,10 @@ struct obs_encoder_info av1_nvenc_soft_info = {
 #ifdef _WIN32
 	.caps = OBS_ENCODER_CAP_DYN_BITRATE | OBS_ENCODER_CAP_ROI |
 		OBS_ENCODER_CAP_INTERNAL,
-	.get_name = av1_nvenc_soft_get_name,
 #else
 	.caps = OBS_ENCODER_CAP_DYN_BITRATE | OBS_ENCODER_CAP_ROI,
-	.get_name = av1_nvenc_get_name,
 #endif
+	.get_name = av1_nvenc_soft_get_name,
 	.create = av1_nvenc_soft_create,
 	.destroy = nvenc_destroy,
 	.update = nvenc_update,

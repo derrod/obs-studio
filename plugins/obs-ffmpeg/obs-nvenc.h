@@ -29,6 +29,15 @@ typedef struct CudaFunctions {
 	tcuArrayDestroy *cuArrayDestroy;
 	// tcuArrayGetPlane *cuArrayGetPlane;
 	tcuMemcpy2D_v2 *cuMemcpy2D;
+
+#ifndef _WIN32
+	tcuGraphicsGLRegisterImage *cuGraphicsGLRegisterImage;
+	tcuGraphicsUnregisterResource *cuGraphicsUnregisterResource;
+	tcuGraphicsMapResources *cuGraphicsMapResources;
+	tcuGraphicsUnmapResources *cuGraphicsUnmapResources;
+	tcuGraphicsSubResourceGetMappedArray
+		*cuGraphicsSubResourceGetMappedArray;
+#endif
 } CudaFunctions;
 
 typedef NVENCSTATUS(NVENCAPI *NV_CREATE_INSTANCE_FUNC)(
