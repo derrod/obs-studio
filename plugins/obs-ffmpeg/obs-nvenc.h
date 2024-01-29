@@ -47,6 +47,7 @@ extern const char *nv_error_name(NVENCSTATUS err);
 extern NV_ENCODE_API_FUNCTION_LIST nv;
 extern NV_CREATE_INSTANCE_FUNC nv_create_instance;
 extern CudaFunctions *cu;
+extern int cuTexDeviceIdx;
 extern uint32_t get_nvenc_ver(void);
 extern bool init_nvenc(obs_encoder_t *encoder);
 extern bool init_cuda(obs_encoder_t *encoder);

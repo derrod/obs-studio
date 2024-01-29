@@ -1457,6 +1457,14 @@ static void *nvenc_create_base(enum codec_type codec, obs_data_t *settings,
 		goto reroute;
 	}
 
+#ifndef _WIN32
+	if (texture && cuTexDeviceIdx == -1) {
+		blog(LOG_INFO,
+		     "[obs-nvenc] OBS not running on NVIDIA GPU, falling back to non-texture encoder");
+		goto reroute;
+	}
+#endif
+
 	struct nvenc_data *enc =
 		nvenc_create_internal(codec, settings, encoder, texture);
 

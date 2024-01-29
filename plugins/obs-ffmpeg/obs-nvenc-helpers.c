@@ -7,6 +7,8 @@
 
 #ifdef _WIN32
 #include <util/windows/device-enum.h>
+#else
+#include <GL/gl.h>
 #endif
 
 static void *nvenc_lib = NULL;
@@ -15,6 +17,7 @@ static pthread_mutex_t init_mutex = PTHREAD_MUTEX_INITIALIZER;
 NV_ENCODE_API_FUNCTION_LIST nv = {NV_ENCODE_API_FUNCTION_LIST_VER};
 NV_CREATE_INSTANCE_FUNC nv_create_instance = NULL;
 CudaFunctions *cu = NULL;
+int cuTexDeviceIdx = -1;
 
 #define error(format, ...) blog(LOG_ERROR, "[obs-nvenc] " format, ##__VA_ARGS__)
 
@@ -443,11 +446,92 @@ bool av1_supported()
 {
 	return get_nvenc_ver() >= ((12 << 4) | 0);
 }
+
+#define CU_FAILED(func)                                                      \
+	{                                                                    \
+		CUresult res = func;                                         \
+		if (res != CUDA_SUCCESS) {                                   \
+			error("CUDA operation \"%s\" failed with %d", #func, \
+			      res);                                          \
+			return false;                                        \
+		}                                                            \
+	}
+
+bool cuda_check_texture_mapping(CUcontext ctx, GLuint tex_id)
+{
+	CUgraphicsResource mapped_tex;
+	CUresult res;
+	bool success = false;
+
+	res = cu->cuGraphicsGLRegisterImage(
+		&mapped_tex, tex_id, GL_TEXTURE_2D,
+		CU_GRAPHICS_REGISTER_FLAGS_READ_ONLY);
+	if (res == CUDA_SUCCESS) {
+		res = cu->cuGraphicsMapResources(1, &mapped_tex, 0);
+		if (res == CUDA_SUCCESS) {
+			success = true;
+			cu->cuGraphicsUnmapResources(1, &mapped_tex, 0);
+		}
+		cu->cuGraphicsUnregisterResource(mapped_tex);
+	}
+
+	return success;
+}
+
+bool cuda_check_device(int idx, GLuint tex_id)
+{
+	CUdevice device;
+	CUcontext ctx;
+	CU_FAILED(cu->cuDeviceGet(&device, idx))
+	CU_FAILED(cu->cuCtxCreate(&ctx, 0, device))
+	bool success = cuda_check_texture_mapping(ctx, tex_id);
+	CU_FAILED(cu->cuCtxDestroy(ctx))
+	return success;
+}
+
+bool cuda_find_texture_device(void)
+{
+	int count;
+	int texture_idx = -1;
+
+	CU_FAILED(cu->cuInit(0))
+	CU_FAILED(cu->cuDeviceGetCount(&count))
+	if (!count)
+		return;
+
+	obs_enter_graphics();
+	gs_texture_t *tex = gs_texture_create(
+		256, 256, GS_R8, 1, NULL, GS_RENDER_TARGET | GS_SHARED_KM_TEX);
+	GLuint tex_id = *(GLuint *)gs_texture_get_obj(tex);
+
+	for (int i = 0; i < count; i++) {
+		if (cuda_check_device(i, tex_id)) {
+			texture_idx = i;
+			break;
+		}
+	}
+
+	gs_texture_destroy(tex);
+	obs_leave_graphics();
+
+	if (texture_idx == -1)
+		return;
+
+	// Set cuda device idx to use for texture encoder
+	cuTexDeviceIdx = texture_idx;
+
+	return;
+}
 #endif
 
 void obs_nvenc_load(bool h264, bool hevc, bool av1)
 {
 	pthread_mutex_init(&init_mutex, NULL);
+#ifndef _WIN32
+	init_cuda(NULL);
+	if (!cuda_find_texture_device())
+		blog(LOG_INFO, "Could not determine CUDA device for NVENC");
+#endif
 	if (h264) {
 		obs_register_encoder(&h264_nvenc_info);
 		obs_register_encoder(&h264_nvenc_soft_info);
