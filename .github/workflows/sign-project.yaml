@@ -11,11 +11,25 @@ jobs:
       run:
         shell: pwsh
     steps:
+      # This shouldn't need to exist but GitHub - for some godforsaken reason - does not allow you to get the reference specified for a reusable workflow.
+      # Would make things too easy, eh?
+      - name: Parse JWT
+        id: jwt
+        run: |
+          $token = ConvertTo-SecureString -String ${env:ACTIONS_ID_TOKEN_REQUEST_TOKEN} -AsPlainText
+          $jwt = Invoke-WebRequest -Uri "${env:ACTIONS_ID_TOKEN_REQUEST_URL}&audience=ignore" -Authentication Bearer -Token $token
+          $claim_b64 = (($jwt.Content | ConvertFrom-Json -AsHashtable).value -split '\.')[1]
+          $claim_b64 += '=' * (4 - $claim_b64.Length % 4)
+          $claim = [Text.Encoding]::Utf8.GetString([Convert]::FromBase64String($claim_b64)) | ConvertFrom-Json -AsHashtable
+          $sha = ${claim}.job_workflow_sha
+          Write-Output "Workflow SHA: ${sha}"
+          "workflow_sha=${sha}" >> $env:GITHUB_OUTPUT
+
       - uses: actions/checkout@v4
         with:
           path: "repo"
           fetch-depth: 0
-          ref: ${{ github.workflow_ref }}
+          ref: ${{ steps.jwt.outputs.workflow_sha }}
 
       - name: Set Up Environment 🔧
         id: setup
