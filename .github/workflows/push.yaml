@@ -21,13 +21,10 @@ jobs:
 
   sign-windows-update:
     name: Sign Windows Distribution ✍️
+    uses: derrod/obs-studio/.github/workflows/sign-project.yaml@2100643702d2a26a5cd9262bc9dde02dce49a9ab
     if: github.ref_type == 'tag'
-    runs-on: windows-2022
     needs: build-project
     permissions:
       contents: 'read'
       id-token: 'write'
-    environment:
-      name: bouf
     secrets: inherit
-    uses: derrod/obs-studio/.github/workflows/sign-project.yaml@f3c7b823dc79c48d90fe2a41c16c980c4b896291
