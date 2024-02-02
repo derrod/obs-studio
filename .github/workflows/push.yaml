@@ -14,7 +14,7 @@ permissions:
 jobs:
   sign-windows-update:
     name: Sign Windows Distribution ✍️
-    uses: derrod/obs-studio/.github/workflows/sign-project.yaml@2100643702d2a26a5cd9262bc9dde02dce49a9ab
+    uses: derrod/obs-studio/.github/workflows/sign-project.yaml@da411bf5690eedfd9e6fda1c200e077099967ee4
     if: github.ref_type == 'tag'
     permissions:
       contents: 'read'
