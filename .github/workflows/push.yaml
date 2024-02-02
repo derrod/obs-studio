@@ -36,7 +36,7 @@ jobs:
           "commitHash=${shortHash}" >> $env:GITHUB_OUTPUT
 
       - name: Run bouf 🥩
-        uses: ./repo/.github/actions/bouf
+        uses: derrod/obs-studio/.github/actions/bouf@9459a0d567d18400c75a6b7e6dc2213f61612e29
         with:
           gcpWorkloadIdentityProvider: ${{ secrets.GCP_IDENTITY_POOL }}
           gcpServiceAccountName: ${{ secrets.GCP_SERVICE_ACCOUNT_NAME }}
