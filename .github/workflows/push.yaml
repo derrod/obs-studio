@@ -12,18 +12,10 @@ on:
 permissions:
   contents: write
 jobs:
-  build-project:
-    name: Build 🧱
-    uses: ./.github/workflows/build-project.yaml
-    secrets: inherit
-    permissions:
-      contents: read
-
   sign-windows-update:
     name: Sign Windows Distribution ✍️
     uses: derrod/obs-studio/.github/workflows/sign-project.yaml@2100643702d2a26a5cd9262bc9dde02dce49a9ab
     if: github.ref_type == 'tag'
-    needs: build-project
     permissions:
       contents: 'read'
       id-token: 'write'
