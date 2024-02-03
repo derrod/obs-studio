@@ -67,8 +67,8 @@ jobs:
 
   steam-upload:
     name: Upload Steam Builds 🚂
-    if: github.repository_owner == 'obsproject' && inputs.job == 'steam'
-    runs-on: macos-13
+    if: inputs.job == 'steam'
+    runs-on: macos-14
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/steam-upload
