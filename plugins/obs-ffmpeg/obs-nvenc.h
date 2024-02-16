@@ -11,6 +11,11 @@
 
 #include "obs-nvenc-ver.h"
 
+/* Missing from FFmpeg headers */
+typedef CUresult CUDAAPI tcuMemHostRegister(void *p, size_t bytesize,
+					    unsigned int Flags);
+typedef CUresult CUDAAPI tcuMemHostUnregister(void *p);
+
 typedef struct CudaFunctions {
 	tcuInit *cuInit;
 
@@ -28,6 +33,9 @@ typedef struct CudaFunctions {
 
 	tcuGetErrorName *cuGetErrorName;
 	tcuGetErrorString *cuGetErrorString;
+
+	tcuMemHostRegister *cuMemHostRegister;
+	tcuMemHostUnregister *cuMemHostUnregister;
 
 #ifndef _WIN32
 	tcuGLGetDevices_v2 *cuGLGetDevices;

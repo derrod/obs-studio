@@ -2190,6 +2190,13 @@ static inline bool nvenc_copy_frame(struct nvenc_data *enc,
 
 	CU_FAILED(cu->cuCtxPushCurrent(enc->cu_ctx))
 
+	// Map host memory into CUDA, this page-locks it which allows direct DMA
+	// rather than CUDA copying the data to a staging area before the DMA transfer.
+	CU_FAILED(cu->cuMemHostRegister(frame->data[0],
+					frame->linesize[0] * height, 0))
+	CU_FAILED(cu->cuMemHostRegister(frame->data[1],
+					frame->linesize[1] * height / 2, 0))
+
 	if (enc->surface_format == NV_ENC_BUFFER_FORMAT_NV12) {
 		m.srcPitch = frame->linesize[0];
 		m.srcHost = frame->data[0];
@@ -2228,6 +2235,10 @@ static inline bool nvenc_copy_frame(struct nvenc_data *enc,
 		m.dstY += height;
 		CU_FAILED(cu->cuMemcpy2D(&m))
 	}
+
+	CU_FAILED(cu->cuMemHostUnregister(frame->data[0]))
+	CU_FAILED(cu->cuMemHostUnregister(frame->data[1]))
+
 	CU_FAILED(cu->cuCtxPopCurrent(NULL))
 
 	return true;

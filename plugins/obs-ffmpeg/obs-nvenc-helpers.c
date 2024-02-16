@@ -278,6 +278,9 @@ static const cuda_function cuda_functions[] = {
 	{offsetof(CudaFunctions, cuGetErrorName), "cuGetErrorName"},
 	{offsetof(CudaFunctions, cuGetErrorString), "cuGetErrorString"},
 
+	{offsetof(CudaFunctions, cuMemHostRegister), "cuMemHostRegister_v2"},
+	{offsetof(CudaFunctions, cuMemHostUnregister), "cuMemHostUnregister"},
+
 #ifndef _WIN32
 	{offsetof(CudaFunctions, cuGLGetDevices), "cuGLGetDevices_v2"},
 	{offsetof(CudaFunctions, cuGraphicsGLRegisterImage),
