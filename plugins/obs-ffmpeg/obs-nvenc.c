@@ -2244,6 +2244,8 @@ static inline bool nvenc_copy_frame(struct nvenc_data *enc,
 	return true;
 }
 
+const char *cuda_copy_name = "nvenc_copy_frame";
+
 static bool nvenc_encode_soft(void *data, struct encoder_frame *frame,
 			      struct encoder_packet *packet,
 			      bool *received_packet)
@@ -2260,7 +2262,11 @@ static bool nvenc_encode_soft(void *data, struct encoder_frame *frame,
 	/* ------------------------------------ */
 	/* copy to CUDA surface                 */
 
-	if (!nvenc_copy_frame(enc, frame, surf))
+	profile_start(cuda_copy_name);
+	bool copy_success = nvenc_copy_frame(enc, frame, surf);
+	profile_end(cuda_copy_name);
+
+	if (!copy_success)
 		return false;
 
 	/* ------------------------------------ */
