@@ -1,6 +1,8 @@
 #ifdef _WIN32
 #include "rtmp-stream.h"
 
+#include <qos2.h>
+
 static void fatal_sock_shutdown(struct rtmp_stream *stream)
 {
 	closesocket(stream->rtmp.m_sb.sb_socket);
@@ -339,10 +341,45 @@ static inline void socket_thread_windows_internal(struct rtmp_stream *stream)
 	blog(LOG_INFO, "socket_thread_windows: Normal exit");
 }
 
+static void setup_qos(PHANDLE qos_handle, const struct rtmp_stream *stream)
+{
+	QOS_VERSION ver = {1, 0};
+	QOS_FLOWID flow_id = 0;
+
+	if (!QOSCreateHandle(&ver, qos_handle)) {
+		blog(LOG_ERROR, "Failed creating QOS Handle: %d",
+		     GetLastError());
+		return;
+	}
+
+	if (!QOSAddSocketToFlow(*qos_handle, stream->rtmp.m_sb.sb_socket, NULL,
+				QOSTrafficTypeAudioVideo, QOS_NON_ADAPTIVE_FLOW,
+				&flow_id)) {
+		blog(LOG_ERROR, "Failed adding socket to QOS: %d",
+		     GetLastError());
+		return;
+	}
+
+	blog(LOG_INFO, "QoS setup success!");
+}
+
+static void teardown_qos(HANDLE qos_handle)
+{
+	if (!qos_handle)
+		return;
+
+	QOSCloseHandle(qos_handle);
+}
+
 void *socket_thread_windows(void *data)
 {
 	struct rtmp_stream *stream = data;
+	HANDLE qos_handle = NULL;
+
+	setup_qos(&qos_handle, stream);
 	socket_thread_windows_internal(stream);
+	teardown_qos(qos_handle);
+
 	return NULL;
 }
 #endif
