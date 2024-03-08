@@ -4284,6 +4284,8 @@ void remove_async_frame(obs_source_t *source, struct obs_source_frame *frame)
 
 /* #define DEBUG_ASYNC_FRAMES 1 */
 
+#define MIN_ASYNC_CACHE_SIZE 5
+
 static bool ready_async_frame(obs_source_t *source, uint64_t sys_time)
 {
 	struct obs_source_frame *next_frame = source->async_frames.array[0];
@@ -4302,6 +4304,9 @@ static bool ready_async_frame(obs_source_t *source, uint64_t sys_time)
 		source->last_frame_ts = next_frame->timestamp;
 		return true;
 	}
+
+	if (source->async_frames.num < MIN_ASYNC_CACHE_SIZE)
+		return false;
 
 #if DEBUG_ASYNC_FRAMES
 	blog(LOG_DEBUG,
