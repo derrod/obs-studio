@@ -137,7 +137,7 @@
         "lhs": "${hostSystemName}",
         "rhs": "Windows"
       },
-      "architecture": "x64",
+      "architecture": {"value": "x64", "strategy": "external"},
       "binaryDir": "${sourceDir}/build_x64",
       "generator": "Visual Studio 17 2022",
       "cacheVariables": {
