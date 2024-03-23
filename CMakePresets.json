@@ -158,6 +158,18 @@
         "CMAKE_COMPILE_WARNING_AS_ERROR": true,
         "ENABLE_CCACHE": false
       }
+    },
+    {
+      "name": "windows-ci-x64-ninja",
+      "displayName": "Windows x64 (CI)",
+      "description": "CI Windows build (x64)",
+      "inherits": ["windows-x64"],
+      "warnings": {"dev": true, "deprecated": true},
+      "generator": "Ninja",
+      "cacheVariables": {
+        "CMAKE_COMPILE_WARNING_AS_ERROR": true,
+        "ENABLE_CCACHE": false
+      }
     }
   ],
   "buildPresets": [
