@@ -347,6 +347,12 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-ccache-x86_64-
 
+      - name: Install Ninja
+        uses: turtlesec-no/get-ninja@main
+
+      - name: Setup MSVC dev environment
+        uses: ilammy/msvc-dev-cmd@v1
+
       - name: Build OBS Studio 🧱
         uses: ./.github/actions/build-obs
         env:
