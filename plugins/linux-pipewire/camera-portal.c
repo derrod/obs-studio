@@ -690,7 +690,6 @@ static void framerate_list(struct camera_device *dev, uint32_t pixelformat,
 			   const struct spa_rectangle *resolution,
 			   obs_property_t *prop)
 {
-	g_autoptr(GHashTable) framerates_map = NULL;
 	g_autoptr(GArray) framerates = NULL;
 	struct param *p;
 	obs_data_t *data;
