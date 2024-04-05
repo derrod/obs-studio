@@ -195,7 +195,8 @@ build() {
         --preset ubuntu-ci
         --toolchain ${project_root}/cmake/linux/toolchain-${target##*-}-gcc.cmake
         -DENABLE_BROWSER:BOOL=ON
-        -DENABLE_NATIVE_NVENC:BOOL=OFF
+        -DENABLE_NVENC:BOOL=OFF
+        -DENABLE_FFMPEG_NVENC:BOOL=ON
         -DCEF_ROOT_DIR:PATH="${project_root}/.deps/cef_binary_${CEF_VERSION}_${target//ubuntu-/linux_}"
       )
 
