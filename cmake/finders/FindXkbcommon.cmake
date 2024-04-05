@@ -45,12 +45,12 @@ include(FindPackageHandleStandardArgs)
 
 find_package(PkgConfig QUIET)
 if(PKG_CONFIG_FOUND)
-  pkg_search_module(PC_xkbcommon QUIET xkbcommon)
+  pkg_search_module(PC_Xkbcommon QUIET xkbcommon)
 endif()
 
 find_path(
   Xkbcommon_INCLUDE_DIR
-  NAMES xkbcommon.h
+  NAMES xkbcommon/xkbcommon.h
   HINTS ${PC_Xkbcommon_INCLUDE_DIRS}
   PATHS /usr/include /usr/local/include
   PATH_SUFFIXES xkbcommon
