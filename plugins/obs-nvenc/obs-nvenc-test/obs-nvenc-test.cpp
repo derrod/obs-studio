@@ -233,6 +233,13 @@ int check_thread()
 	caps["hevc"]["codec_supported"] = 0;
 	caps["av1"]["codec_supported"] = 0;
 
+	int driver_version;
+	if (cu->cuDriverGetVersion(&driver_version) != CUDA_SUCCESS) {
+		printf("nvenc_supported=false\n"
+		       "reason=driver_version_check_fail\n");
+		return 1;
+	}
+
 	int num_devices = 0;
 	cu->cuDeviceGetCount(&num_devices);
 	if (!num_devices) {
@@ -250,10 +257,10 @@ int check_thread()
 		return 1;
 	}
 
-	// ToDo log CUDA driver version
 	printf("nvenc_supported=true\n"
-	       "devices=%d\n",
-	       num_devices);
+	       "devices=%d\n"
+	       "cuda_driver=%d\n",
+	       num_devices, driver_version);
 
 	for (const auto &[codec, codec_caps] : caps) {
 		printf("\n[%s]\n", codec.c_str());
