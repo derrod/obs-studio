@@ -41,7 +41,7 @@ static void nv_bitstream_free(struct nvenc_data *enc, struct nv_bitstream *bs)
 static const char *h264_nvenc_get_name(void *type_data)
 {
 	UNUSED_PARAMETER(type_data);
-	return "NVIDIA NVENC H.264";
+	return "NVIDIA NVENC H.264 (new)";
 }
 
 static const char *h264_nvenc_soft_get_name(void *type_data)
@@ -54,7 +54,7 @@ static const char *h264_nvenc_soft_get_name(void *type_data)
 static const char *hevc_nvenc_get_name(void *type_data)
 {
 	UNUSED_PARAMETER(type_data);
-	return "NVIDIA NVENC HEVC";
+	return "NVIDIA NVENC HEVC (new)";
 }
 
 static const char *hevc_nvenc_soft_get_name(void *type_data)
@@ -67,7 +67,7 @@ static const char *hevc_nvenc_soft_get_name(void *type_data)
 static const char *av1_nvenc_get_name(void *type_data)
 {
 	UNUSED_PARAMETER(type_data);
-	return "NVIDIA NVENC AV1";
+	return "NVIDIA NVENC AV1 (new)";
 }
 
 static const char *av1_nvenc_soft_get_name(void *type_data)

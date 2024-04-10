@@ -302,7 +302,10 @@ static void read_codec_caps(config_t *config, enum codec_type codec,
 static bool nvenc_check(void)
 {
 #ifdef _WIN32
-	char *test_exe = os_get_executable_path_ptr("obs-nvenc-test.exe");
+	char *test_exe = obs_module_file("obs-nvenc-test.exe");
+	// In standalone mode we have to get the exe from the `data/` directory
+	if (!os_file_exists(test_exe))
+		test_exe = os_get_executable_path_ptr("obs-nvenc-test.exe");
 #else
 	char *test_exe = os_get_executable_path_ptr("obs-nvenc-test");
 #endif
@@ -400,7 +403,7 @@ void obs_nvenc_load(void)
 {
 	pthread_mutex_init(&init_mutex, NULL);
 	register_encoders();
-	register_compat_encoders();
+	//register_compat_encoders();
 }
 
 void obs_nvenc_unload(void)
