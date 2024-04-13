@@ -270,20 +270,6 @@ jobs:
           windows_debug_name="obs-studio-windows-x64-${{ steps.check.outputs.version }}-pdbs"
 
           echo '::group::Renaming Artifacts'
-          mv -v "${macos_arm64_artifact_name}/"obs-studio-*-macos-apple.dmg \
-            "${root_dir}"/OBS-Studio-${{ steps.check.outputs.version }}-macOS-Apple.dmg
-          mv -v "${macos_arm64_dsym_artifact_name}/"obs-studio-*-macos-apple-dSYMs.tar.xz \
-            "${root_dir}"/OBS-Studio-${{ steps.check.outputs.version }}-macOS-Apple-dSYMs.tar.xz
-          mv -v "${macos_intel_artifact_name}/"obs-studio-*-macos-intel.dmg \
-            "${root_dir}"/OBS-Studio-${{ steps.check.outputs.version }}-macOS-Intel.dmg
-          mv -v "${macos_intel_dsym_artifact_name}/"obs-studio-*-macos-intel-dSYMs.tar.xz \
-            "${root_dir}"/OBS-Studio-${{ steps.check.outputs.version }}-macOS-Intel-dSYMs.tar.xz
-          mv -v "${ubuntu_x86_64_artifact_name}/"obs-studio-*-x86_64-linux-gnu.deb \
-            "${root_dir}"/OBS-Studio-${{ steps.check.outputs.version }}-Ubuntu-x86_64.deb
-          mv -v "${ubuntu_x86_64_debug_name}/"obs-studio-*-x86_64-linux-gnu-dbgsym.ddeb \
-            "${root_dir}"/OBS-Studio-${{ steps.check.outputs.version }}-Ubuntu-x86_64-dbsym.ddeb
-          mv -v "${ubuntu_sources_name}/"obs-studio-*-sources.tar.gz \
-            "${root_dir}"/OBS-Studio-${{ steps.check.outputs.version }}-Sources.tar.gz
           mv -v "${windows_installer_name}/"OBS-Studio-*.exe \
             "${root_dir}"/OBS-Studio-${{ steps.check.outputs.version }}-Windows-Installer.exe
           mv -v "${windows_artifact_name}/"OBS-Studio-*.zip \
@@ -315,11 +301,6 @@ jobs:
           name: OBS Studio ${{ steps.check.outputs.version }}
           body_path: ${{ github.workspace }}/CHECKSUMS.txt
           files: |
-            ${{ github.workspace }}/OBS-Studio-${{ steps.check.outputs.version }}-macOS-*.dmg
-            ${{ github.workspace }}/OBS-Studio-${{ steps.check.outputs.version }}-macOS-*-dSYMs.tar.xz
-            ${{ github.workspace }}/OBS-Studio-${{ steps.check.outputs.version }}-Ubuntu-*.deb
-            ${{ github.workspace }}/OBS-Studio-${{ steps.check.outputs.version }}-Ubuntu-*.ddeb
-            ${{ github.workspace }}/OBS-Studio-${{ steps.check.outputs.version }}-Sources.tar.gz
             ${{ github.workspace }}/OBS-Studio-${{ steps.check.outputs.version }}-Windows.zip
             ${{ github.workspace }}/OBS-Studio-${{ steps.check.outputs.version }}-Windows-PDBs.zip
             ${{ github.workspace }}/OBS-Studio-${{ steps.check.outputs.version }}-Windows-Installer.exe
