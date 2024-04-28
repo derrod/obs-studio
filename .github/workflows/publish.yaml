@@ -177,7 +177,7 @@ jobs:
   windows-patches:
     name: Create Windows Patches 🩹
     needs: check-tag
-    if: github.repository_owner == 'obsproject' && fromJSON(needs.check-tag.outputs.validTag)
+    if: fromJSON(needs.check-tag.outputs.validTag)
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4

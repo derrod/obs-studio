@@ -138,7 +138,7 @@ jobs:
 
   windows-patches:
     name: Create Windows Patches 🩹
-    if: github.repository_owner == 'obsproject' && inputs.job == 'patches'
+    if: inputs.job == 'patches'
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
