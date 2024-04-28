@@ -1,0 +1,15 @@
+[general]
+log_level = "trace"
+
+[env]
+# On CI these should be in %PATH%
+pandoc_path = "pandoc"
+
+[generate]
+patch_type = "zstd"
+compress_files = true
+
+[package]
+[package.updater]
+vc_redist_path = "bouf/nsis/VC_redist.x64.exe"
+skip_sign = true
