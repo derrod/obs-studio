@@ -1592,6 +1592,9 @@ EXPORT void obs_source_get_audio_mix(const obs_source_t *source,
 EXPORT void obs_source_set_async_unbuffered(obs_source_t *source,
 					    bool unbuffered);
 EXPORT bool obs_source_async_unbuffered(const obs_source_t *source);
+EXPORT void obs_source_set_async_minimum_frames(obs_source_t *source,
+						uint32_t size);
+EXPORT uint32_t obs_source_get_async_minimum_frames(const obs_source_t *source);
 
 /** Used to decouple audio from video so that audio doesn't attempt to sync up
  * with video.  I.E. Audio acts independently.  Only works when in unbuffered

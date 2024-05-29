@@ -4289,6 +4289,9 @@ static bool ready_async_frame(obs_source_t *source, uint64_t sys_time)
 		return true;
 	}
 
+	if (source->async_frames.num < source->async_cache_min)
+		return false;
+
 #if DEBUG_ASYNC_FRAMES
 	blog(LOG_DEBUG,
 	     "source->last_frame_ts: %llu, frame_time: %llu, "
@@ -5939,6 +5942,21 @@ bool obs_source_async_unbuffered(const obs_source_t *source)
 {
 	return obs_source_valid(source, "obs_source_async_unbuffered")
 		       ? source->async_unbuffered
+		       : false;
+}
+
+void obs_source_set_async_minimum_frames(obs_source_t *source, uint32_t size)
+{
+	if (!obs_source_valid(source, "obs_source_set_async_minimum_frames"))
+		return;
+
+	source->async_cache_min = size;
+}
+
+uint32_t obs_source_get_async_minimum_frames(const obs_source_t *source)
+{
+	return obs_source_valid(source, "obs_source_get_async_minimum_frames")
+		       ? source->async_cache_min
 		       : false;
 }
 
