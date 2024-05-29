@@ -889,7 +889,15 @@ inline void DShowInput::SetupBuffering(obs_data_t *settings)
 	else
 		useBuffering = bufType == BufferingType::On;
 
+	uint32_t buffer_size = 0;
+	if (videoConfig.frameInterval) {
+		/* Set buffer size to roughly 1/10th of expected FPS.*/
+		double fps = 10000000.0 / double(videoConfig.frameInterval);
+		buffer_size = (uint32_t)(fps / 10.0);
+	}
+
 	obs_source_set_async_unbuffered(source, !useBuffering);
+	obs_source_set_async_minimum_frames(source, buffer_size);
 	obs_source_set_async_decoupled(source, IsDecoupled(videoConfig));
 }
 
@@ -1014,13 +1022,14 @@ bool DShowInput::UpdateVideoConfig(obs_data_t *settings)
 	     "\tflip: %d\n"
 	     "\tfps: %0.2f (interval: %lld)\n"
 	     "\tformat: %s\n"
-	     "\tbuffering: %s\n"
+	     "\tbuffering: %s (%d frames)\n"
 	     "\thardware decode: %s",
 	     obs_source_get_name(source), (const char *)name_utf8,
 	     (const char *)path_utf8, videoConfig.cx, videoConfig.cy_abs,
 	     (int)videoConfig.cy_flip, fps, videoConfig.frameInterval,
 	     formatName->array,
 	     obs_source_async_unbuffered(source) ? "disabled" : "enabled",
+	     obs_source_get_async_minimum_frames(source),
 	     hw_decode ? "enabled" : "disabled");
 
 	return true;
