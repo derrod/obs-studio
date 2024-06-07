@@ -27,6 +27,7 @@
 #include <QUrl>
 #include <QUrlQuery>
 #include <QUuid>
+#include <unordered_set>
 
 #include <nlohmann/json.hpp>
 
@@ -259,16 +260,19 @@ static void adjust_encoder_frame_rate_divisor(
 	obs_encoder_set_frame_rate_divisor(video_encoder, divisor);
 }
 
-static bool encoder_available(const char *type)
+static bool encoder_available(const std::string_view &type)
 {
-	const char *id = nullptr;
+	static const auto available_encoders = [] {
+		std::unordered_set<std::string_view> available_encoders;
 
-	for (size_t idx = 0; obs_enum_encoder_types(idx, &id); idx++) {
-		if (strcmp(id, type) == 0)
-			return true;
-	}
+		const char *id = nullptr;
+		for (size_t i = 0; obs_enum_encoder_types(i, &id); i++)
+			available_encoders.insert(id);
 
-	return false;
+		return available_encoders;
+	}();
+
+	return !!available_encoders.count(type);
 }
 
 static OBSEncoderAutoRelease create_video_encoder(
