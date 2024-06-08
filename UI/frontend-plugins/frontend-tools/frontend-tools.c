@@ -19,6 +19,8 @@ void InitScripts();
 void FreeScripts();
 #endif
 
+void InitChapterHotkeys();
+
 bool obs_module_load(void)
 {
 #if defined(_WIN32)
@@ -29,6 +31,7 @@ bool obs_module_load(void)
 #if defined(ENABLE_SCRIPTING)
 	InitScripts();
 #endif
+	InitChapterHotkeys();
 	return true;
 }
 
@@ -42,4 +45,5 @@ void obs_module_unload(void)
 #if defined(ENABLE_SCRIPTING)
 	FreeScripts();
 #endif
+	void FreeChapterHotkeys();
 }

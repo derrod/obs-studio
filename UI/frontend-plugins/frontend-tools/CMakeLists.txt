@@ -33,10 +33,12 @@ target_sources(
           frontend-tools.c
           output-timer.cpp
           output-timer.hpp
+          chapter-hotkeys.cpp
+          chapter-hotkeys.hpp
           tool-helpers.hpp)
 
 target_sources(frontend-tools PRIVATE forms/auto-scene-switcher.ui forms/captions.ui forms/output-timer.ui
-                                      forms/scripts.ui)
+                                      forms/scripts.ui forms/chapter-hotkeys.ui)
 
 target_compile_options(frontend-tools PRIVATE $<$<PLATFORM_ID:Darwin>:-Wno-quoted-include-in-framework-header>
                                               $<$<PLATFORM_ID:Darwin>:-Wno-comma>)
