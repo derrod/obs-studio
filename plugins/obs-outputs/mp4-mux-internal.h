@@ -128,6 +128,12 @@ struct mp4_track {
 	DARRAY(struct fragment_sample) fragment_samples;
 };
 
+struct mp4_chapter {
+	char *name;
+	/* Timestamp in usec */
+	uint64_t timestamp;
+};
+
 struct mp4_mux {
 	obs_output_t *output;
 	struct serializer *serializer;
@@ -153,6 +159,8 @@ struct mp4_mux {
 	DARRAY(struct mp4_track) tracks;
 	/* Special tracks */
 	struct mp4_track *chapter_track;
+	/* Chapters */
+	DARRAY(struct mp4_chapter) chapters;
 };
 
 /* clang-format off */

@@ -1972,6 +1972,34 @@ static size_t mp4_write_meta(struct mp4_mux *mux)
 	return write_box_size(s, start);
 }
 
+/// Nero Chapter Box
+static size_t mp4_write_chpl(struct mp4_mux *mux)
+{
+	struct serializer *s = mux->serializer;
+	int64_t start = serializer_get_pos(s);
+
+	write_fullbox(s, 0, "chpl", 1, 0);
+
+	s_wb32(s, 0); // unknown
+
+	uint8_t num_chapters = (uint8_t)(min(mux->chapters.num, 255));
+
+	/* Placeholder "Start" chapter is skipped */
+	s_w8(s, num_chapters - 1); // count
+
+	for (uint8_t i = 1; i < num_chapters; i++) {
+		struct mp4_chapter *chapter = &mux->chapters.array[i];
+		uint8_t len = (uint8_t)(min(strlen(chapter->name), 255));
+
+		// timestamp in 0.1 us increments for some reason
+		s_wb64(s, chapter->timestamp * 10);
+		s_w8(s, len);
+		s_write(s, chapter->name, len);
+	}
+
+	return write_box_size(s, start);
+}
+
 /// 8.10.1 User Data Box
 static size_t mp4_write_udta(struct mp4_mux *mux)
 {
@@ -1985,6 +2013,10 @@ static size_t mp4_write_udta(struct mp4_mux *mux)
 
 	// meta
 	mp4_write_meta(mux);
+
+	// chpl
+	if (mux->chapters.num > 1)
+		mp4_write_chpl(mux);
 
 	return write_box_size(s, start);
 }
@@ -2698,9 +2730,13 @@ void mp4_mux_destroy(struct mp4_mux *mux)
 	for (size_t i = 0; i < mux->tracks.num; i++)
 		free_track(&mux->tracks.array[i]);
 
+	for (size_t i = 0; i < mux->chapters.num; i++)
+		bfree(mux->chapters.array[i].name);
+
 	free_track(mux->chapter_track);
 	bfree(mux->chapter_track);
 	da_free(mux->tracks);
+	da_free(mux->chapters);
 	bfree(mux);
 }
 
@@ -2774,6 +2810,11 @@ bool mp4_mux_add_chapter(struct mp4_mux *mux, int64_t dts_usec,
 	struct encoder_packet pkt;
 	mp4_create_chapter_pkt(&pkt, dts_usec, name);
 	track_insert_packet(mux->chapter_track, &pkt);
+
+	/* Add chapter to list used for Nero-style chapters */
+	struct mp4_chapter *chap = da_push_back_new(mux->chapters);
+	chap->name = bstrdup(name);
+	chap->timestamp = dts_usec;
 
 	return true;
 }
