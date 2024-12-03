@@ -657,7 +657,7 @@ EXPORT void obs_set_output_source(uint32_t channel, obs_source_t *source);
 EXPORT obs_source_t *obs_get_output_source(uint32_t channel);
 
 /**
- * Enumerates all input sources
+ * Enumerates all input sources in the default namespace.
  *
  *   Callback function returns true to continue enumeration, or false to end
  * enumeration.
@@ -667,8 +667,20 @@ EXPORT obs_source_t *obs_get_output_source(uint32_t channel);
  */
 EXPORT void obs_enum_sources(bool (*enum_proc)(void *, obs_source_t *), void *param);
 
+/**
+ * Enumerates all input sources in a specified namespace
+ *
+ *   Callback function returns true to continue enumeration, or false to end
+ * enumeration.
+ *
+ *   Use obs_source_get_ref or obs_source_get_weak_source if you want to retain
+ * a reference after obs_enum_sources finishes
+ */
+EXPORT void obs_enum_sources_namespace(const char *ns, bool (*enum_proc)(void *, obs_source_t *), void *param);
+
 /** Enumerates scenes */
 EXPORT void obs_enum_scenes(bool (*enum_proc)(void *, obs_source_t *), void *param);
+EXPORT void obs_enum_scenes_namespace(const char *ns, bool (*enum_proc)(void *, obs_source_t *), void *param);
 
 /** Enumerates all sources (regardless of type) */
 EXPORT void obs_enum_all_sources(bool (*enum_proc)(void *, obs_source_t *), void *param);
@@ -683,12 +695,20 @@ EXPORT void obs_enum_encoders(bool (*enum_proc)(void *, obs_encoder_t *), void *
 EXPORT void obs_enum_services(bool (*enum_proc)(void *, obs_service_t *), void *param);
 
 /**
- * Gets a source by its name.
+ * Gets a source from the default namespace by name.
  *
  *   Increments the source reference counter, use obs_source_release to
  * release it when complete.
  */
 EXPORT obs_source_t *obs_get_source_by_name(const char *name);
+
+/**
+ * Gets a source from a namespace by name.
+ *
+ *   Increments the source reference counter, use obs_source_release to
+ * release it when complete.
+ */
+EXPORT obs_source_t *obs_get_source_by_namespace(const char *ns, const char *name);
 
 /**
  * Gets a source by its UUID.
@@ -752,7 +772,7 @@ EXPORT obs_data_t *obs_save_source(obs_source_t *source);
 EXPORT obs_source_t *obs_load_source(obs_data_t *data);
 
 /** Loads a private source from settings data */
-EXPORT obs_source_t *obs_load_private_source(obs_data_t *data);
+OBS_DEPRECATED obs_source_t *obs_load_private_source(obs_data_t *data);
 
 /** Send a save signal to sources */
 EXPORT void obs_source_save(obs_source_t *source);
@@ -773,6 +793,7 @@ EXPORT obs_data_array_t *obs_save_sources(void);
 
 typedef bool (*obs_save_source_filter_cb)(void *data, obs_source_t *source);
 EXPORT obs_data_array_t *obs_save_sources_filtered(obs_save_source_filter_cb cb, void *data);
+EXPORT obs_data_array_t *obs_save_sources_namespace_filtered(const char *ns, obs_save_source_filter_cb cb, void *data);
 
 /** Reset source UUIDs. NOTE: this function is only to be used by the UI and
  *  will be removed in a future version! */
@@ -959,8 +980,9 @@ EXPORT const char *obs_source_get_display_name(const char *id);
  * or modifying video/audio.  Use obs_source_release to release it.
  */
 EXPORT obs_source_t *obs_source_create(const char *id, const char *name, obs_data_t *settings, obs_data_t *hotkey_data);
-
 EXPORT obs_source_t *obs_source_create_private(const char *id, const char *name, obs_data_t *settings);
+EXPORT obs_source_t *obs_source_create_ns(const char *id, const char *ns, const char *name, obs_data_t *settings,
+					  obs_data_t *hotkey_data);
 
 /* if source has OBS_SOURCE_DO_NOT_DUPLICATE output flag set, only returns a
  * reference */
@@ -1086,6 +1108,9 @@ EXPORT void obs_source_set_name(obs_source_t *source, const char *name);
 
 /** Gets the UUID of a source */
 EXPORT const char *obs_source_get_uuid(const obs_source_t *source);
+
+/** Gets the namespace of a source */
+EXPORT const char *obs_source_get_namespace(const obs_source_t *source);
 
 /** Gets the source type */
 EXPORT enum obs_source_type obs_source_get_type(const obs_source_t *source);

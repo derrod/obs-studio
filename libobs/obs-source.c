@@ -115,10 +115,11 @@ static const char *source_signals[] = {
 	NULL,
 };
 
-bool obs_source_init_context(struct obs_source *source, obs_data_t *settings, const char *name, const char *uuid,
-			     obs_data_t *hotkey_data, bool private)
+bool obs_source_init_context(struct obs_source *source, obs_data_t *settings, const char *ns, const char *name,
+			     const char *uuid, obs_data_t *hotkey_data, bool private)
 {
-	if (!obs_context_data_init(&source->context, OBS_OBJ_TYPE_SOURCE, settings, name, uuid, hotkey_data, private))
+	if (!obs_context_data_init(&source->context, OBS_OBJ_TYPE_SOURCE, settings, ns, name, uuid, hotkey_data,
+				   private))
 		return false;
 
 	return signal_handler_add_array(source->context.signals, source_signals);
@@ -233,7 +234,8 @@ static void obs_source_init_finalize(struct obs_source *source)
 	}
 
 	if (!source->context.private) {
-		obs_context_data_insert_name(&source->context, &obs->data.sources_mutex, &obs->data.public_sources);
+		obs_context_data_insert_namespace(&source->context, &obs->data.sources_mutex,
+						  &obs->data.sources_namespaced);
 	}
 	obs_context_data_insert_uuid(&source->context, &obs->data.sources_mutex, &obs->data.sources);
 }
@@ -318,7 +320,7 @@ static void obs_source_init_audio_hotkeys(struct obs_source *source)
 							      obs_source_hotkey_push_to_talk, source);
 }
 
-static obs_source_t *obs_source_create_internal(const char *id, const char *name, const char *uuid,
+static obs_source_t *obs_source_create_internal(const char *id, const char *name, const char *uuid, const char *ns,
 						obs_data_t *settings, obs_data_t *hotkey_data, bool private,
 						uint32_t last_obs_ver)
 {
@@ -347,7 +349,7 @@ static obs_source_t *obs_source_create_internal(const char *id, const char *name
 	source->push_to_talk_key = OBS_INVALID_HOTKEY_ID;
 	source->last_obs_ver = last_obs_ver;
 
-	if (!obs_source_init_context(source, settings, name, uuid, hotkey_data, private))
+	if (!obs_source_init_context(source, settings, ns, name, uuid, hotkey_data, private))
 		goto fail;
 
 	if (info) {
@@ -392,18 +394,26 @@ fail:
 
 obs_source_t *obs_source_create(const char *id, const char *name, obs_data_t *settings, obs_data_t *hotkey_data)
 {
-	return obs_source_create_internal(id, name, NULL, settings, hotkey_data, false, LIBOBS_API_VER);
+	return obs_source_create_internal(id, name, NULL, DEFAULT_NAMESPACE, settings, hotkey_data, false,
+					  LIBOBS_API_VER);
 }
 
 obs_source_t *obs_source_create_private(const char *id, const char *name, obs_data_t *settings)
 {
-	return obs_source_create_internal(id, name, NULL, settings, NULL, true, LIBOBS_API_VER);
+	return obs_source_create_internal(id, name, NULL, NULL, settings, NULL, true, LIBOBS_API_VER);
 }
 
-obs_source_t *obs_source_create_set_last_ver(const char *id, const char *name, const char *uuid, obs_data_t *settings,
-					     obs_data_t *hotkey_data, uint32_t last_obs_ver, bool is_private)
+obs_source_t *obs_source_create_ns(const char *id, const char *ns, const char *name, obs_data_t *settings,
+				   obs_data_t *hotkey_data)
 {
-	return obs_source_create_internal(id, name, uuid, settings, hotkey_data, is_private, last_obs_ver);
+	return obs_source_create_internal(id, name, NULL, ns, settings, hotkey_data, !ns, LIBOBS_API_VER);
+}
+
+obs_source_t *obs_source_create_set_last_ver(const char *id, const char *name, const char *uuid, const char *ns,
+					     obs_data_t *settings, obs_data_t *hotkey_data, uint32_t last_obs_ver,
+					     bool is_private)
+{
+	return obs_source_create_internal(id, name, uuid, ns, settings, hotkey_data, is_private, last_obs_ver);
 }
 
 static char *get_new_filter_name(obs_source_t *dst, const char *name)
@@ -525,9 +535,8 @@ obs_source_t *obs_source_duplicate(obs_source_t *source, const char *new_name, b
 	settings = obs_data_create();
 	obs_data_apply(settings, source->context.settings);
 
-	new_source = create_private ? obs_source_create_private(source->info.id, new_name, settings)
-				    : obs_source_create(source->info.id, new_name, settings, NULL);
-
+	new_source = obs_source_create_ns(source->info.id, create_private ? NULL : source->context.namespace, new_name,
+					  settings, NULL);
 	new_source->audio_mixers = source->audio_mixers;
 	new_source->sync_offset = source->sync_offset;
 	new_source->user_volume = source->user_volume;
@@ -614,7 +623,7 @@ void obs_source_destroy(struct obs_source *source)
 
 	obs_context_data_remove_uuid(&source->context, &obs->data.sources);
 	if (!source->context.private)
-		obs_context_data_remove_name(&source->context, &obs->data.public_sources);
+		obs_context_data_remove_namespace(&source->context, &obs->data.sources_namespaced);
 
 	source_profiler_remove_source(source);
 
@@ -4102,6 +4111,11 @@ const char *obs_source_get_uuid(const obs_source_t *source)
 	return obs_source_valid(source, "obs_source_get_uuid") ? source->context.uuid : NULL;
 }
 
+const char *obs_source_get_namespace(const obs_source_t *source)
+{
+	return obs_source_valid(source, "obs_source_get_namespace") ? source->context.namespace : NULL;
+}
+
 void obs_source_set_name(obs_source_t *source, const char *name)
 {
 	if (!obs_source_valid(source, "obs_source_set_name"))
@@ -4112,7 +4126,7 @@ void obs_source_set_name(obs_source_t *source, const char *name)
 		char *prev_name = bstrdup(source->context.name);
 
 		if (!source->context.private) {
-			obs_context_data_setname_ht(&source->context, name, &obs->data.public_sources);
+			obs_context_data_setname_namespace(&source->context, name, &obs->data.sources_namespaced);
 		} else {
 			obs_context_data_setname(&source->context, name);
 		}

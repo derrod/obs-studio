@@ -941,7 +941,7 @@ static bool obs_init_data(void)
 		goto fail;
 
 	data->sources = NULL;
-	data->public_sources = NULL;
+	data->sources_namespaced = NULL;
 	data->private_data = obs_data_create();
 	data->valid = true;
 
@@ -973,6 +973,19 @@ void obs_main_view_free(struct obs_view *view)
 			blog(LOG_INFO, "\t%d " #type "(s) were remaining", unfreed); \
 	} while (false)
 
+#define FREE_OBS_NAMESPACE(handle, table, type)                                    \
+	do {                                                                       \
+		struct obs_context_namespace *ns, *tmp;                            \
+		HASH_ITER (hh, *(struct obs_context_namespace **)table, ns, tmp) { \
+			if (ns->objects) {                                         \
+				FREE_OBS_HASH_TABLE(hh, ns->objects, type);        \
+			}                                                          \
+			HASH_DEL(*(struct obs_context_namespace **)table, ns);     \
+			bfree((void *)ns->name);                                   \
+			bfree(ns);                                                 \
+		}                                                                  \
+	} while (false)
+
 #define FREE_OBS_LINKED_LIST(type)                                                   \
 	do {                                                                         \
 		int unfreed = 0;                                                     \
@@ -1000,7 +1013,7 @@ static void obs_free_data(void)
 	FREE_OBS_LINKED_LIST(display);
 	FREE_OBS_LINKED_LIST(service);
 
-	FREE_OBS_HASH_TABLE(hh, &data->public_sources, source);
+	FREE_OBS_NAMESPACE(hh, &data->sources_namespaced, source);
 	FREE_OBS_HASH_TABLE(hh_uuid, &data->sources, source);
 
 	os_task_queue_wait(obs->destruction_task_thread);
@@ -1763,27 +1776,65 @@ void obs_set_output_source(uint32_t channel, obs_source_t *source)
 	}
 }
 
-void obs_enum_sources(bool (*enum_proc)(void *, obs_source_t *), void *param)
+void obs_enum_sources_namespace(const char *ns, bool (*enum_proc)(void *, obs_source_t *), void *param)
 {
-	obs_source_t *source;
+	struct obs_context_namespace *nsctx;
 
 	pthread_mutex_lock(&obs->data.sources_mutex);
-	source = obs->data.public_sources;
 
-	while (source) {
-		obs_source_t *s = obs_source_get_ref(source);
-		if (s) {
-			if (s->info.type == OBS_SOURCE_TYPE_INPUT && !enum_proc(param, s)) {
+	HASH_FIND_STR(obs->data.sources_namespaced, ns, nsctx);
+
+	if (nsctx) {
+		obs_source_t *source = (obs_source_t *)nsctx->objects;
+
+		while (source) {
+			obs_source_t *s = obs_source_get_ref(source);
+			if (s) {
+				if (s->info.type == OBS_SOURCE_TYPE_INPUT && !enum_proc(param, s)) {
+					obs_source_release(s);
+					break;
+				} else if (strcmp(s->info.id, group_info.id) == 0 && !enum_proc(param, s)) {
+					obs_source_release(s);
+					break;
+				}
 				obs_source_release(s);
-				break;
-			} else if (strcmp(s->info.id, group_info.id) == 0 && !enum_proc(param, s)) {
-				obs_source_release(s);
-				break;
 			}
-			obs_source_release(s);
-		}
 
-		source = (obs_source_t *)source->context.hh.next;
+			source = (obs_source_t *)source->context.hh.next;
+		}
+	}
+
+	pthread_mutex_unlock(&obs->data.sources_mutex);
+}
+
+void obs_enum_sources(bool (*enum_proc)(void *, obs_source_t *), void *param)
+{
+	obs_enum_sources_namespace(DEFAULT_NAMESPACE, enum_proc, param);
+}
+
+void obs_enum_scenes_namespace(const char *ns, bool (*enum_proc)(void *, obs_source_t *), void *param)
+{
+	struct obs_context_namespace *nsctx;
+
+	pthread_mutex_lock(&obs->data.sources_mutex);
+
+	HASH_FIND_STR(obs->data.sources_namespaced, ns, nsctx);
+
+	if (nsctx) {
+		obs_source_t *source = (obs_source_t *)nsctx->objects;
+
+		while (source) {
+			obs_source_t *s = obs_source_get_ref(source);
+			if (s) {
+				if (source->info.type == OBS_SOURCE_TYPE_SCENE && !enum_proc(param, s)) {
+					obs_source_release(s);
+					break;
+				}
+				obs_source_release(s);
+			}
+
+			source = (obs_source_t *)source->context.hh.next;
+		}
 	}
 
 	pthread_mutex_unlock(&obs->data.sources_mutex);
@@ -1791,25 +1842,7 @@ void obs_enum_sources(bool (*enum_proc)(void *, obs_source_t *), void *param)
 
 void obs_enum_scenes(bool (*enum_proc)(void *, obs_source_t *), void *param)
 {
-	obs_source_t *source;
-
-	pthread_mutex_lock(&obs->data.sources_mutex);
-
-	source = obs->data.public_sources;
-	while (source) {
-		obs_source_t *s = obs_source_get_ref(source);
-		if (s) {
-			if (source->info.type == OBS_SOURCE_TYPE_SCENE && !enum_proc(param, s)) {
-				obs_source_release(s);
-				break;
-			}
-			obs_source_release(s);
-		}
-
-		source = (obs_source_t *)source->context.hh.next;
-	}
-
-	pthread_mutex_unlock(&obs->data.sources_mutex);
+	obs_enum_scenes_namespace(DEFAULT_NAMESPACE, enum_proc, param);
 }
 
 static inline void obs_enum(void *pstart, pthread_mutex_t *mutex, void *proc, void *param)
@@ -1901,6 +1934,22 @@ static inline void *get_context_by_name(void *vfirst, const char *name, pthread_
 	return context;
 }
 
+static inline void *get_context_by_namespace(void *vfirst, const char *ns, const char *name, pthread_mutex_t *mutex,
+					     void *(*addref)(void *))
+{
+	struct obs_context_namespace **first = vfirst;
+	struct obs_context_namespace *ctxns;
+
+	pthread_mutex_lock(mutex);
+	HASH_FIND_STR(*first, ns, ctxns);
+	pthread_mutex_unlock(mutex);
+
+	if (!ctxns)
+		return NULL;
+
+	return get_context_by_name(&ctxns->objects, name, mutex, addref);
+}
+
 static void *get_context_by_uuid(void *ptable, const char *uuid, pthread_mutex_t *mutex, void *(*addref)(void *))
 {
 	struct obs_context_data **ht = ptable;
@@ -1938,7 +1987,14 @@ static inline void *obs_service_addref_safe_(void *ref)
 
 obs_source_t *obs_get_source_by_name(const char *name)
 {
-	return get_context_by_name(&obs->data.public_sources, name, &obs->data.sources_mutex, obs_source_addref_safe_);
+	return get_context_by_namespace(&obs->data.sources_namespaced, DEFAULT_NAMESPACE, name,
+					&obs->data.sources_mutex, obs_source_addref_safe_);
+}
+
+obs_source_t *obs_get_source_by_namespace(const char *ns, const char *name)
+{
+	return get_context_by_namespace(&obs->data.sources_namespaced, ns, name, &obs->data.sources_mutex,
+					obs_source_addref_safe_);
 }
 
 obs_source_t *obs_get_source_by_uuid(const char *uuid)
@@ -2111,6 +2167,7 @@ static obs_source_t *obs_load_source_type(obs_data_t *source_data, bool is_priva
 	obs_source_t *source;
 	const char *name = obs_data_get_string(source_data, "name");
 	const char *uuid = obs_data_get_string(source_data, "uuid");
+	const char *ns = obs_data_get_string(source_data, "namespace");
 	const char *id = obs_data_get_string(source_data, "id");
 	const char *v_id = obs_data_get_string(source_data, "versioned_id");
 	obs_data_t *settings = obs_data_get_obj(source_data, "settings");
@@ -2131,7 +2188,7 @@ static obs_source_t *obs_load_source_type(obs_data_t *source_data, bool is_priva
 	if (!*v_id)
 		v_id = id;
 
-	source = obs_source_create_set_last_ver(v_id, name, uuid, settings, hotkeys, prev_ver, is_private);
+	source = obs_source_create_set_last_ver(v_id, name, uuid, ns, settings, hotkeys, prev_ver, is_private);
 
 	if (source->owns_info_id) {
 		bfree((void *)source->info.unversioned_id);
@@ -2293,6 +2350,7 @@ obs_data_t *obs_save_source(obs_source_t *source)
 	int64_t sync = obs_source_get_sync_offset(source);
 	uint32_t flags = obs_source_get_flags(source);
 	const char *name = obs_source_get_name(source);
+	const char *ns = obs_source_get_namespace(source);
 	const char *uuid = obs_source_get_uuid(source);
 	const char *id = source->info.unversioned_id;
 	const char *v_id = source->info.id;
@@ -2318,6 +2376,8 @@ obs_data_t *obs_save_source(obs_source_t *source)
 
 	obs_data_set_int(source_data, "prev_ver", LIBOBS_API_VER);
 
+	obs_data_set_string(source_data, "name", name);
+	obs_data_set_string(source_data, "namespace", ns);
 	obs_data_set_string(source_data, "name", name);
 	obs_data_set_string(source_data, "uuid", uuid);
 	obs_data_set_string(source_data, "id", id);
@@ -2376,33 +2436,41 @@ obs_data_t *obs_save_source(obs_source_t *source)
 	return source_data;
 }
 
-obs_data_array_t *obs_save_sources_filtered(obs_save_source_filter_cb cb, void *data_)
+obs_data_array_t *obs_save_sources_namespace_filtered(const char *ns, obs_save_source_filter_cb cb, void *data_)
 {
 	struct obs_core_data *data = &obs->data;
-	obs_data_array_t *array;
-	obs_source_t *source;
+	obs_data_array_t *array = obs_data_array_create();
 
-	array = obs_data_array_create();
+	struct obs_context_namespace *nsctx;
 
-	pthread_mutex_lock(&data->sources_mutex);
+	pthread_mutex_lock(&obs->data.sources_mutex);
 
-	source = data->public_sources;
+	HASH_FIND_STR(obs->data.sources_namespaced, ns, nsctx);
+	if (nsctx) {
 
-	while (source) {
-		if ((source->info.type != OBS_SOURCE_TYPE_FILTER) != 0 && !source->removed && !source->temp_removed &&
-		    cb(data_, source)) {
-			obs_data_t *source_data = obs_save_source(source);
+		obs_source_t *source = (obs_source_t *)nsctx->objects;
 
-			obs_data_array_push_back(array, source_data);
-			obs_data_release(source_data);
+		while (source) {
+			if ((source->info.type != OBS_SOURCE_TYPE_FILTER) != 0 && !source->removed &&
+			    !source->temp_removed && cb(data_, source)) {
+				obs_data_t *source_data = obs_save_source(source);
+
+				obs_data_array_push_back(array, source_data);
+				obs_data_release(source_data);
+			}
+
+			source = (obs_source_t *)source->context.hh.next;
 		}
-
-		source = (obs_source_t *)source->context.hh.next;
 	}
 
 	pthread_mutex_unlock(&data->sources_mutex);
 
 	return array;
+}
+
+obs_data_array_t *obs_save_sources_filtered(obs_save_source_filter_cb cb, void *data_)
+{
+	return obs_save_sources_namespace_filtered(DEFAULT_NAMESPACE, cb, data_);
 }
 
 static bool save_source_filter(void *data, obs_source_t *source)
@@ -2459,7 +2527,7 @@ static inline char *dup_name(const char *name, bool private)
 }
 
 static inline bool obs_context_data_init_wrap(struct obs_context_data *context, enum obs_obj_type type,
-					      obs_data_t *settings, const char *name, const char *uuid,
+					      obs_data_t *settings, const char *ns, const char *name, const char *uuid,
 					      obs_data_t *hotkey_data, bool private)
 {
 	assert(context);
@@ -2485,6 +2553,11 @@ static inline bool obs_context_data_init_wrap(struct obs_context_data *context, 
 	else if (type == OBS_OBJ_TYPE_SOURCE)
 		context->uuid = os_generate_uuid();
 
+	if (ns && strlen(ns))
+		context->namespace = bstrdup(ns);
+	else if (!private)
+		context->namespace = bstrdup(DEFAULT_NAMESPACE);
+
 	context->name = dup_name(name, private);
 	context->settings = obs_data_newref(settings);
 	context->hotkey_data = obs_data_newref(hotkey_data);
@@ -2492,9 +2565,9 @@ static inline bool obs_context_data_init_wrap(struct obs_context_data *context, 
 }
 
 bool obs_context_data_init(struct obs_context_data *context, enum obs_obj_type type, obs_data_t *settings,
-			   const char *name, const char *uuid, obs_data_t *hotkey_data, bool private)
+			   const char *ns, const char *name, const char *uuid, obs_data_t *hotkey_data, bool private)
 {
-	if (obs_context_data_init_wrap(context, type, settings, name, uuid, hotkey_data, private)) {
+	if (obs_context_data_init_wrap(context, type, settings, ns, name, uuid, hotkey_data, private)) {
 		return true;
 	} else {
 		obs_context_data_free(context);
@@ -2512,6 +2585,7 @@ void obs_context_data_free(struct obs_context_data *context)
 	pthread_mutex_destroy(&context->rename_cache_mutex);
 	bfree(context->name);
 	bfree((void *)context->uuid);
+	bfree((void *)context->namespace);
 
 	for (size_t i = 0; i < context->rename_cache.num; i++)
 		bfree(context->rename_cache.array[i]);
@@ -2597,6 +2671,30 @@ void obs_context_data_insert_name(struct obs_context_data *context, pthread_mute
 	pthread_mutex_unlock(mutex);
 }
 
+void obs_context_data_insert_namespace(struct obs_context_data *context, pthread_mutex_t *mutex,
+				       struct obs_context_namespace **first)
+{
+	assert(context);
+	assert(mutex);
+	assert(first);
+
+	pthread_mutex_lock(mutex);
+
+	/* Ensure namespace exists */
+	struct obs_context_namespace *ns = NULL;
+	HASH_FIND_STR(*first, context->namespace, ns);
+	if (!ns) {
+		ns = bzalloc(sizeof(struct obs_context_namespace));
+		ns->name = bstrdup(context->namespace);
+		HASH_ADD_STR(*first, name, ns);
+		blog(LOG_DEBUG, "Created new namespace '%s'", ns->name);
+	}
+
+	pthread_mutex_unlock(mutex);
+
+	obs_context_data_insert_name(context, mutex, &ns->objects);
+}
+
 void obs_context_data_insert_uuid(struct obs_context_data *context, pthread_mutex_t *mutex, void *pfirst_uuid)
 {
 	struct obs_context_data **first_uuid = pfirst_uuid;
@@ -2651,6 +2749,24 @@ void obs_context_data_remove_name(struct obs_context_data *context, void *phead)
 	pthread_mutex_lock(context->mutex);
 	HASH_DELETE(hh, *head, context);
 	pthread_mutex_unlock(context->mutex);
+}
+
+void obs_context_data_remove_namespace(struct obs_context_data *context, struct obs_context_namespace **first)
+{
+	assert(first);
+
+	if (!context)
+		return;
+
+	struct obs_context_namespace *ns = NULL;
+	pthread_mutex_lock(context->mutex);
+	HASH_FIND_STR(*first, context->namespace, ns);
+	pthread_mutex_unlock(context->mutex);
+
+	if (!ns)
+		return;
+
+	obs_context_data_remove_name(context, &ns->objects);
 }
 
 void obs_context_data_remove_uuid(struct obs_context_data *context, void *puuid_head)
@@ -2712,6 +2828,22 @@ void obs_context_data_setname_ht(struct obs_context_data *context, const char *n
 
 	pthread_mutex_unlock(&context->rename_cache_mutex);
 	pthread_mutex_unlock(context->mutex);
+}
+
+void obs_context_data_setname_namespace(struct obs_context_data *context, const char *name,
+					struct obs_context_namespace **first)
+{
+	assert(first);
+
+	pthread_mutex_lock(context->mutex);
+	struct obs_context_namespace *ns = NULL;
+	HASH_FIND_STR(*first, context->namespace, ns);
+	pthread_mutex_unlock(context->mutex);
+
+	if (!ns)
+		return;
+
+	obs_context_data_setname_ht(context, name, &ns->objects);
 }
 
 profiler_name_store_t *obs_get_profiler_name_store(void)

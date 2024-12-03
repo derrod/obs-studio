@@ -394,11 +394,13 @@ struct obs_core_audio {
 	struct deque tasks;
 };
 
+static const char *DEFAULT_NAMESPACE = "public";
+
 /* user sources, output channels, and displays */
 struct obs_core_data {
 	/* Hash tables (uthash) */
-	struct obs_source *sources;        /* Lookup by UUID (hh_uuid) */
-	struct obs_source *public_sources; /* Lookup by name (hh) */
+	struct obs_source *sources;                       /* All sources, lookup by UUID (hh_uuid) */
+	struct obs_context_namespace *sources_namespaced; /* Non-private sources, lookup by name + namespace */
 
 	/* Linked lists */
 	struct obs_source *first_audio_source;
@@ -546,6 +548,7 @@ typedef void (*obs_destroy_cb)(void *obj);
 
 struct obs_context_data {
 	char *name;
+	const char *namespace;
 	const char *uuid;
 	void *data;
 	obs_data_t *settings;
@@ -574,22 +577,36 @@ struct obs_context_data {
 };
 
 extern bool obs_context_data_init(struct obs_context_data *context, enum obs_obj_type type, obs_data_t *settings,
-				  const char *name, const char *uuid, obs_data_t *hotkey_data, bool private);
+				  const char *ns, const char *name, const char *uuid, obs_data_t *hotkey_data,
+				  bool private);
 extern void obs_context_init_control(struct obs_context_data *context, void *object, obs_destroy_cb destroy);
 extern void obs_context_data_free(struct obs_context_data *context);
 
 extern void obs_context_data_insert(struct obs_context_data *context, pthread_mutex_t *mutex, void *first);
 extern void obs_context_data_insert_name(struct obs_context_data *context, pthread_mutex_t *mutex, void *first);
+extern void obs_context_data_insert_namespace(struct obs_context_data *context, pthread_mutex_t *mutex,
+					      struct obs_context_namespace **namespace);
 extern void obs_context_data_insert_uuid(struct obs_context_data *context, pthread_mutex_t *mutex, void *first_uuid);
 
 extern void obs_context_data_remove(struct obs_context_data *context);
 extern void obs_context_data_remove_name(struct obs_context_data *context, void *phead);
+extern void obs_context_data_remove_namespace(struct obs_context_data *context,
+					      struct obs_context_namespace **namespace);
 extern void obs_context_data_remove_uuid(struct obs_context_data *context, void *puuid_head);
 
 extern void obs_context_wait(struct obs_context_data *context);
 
 extern void obs_context_data_setname(struct obs_context_data *context, const char *name);
 extern void obs_context_data_setname_ht(struct obs_context_data *context, const char *name, void *phead);
+extern void obs_context_data_setname_namespace(struct obs_context_data *context, const char *name,
+					       struct obs_context_namespace **first);
+
+/* A namespace contains a listof context objects within a named space. */
+struct obs_context_namespace {
+	const char *name;
+	struct obs_context_data *objects;
+	UT_hash_handle hh;
+};
 
 /* ------------------------------------------------------------------------- */
 /* ref-counting  */
@@ -886,8 +903,8 @@ struct obs_source {
 
 extern struct obs_source_info *get_source_info(const char *id);
 extern struct obs_source_info *get_source_info2(const char *unversioned_id, uint32_t ver);
-extern bool obs_source_init_context(struct obs_source *source, obs_data_t *settings, const char *name, const char *uuid,
-				    obs_data_t *hotkey_data, bool private);
+extern bool obs_source_init_context(struct obs_source *source, obs_data_t *settings, const char *ns, const char *name,
+				    const char *uuid, obs_data_t *hotkey_data, bool private);
 
 extern bool obs_transition_init(obs_source_t *transition);
 extern void obs_transition_free(obs_source_t *transition);
@@ -900,7 +917,7 @@ struct audio_monitor *audio_monitor_create(obs_source_t *source);
 void audio_monitor_reset(struct audio_monitor *monitor);
 extern void audio_monitor_destroy(struct audio_monitor *monitor);
 
-extern obs_source_t *obs_source_create_set_last_ver(const char *id, const char *name, const char *uuid,
+extern obs_source_t *obs_source_create_set_last_ver(const char *id, const char *name, const char *uuid, const char *ns,
 						    obs_data_t *settings, obs_data_t *hotkey_data,
 						    uint32_t last_obs_ver, bool is_private);
 extern void obs_source_destroy(struct obs_source *source);
