@@ -1939,15 +1939,16 @@ static inline void *get_context_by_namespace(void *vfirst, const char *ns, const
 {
 	struct obs_context_namespace **first = vfirst;
 	struct obs_context_namespace *ctxns;
+	struct obs_context_data *context = NULL;
 
 	pthread_mutex_lock(mutex);
 	HASH_FIND_STR(*first, ns, ctxns);
+	if (ctxns) {
+		HASH_FIND_STR(ctxns->objects, name, context);
+	}
 	pthread_mutex_unlock(mutex);
 
-	if (!ctxns)
-		return NULL;
-
-	return get_context_by_name(&ctxns->objects, name, mutex, addref);
+	return context;
 }
 
 static void *get_context_by_uuid(void *ptable, const char *uuid, pthread_mutex_t *mutex, void *(*addref)(void *))
@@ -2760,13 +2761,12 @@ void obs_context_data_remove_namespace(struct obs_context_data *context, struct 
 
 	struct obs_context_namespace *ns = NULL;
 	pthread_mutex_lock(context->mutex);
+
 	HASH_FIND_STR(*first, context->namespace, ns);
+	if (ns)
+		HASH_DELETE(hh, ns->objects, context);
+
 	pthread_mutex_unlock(context->mutex);
-
-	if (!ns)
-		return;
-
-	obs_context_data_remove_name(context, &ns->objects);
 }
 
 void obs_context_data_remove_uuid(struct obs_context_data *context, void *puuid_head)
