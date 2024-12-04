@@ -813,6 +813,10 @@ EXPORT bool obs_obj_invalid(void *obj);
 EXPORT void *obs_obj_get_data(void *obj);
 EXPORT bool obs_obj_is_private(void *obj);
 
+/* Get default namespace for an object type.
+ * Returns NULL if namespaces are not used/supported for this type. */
+EXPORT const char *obs_obj_get_default_namespace(enum obs_obj_type type);
+
 typedef bool (*obs_enum_audio_device_cb)(void *data, const char *name, const char *id);
 
 EXPORT bool obs_audio_monitoring_available(void);

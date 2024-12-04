@@ -394,8 +394,6 @@ struct obs_core_audio {
 	struct deque tasks;
 };
 
-static const char *DEFAULT_NAMESPACE = "public";
-
 /* user sources, output channels, and displays */
 struct obs_core_data {
 	/* Hash tables (uthash) */
@@ -607,6 +605,9 @@ struct obs_context_namespace {
 	struct obs_context_data *objects;
 	UT_hash_handle hh;
 };
+
+/* Default namespace per type. */
+static const char *NAMESPACE_DEFAULT_SOURCES = "public";
 
 /* ------------------------------------------------------------------------- */
 /* ref-counting  */

@@ -1809,7 +1809,7 @@ void obs_enum_sources_namespace(const char *ns, bool (*enum_proc)(void *, obs_so
 
 void obs_enum_sources(bool (*enum_proc)(void *, obs_source_t *), void *param)
 {
-	obs_enum_sources_namespace(DEFAULT_NAMESPACE, enum_proc, param);
+	obs_enum_sources_namespace(NAMESPACE_DEFAULT_SOURCES, enum_proc, param);
 }
 
 void obs_enum_scenes_namespace(const char *ns, bool (*enum_proc)(void *, obs_source_t *), void *param)
@@ -1842,7 +1842,7 @@ void obs_enum_scenes_namespace(const char *ns, bool (*enum_proc)(void *, obs_sou
 
 void obs_enum_scenes(bool (*enum_proc)(void *, obs_source_t *), void *param)
 {
-	obs_enum_scenes_namespace(DEFAULT_NAMESPACE, enum_proc, param);
+	obs_enum_scenes_namespace(NAMESPACE_DEFAULT_SOURCES, enum_proc, param);
 }
 
 static inline void obs_enum(void *pstart, pthread_mutex_t *mutex, void *proc, void *param)
@@ -1987,7 +1987,7 @@ static inline void *obs_service_addref_safe_(void *ref)
 
 obs_source_t *obs_get_source_by_name(const char *name)
 {
-	return get_context_by_namespace(&obs->data.sources_namespaced, DEFAULT_NAMESPACE, name,
+	return get_context_by_namespace(&obs->data.sources_namespaced, NAMESPACE_DEFAULT_SOURCES, name,
 					&obs->data.sources_mutex, obs_source_addref_safe_);
 }
 
@@ -2470,7 +2470,7 @@ obs_data_array_t *obs_save_sources_namespace_filtered(const char *ns, obs_save_s
 
 obs_data_array_t *obs_save_sources_filtered(obs_save_source_filter_cb cb, void *data_)
 {
-	return obs_save_sources_namespace_filtered(DEFAULT_NAMESPACE, cb, data_);
+	return obs_save_sources_namespace_filtered(NAMESPACE_DEFAULT_SOURCES, cb, data_);
 }
 
 static bool save_source_filter(void *data, obs_source_t *source)
@@ -2556,7 +2556,7 @@ static inline bool obs_context_data_init_wrap(struct obs_context_data *context, 
 	if (ns && strlen(ns))
 		context->namespace = bstrdup(ns);
 	else if (!private)
-		context->namespace = bstrdup(DEFAULT_NAMESPACE);
+		context->namespace = bstrdup(NAMESPACE_DEFAULT_SOURCES);
 
 	context->name = dup_name(name, private);
 	context->settings = obs_data_newref(settings);
@@ -2923,6 +2923,14 @@ bool obs_obj_is_private(void *obj)
 		return false;
 
 	return context->private;
+}
+
+const char *obs_obj_get_default_namespace(enum obs_obj_type type)
+{
+	if (type != OBS_OBJ_TYPE_SOURCE)
+		return NULL;
+
+	return NAMESPACE_DEFAULT_SOURCES;
 }
 
 void obs_reset_audio_monitoring(void)

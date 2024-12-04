@@ -394,7 +394,7 @@ fail:
 
 obs_source_t *obs_source_create(const char *id, const char *name, obs_data_t *settings, obs_data_t *hotkey_data)
 {
-	return obs_source_create_internal(id, name, NULL, DEFAULT_NAMESPACE, settings, hotkey_data, false,
+	return obs_source_create_internal(id, name, NULL, NAMESPACE_DEFAULT_SOURCES, settings, hotkey_data, false,
 					  LIBOBS_API_VER);
 }
 
