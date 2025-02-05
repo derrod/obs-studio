@@ -7,3 +7,7 @@
 [submodule "plugins/obs-websocket"]
 	path = plugins/obs-websocket
 	url = https://github.com/obsproject/obs-websocket.git
+[submodule "frontend/plugins/vertical-canvas"]
+	path = frontend/plugins/vertical-canvas
+	url = https://github.com/dsaedtler/obs-vertical-canvas.git
+	branch = eb-prototype
