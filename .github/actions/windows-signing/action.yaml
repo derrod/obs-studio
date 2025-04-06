@@ -133,22 +133,3 @@ runs:
            "--packaging-only"
         )
         Invoke-External "${{ github.workspace }}\bouf\bin\bouf.exe" @boufArgs
-
-    - name: Sync Latest Build
-      if: inputs.architecture == 'x64'
-      shell: pwsh
-      env:
-        RCLONE_INCLUDE: '**/${{ inputs.version }}/**'
-        RCLONE_GCS_ENV_AUTH: 'true'
-        RCLONE_GCS_BUCKET_POLICY_ONLY: 'true'
-      run: |
-        rclone sync --delete-excluded --transfers 100 "${{ github.workspace }}/old_builds" ":gcs:obs-latest/${{ inputs.channel }}"
-
-    - name: Upload Build to Archive
-      if: inputs.architecture == 'x64'
-      shell: pwsh
-      env:
-        RCLONE_GCS_ENV_AUTH: 'true'
-        RCLONE_GCS_BUCKET_POLICY_ONLY: 'true'
-      run: |
-        rclone copy --transfers 100 "${{ github.workspace }}/old_builds" ":gcs:obs-builds"
