@@ -246,6 +246,20 @@ obs_data_t *obs_save_canvas(obs_canvas_t *canvas)
 	obs_data_set_bool(canvas_data, "private", canvas->context.private);
 	obs_data_set_int(canvas_data, "flags", canvas->flags);
 
+	/* Save video info in a child object. */
+	obs_data_t *video_config = obs_data_create();
+	obs_data_set_int(video_config, "base_width", canvas->ovi.base_width);
+	obs_data_set_int(video_config, "base_height", canvas->ovi.base_height);
+	obs_data_set_int(video_config, "output_width", canvas->ovi.output_width);
+	obs_data_set_int(video_config, "output_height", canvas->ovi.output_height);
+	obs_data_set_int(video_config, "output_format", canvas->ovi.output_format);
+	obs_data_set_int(video_config, "colorspace", canvas->ovi.colorspace);
+	obs_data_set_int(video_config, "range", canvas->ovi.range);
+	obs_data_set_int(video_config, "scale_type", canvas->ovi.scale_type);
+
+	obs_data_set_obj(canvas_data, "video", video_config);
+	obs_data_release(video_config);
+
 	return canvas_data;
 }
 
@@ -256,8 +270,23 @@ obs_canvas_t *obs_load_canvas(obs_data_t *data)
 	const bool private = obs_data_get_bool(data, "private");
 	uint32_t flags = (uint32_t)obs_data_get_int(data, "flags");
 
+	struct obs_video_info ovi;
+	obs_get_video_info(&ovi);
+
+	obs_data_t *video_config = obs_data_get_obj(data, "video");
+	if (video_config) {
+		ovi.base_width = (uint32_t)obs_data_get_int(video_config, "base_width");
+		ovi.base_height = (uint32_t)obs_data_get_int(video_config, "base_height");
+		ovi.output_width = (uint32_t)obs_data_get_int(video_config, "output_width");
+		ovi.output_height = (uint32_t)obs_data_get_int(video_config, "output_height");
+		ovi.output_format = (enum video_format)obs_data_get_int(video_config, "output_format");
+		ovi.colorspace = (enum video_colorspace)obs_data_get_int(video_config, "colorspace");
+		ovi.range = (enum video_range_type)obs_data_get_int(video_config, "range");
+		ovi.scale_type = (enum obs_scale_type)obs_data_get_int(video_config, "scale_type");
+	}
+
 	flags &= ~MAIN; /* Prevent user from creating a MAIN canvas. */
-	return obs_canvas_create_internal(name, uuid, NULL, flags, private);
+	return obs_canvas_create_internal(name, uuid, video_config ? &ovi : NULL, flags, private);
 }
 
 /*** Internal API ***/
