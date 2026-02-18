@@ -77,7 +77,7 @@ enum gs_color_format {
 	GS_BGRX_UNORM,
 	GS_BGRA_UNORM,
 	GS_RG16,
-	GS_AYUV,
+	GS_GBRA,
 };
 
 enum gs_color_space {
@@ -948,6 +948,7 @@ static inline uint32_t gs_get_format_bpp(enum gs_color_format format)
 	case GS_BGRX_UNORM:
 	case GS_BGRA_UNORM:
 	case GS_RG16:
+	case GS_GBRA:
 		return 32;
 	case GS_RGBA16:
 	case GS_RGBA16F:

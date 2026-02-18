@@ -106,7 +106,7 @@ static inline DXGI_FORMAT ConvertGSTextureFormatResource(gs_color_format format)
 		return DXGI_FORMAT_B8G8R8A8_UNORM;
 	case GS_RG16:
 		return DXGI_FORMAT_R16G16_UNORM;
-	case GS_AYUV:
+	case GS_GBRA:
 		return DXGI_FORMAT_AYUV;
 	}
 
@@ -116,9 +116,8 @@ static inline DXGI_FORMAT ConvertGSTextureFormatResource(gs_color_format format)
 static inline DXGI_FORMAT ConvertGSTextureFormatView(gs_color_format format)
 {
 	switch (format) {
-	case GS_AYUV:
-		return DXGI_FORMAT_R8G8B8A8_UNORM;
 	case GS_RGBA:
+	case GS_GBRA:
 		return DXGI_FORMAT_R8G8B8A8_UNORM;
 	case GS_BGRX:
 		return DXGI_FORMAT_B8G8R8X8_UNORM;
@@ -132,14 +131,14 @@ static inline DXGI_FORMAT ConvertGSTextureFormatView(gs_color_format format)
 static inline DXGI_FORMAT ConvertGSTextureFormatViewLinear(gs_color_format format)
 {
 	switch (format) {
-	case GS_AYUV:
-		return DXGI_FORMAT_R8G8B8A8_UNORM;
 	case GS_RGBA:
 		return DXGI_FORMAT_R8G8B8A8_UNORM_SRGB;
 	case GS_BGRX:
 		return DXGI_FORMAT_B8G8R8X8_UNORM_SRGB;
 	case GS_BGRA:
 		return DXGI_FORMAT_B8G8R8A8_UNORM_SRGB;
+	case GS_GBRA:
+		return DXGI_FORMAT_R8G8B8A8_UNORM;
 	default:
 		return ConvertGSTextureFormatResource(format);
 	}
@@ -966,6 +965,7 @@ struct gs_device {
 	uint32_t adpIdx = 0;
 	bool nv12Supported = false;
 	bool p010Supported = false;
+	bool gbraSupported = false;
 	bool fastClearSupported = false;
 
 	gs_texture_2d *curRenderTarget = nullptr;

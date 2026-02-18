@@ -665,6 +665,8 @@ void gs_device::InitDevice(uint32_t adapterIdx)
 
 	nv12Supported = CheckFormat(device, DXGI_FORMAT_NV12) && !HasBadNV12Output();
 	p010Supported = nv12Supported && CheckFormat(device, DXGI_FORMAT_P010);
+	// Supported from Windows 8.1 onwards, but checking just to make sure
+	gbraSupported = CheckFormat(device, DXGI_FORMAT_AYUV);
 
 	fastClearSupported = FastClearSupported(desc.VendorId, driverVersion);
 }
