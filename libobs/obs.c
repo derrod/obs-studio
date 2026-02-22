@@ -297,6 +297,12 @@ static bool obs_init_gpu_conversion(struct obs_core_video_mix *video)
 		if (!video->convert_textures[0] || !video->convert_textures[1])
 			success = false;
 		break;
+	case VIDEO_FORMAT_R10L:
+		video->convert_textures[0] =
+			gs_texture_create(info->width, info->height, GS_R10G10B10A2, 1, NULL, GS_RENDER_TARGET);
+		if (!video->convert_textures[0])
+			success = false;
+		break;
 	default:
 		break;
 	}
@@ -384,6 +390,11 @@ static bool obs_init_gpu_copy_surfaces(struct obs_core_video_mix *video, size_t 
 			return false;
 		video->copy_surfaces[i][1] = gs_stagesurface_create(info->width, info->height, GS_RG16);
 		if (!video->copy_surfaces[i][1])
+			return false;
+		break;
+	case VIDEO_FORMAT_R10L:
+		video->copy_surfaces[i][0] = gs_stagesurface_create(info->width, info->height, GS_R10G10B10A2);
+		if (!video->copy_surfaces[i][0])
 			return false;
 		break;
 	default:
