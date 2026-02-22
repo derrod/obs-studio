@@ -780,6 +780,7 @@ static void *obs_qsv_create(enum qsv_codec codec, obs_data_t *settings, obs_enco
 	}
 	case VIDEO_FORMAT_GBRA:
 	case VIDEO_FORMAT_AYUV:
+	case VIDEO_FORMAT_B10L:
 		if (codec != QSV_CODEC_HEVC || !useTexAlloc) {
 			const char *const text = obs_module_text("444Unsupported");
 			obs_encoder_set_last_error(encoder, text);
@@ -787,7 +788,9 @@ static void *obs_qsv_create(enum qsv_codec codec, obs_data_t *settings, obs_enco
 			bfree(obsqsv);
 			return NULL;
 		}
-		obsqsv->params.video_fmt_ayuv = true;
+		obsqsv->params.video_fmt_ayuv = voi->format != VIDEO_FORMAT_B10L;
+		obsqsv->params.video_fmt_rbg10 = voi->format == VIDEO_FORMAT_B10L;
+		obsqsv->params.video_fmt_10bit = voi->format == VIDEO_FORMAT_B10L;
 		break;
 	default:
 		switch (voi->colorspace) {
@@ -871,7 +874,8 @@ static void *obs_qsv_create_tex(enum qsv_codec codec, obs_data_t *settings, obs_
 		gpu_texture_active = gpu_texture_active || obs_encoder_video_tex_active(encoder, VIDEO_FORMAT_P010);
 	if (codec == QSV_CODEC_HEVC) {
 		gpu_texture_active = gpu_texture_active || obs_encoder_video_tex_active(encoder, VIDEO_FORMAT_GBRA) ||
-				     obs_encoder_video_tex_active(encoder, VIDEO_FORMAT_AYUV);
+				     obs_encoder_video_tex_active(encoder, VIDEO_FORMAT_AYUV) ||
+				     obs_encoder_video_tex_active(encoder, VIDEO_FORMAT_B10L);
 	}
 
 	if (!gpu_texture_active) {
@@ -1008,6 +1012,9 @@ static void obs_qsv_video_info_hevc_tex(void *data, struct video_scale_info *inf
 		return;
 	} else if (info->format == VIDEO_FORMAT_I444) {
 		info->format = VIDEO_FORMAT_AYUV;
+		return;
+	} else if (info->format == VIDEO_FORMAT_R10L || info->format == VIDEO_FORMAT_B10L) {
+		info->format = VIDEO_FORMAT_B10L;
 		return;
 	}
 #endif
