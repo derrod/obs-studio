@@ -100,6 +100,8 @@ static DXGI_FORMAT d3d11_format(const obs_encoder_t *encoder)
 	if (obs_encoder_video_tex_active(encoder, VIDEO_FORMAT_GBRA) ||
 	    obs_encoder_video_tex_active(encoder, VIDEO_FORMAT_AYUV))
 		return DXGI_FORMAT_AYUV;
+	if (obs_encoder_video_tex_active(encoder, VIDEO_FORMAT_R10L))
+		return DXGI_FORMAT_R10G10B10A2_UNORM;
 
 	return DXGI_FORMAT_UNKNOWN;
 }
@@ -113,6 +115,8 @@ static NV_ENC_BUFFER_FORMAT nvenc_format(const obs_encoder_t *encoder)
 	if (obs_encoder_video_tex_active(encoder, VIDEO_FORMAT_GBRA) ||
 	    obs_encoder_video_tex_active(encoder, VIDEO_FORMAT_AYUV))
 		return NV_ENC_BUFFER_FORMAT_AYUV;
+	if (obs_encoder_video_tex_active(encoder, VIDEO_FORMAT_R10L))
+		return NV_ENC_BUFFER_FORMAT_ABGR10;
 
 	return NV_ENC_BUFFER_FORMAT_UNDEFINED;
 }
