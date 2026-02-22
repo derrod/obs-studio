@@ -97,6 +97,9 @@ enum video_format {
 
 	/* GBRA, packed uncompressed format */
 	VIDEO_FORMAT_GBRA,
+
+	/* Like R10L, but red and blue channels are swapped */
+	VIDEO_FORMAT_B10L,
 };
 
 enum video_trc {

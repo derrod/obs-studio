@@ -155,6 +155,16 @@ static inline void calc_gpu_conversion_sizes(struct obs_core_video_mix *video)
 			video->conversion_techs[0] = "R10L_SRGB";
 		}
 		break;
+	case VIDEO_FORMAT_B10L:
+		video->conversion_needed = true;
+		if (info->colorspace == VIDEO_CS_2100_PQ) {
+			video->conversion_techs[0] = "B10L_PQ";
+		} else if (info->colorspace == VIDEO_CS_2100_HLG) {
+			video->conversion_techs[0] = "B10L_HLG";
+		} else {
+			video->conversion_techs[0] = "B10L_SRGB";
+		}
+		break;
 	default:
 		break;
 	}
@@ -172,6 +182,7 @@ static bool video_format_texture_supported(const enum video_format input_format)
 		return gs_ayuv_available();
 #ifdef _WIN32
 	case VIDEO_FORMAT_R10L:
+	case VIDEO_FORMAT_B10L:
 		return true;
 #endif
 	default:
@@ -224,7 +235,8 @@ static bool obs_init_gpu_conversion(struct obs_core_video_mix *video)
 		if (!video->convert_textures_encode[0]) {
 			return false;
 		}
-	} else if (video->encoder_texture_format == VIDEO_FORMAT_R10L) {
+	} else if (video->encoder_texture_format == VIDEO_FORMAT_R10L ||
+		   video->encoder_texture_format == VIDEO_FORMAT_B10L) {
 		video->convert_textures_encode[0] = gs_texture_create(info->width, info->height, GS_R10G10B10A2, 1,
 								      NULL, GS_RENDER_TARGET | GS_SHARED_KM_TEX);
 		if (!video->convert_textures_encode[0]) {
@@ -420,6 +432,7 @@ static bool obs_init_textures(struct obs_core_video_mix *video)
 	case VIDEO_FORMAT_P216:
 	case VIDEO_FORMAT_P416:
 	case VIDEO_FORMAT_R10L:
+	case VIDEO_FORMAT_B10L:
 		format = GS_RGBA16F;
 		break;
 	default:
@@ -470,6 +483,7 @@ static bool obs_init_textures(struct obs_core_video_mix *video)
 		case VIDEO_FORMAT_P216:
 		case VIDEO_FORMAT_P416:
 		case VIDEO_FORMAT_R10L:
+		case VIDEO_FORMAT_B10L:
 			space = GS_CS_SRGB_16F;
 			break;
 		default:
