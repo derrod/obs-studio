@@ -95,7 +95,9 @@ enum video_format {
 	/* packed uncompressed 10-bit format */
 	VIDEO_FORMAT_R10L,
 
-	/* GBRA, packed uncompressed format */
+	/* packed uncompressed 8-bit format. Same as BGRA but with blue and green channels swapped to allow for direct
+	 * encoding of RGB data in various codecs by using the identity matrix specified in ITU H.273 Section 8.3.
+	 * Needs to be passed into encoders as AYUV, with Y = G, U = B, V = R, and A = A. */
 	VIDEO_FORMAT_GBRA,
 };
 
