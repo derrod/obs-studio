@@ -2866,7 +2866,7 @@ bool gs_p010_available(void)
 
 bool gs_ayuv_available(void)
 {
-	if (!gs_valid("_available"))
+	if (!gs_valid("gs_ayuv_available"))
 		return false;
 
 	if (!thread_graphics->exports.device_ayuv_available)
