@@ -99,6 +99,16 @@ enum video_format {
 	 * encoding of RGB data in various codecs by using the identity matrix specified in ITU H.273 Section 8.3.
 	 * Needs to be passed into encoders as AYUV, with Y = G, U = B, V = R, and A = A. */
 	VIDEO_FORMAT_GBRA,
+
+	/* planar 4:4:4 format, 10 bpp, three planes */
+	VIDEO_FORMAT_I410,
+
+	/* packed 4:4:4 format, 10 bpp */
+	VIDEO_FORMAT_Y410,
+
+	/* uncompressed 10-bit formats. Variants of I410/Y410 with the same purpose as GBRA, but for 10-bit encoding. */
+	VIDEO_FORMAT_GBRP10, /* Planar like I410 (used by NVENC) */
+	VIDEO_FORMAT_GBR10,  /* Packed like Y410 (used by QSV) */
 };
 
 enum video_trc {
@@ -165,6 +175,8 @@ static inline bool format_is_yuv(enum video_format format)
 	case VIDEO_FORMAT_P216:
 	case VIDEO_FORMAT_P416:
 	case VIDEO_FORMAT_V210:
+	case VIDEO_FORMAT_Y410:
+	case VIDEO_FORMAT_I410:
 		return true;
 	case VIDEO_FORMAT_NONE:
 	case VIDEO_FORMAT_RGBA:
@@ -174,6 +186,8 @@ static inline bool format_is_yuv(enum video_format format)
 	case VIDEO_FORMAT_BGR3:
 	case VIDEO_FORMAT_R10L:
 	case VIDEO_FORMAT_GBRA:
+	case VIDEO_FORMAT_GBR10:
+	case VIDEO_FORMAT_GBRP10:
 		return false;
 	}
 
@@ -235,6 +249,14 @@ static inline const char *get_video_format_name(enum video_format format)
 		return "R10l";
 	case VIDEO_FORMAT_GBRA:
 		return "GBRA";
+	case VIDEO_FORMAT_I410:
+		return "I410";
+	case VIDEO_FORMAT_Y410:
+		return "Y410";
+	case VIDEO_FORMAT_GBR10:
+		return "GBR10";
+	case VIDEO_FORMAT_GBRP10:
+		return "GBRP10";
 	case VIDEO_FORMAT_NONE:;
 	}
 

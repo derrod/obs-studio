@@ -670,6 +670,7 @@ void gs_device::InitDevice(uint32_t adapterIdx)
 	nv12Supported = CheckFormat(device, DXGI_FORMAT_NV12) && !HasBadNV12Output();
 	p010Supported = nv12Supported && CheckFormat(device, DXGI_FORMAT_P010);
 	ayuvSupported = CheckFormat(device, DXGI_FORMAT_AYUV);
+	y410Supported = CheckFormat(device, DXGI_FORMAT_Y410);
 
 	fastClearSupported = FastClearSupported(desc.VendorId, driverVersion);
 }
@@ -2981,6 +2982,11 @@ extern "C" EXPORT bool device_p010_available(gs_device_t *device)
 extern "C" EXPORT bool device_ayuv_available(gs_device_t *device)
 {
 	return device->ayuvSupported;
+}
+
+extern "C" EXPORT bool device_y410_available(gs_device_t *device)
+{
+	return device->y410Supported;
 }
 
 extern "C" EXPORT bool device_is_monitor_hdr(gs_device_t *device, void *monitor)

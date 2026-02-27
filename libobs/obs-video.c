@@ -741,7 +741,20 @@ static void set_gpu_converted_data(struct video_frame *output, const struct vide
 
 		break;
 	}
+	case VIDEO_FORMAT_I410:
+	case VIDEO_FORMAT_GBRP10: {
+		const uint32_t width_x2 = info->width * 2;
+		const uint32_t height = info->height;
+		const uint32_t linesize = input->linesize[0];
+		const uint8_t *const in_y = input->data[0];
 
+		const uint8_t *const in_u =
+			set_gpu_converted_plane(width_x2, height, linesize, output->linesize[0], in_y, output->data[0]);
+		const uint8_t *const in_v =
+			set_gpu_converted_plane(width_x2, height, linesize, output->linesize[1], in_u, output->data[1]);
+		set_gpu_converted_plane(width_x2, height, linesize, output->linesize[2], in_v, output->data[2]);
+		break;
+	}
 	case VIDEO_FORMAT_NONE:
 	case VIDEO_FORMAT_YVYU:
 	case VIDEO_FORMAT_YUY2:
@@ -760,8 +773,9 @@ static void set_gpu_converted_data(struct video_frame *output, const struct vide
 	case VIDEO_FORMAT_YA2L:
 	case VIDEO_FORMAT_AYUV:
 	case VIDEO_FORMAT_V210:
-	case VIDEO_FORMAT_R10L:
 	case VIDEO_FORMAT_GBRA:
+	case VIDEO_FORMAT_Y410:
+	case VIDEO_FORMAT_GBR10:
 		/* unimplemented */
 		;
 	}
